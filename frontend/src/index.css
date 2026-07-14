@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f4f9fc; /* Đồng bộ với màu nền xanh nhạt của website dymmedicalcenter.com.vn */
+  color: #0d1227; /* Màu chữ tối đặc trưng */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Các tùy chỉnh phong cách y tế dựa trên tông màu của DYM */
+.medical-card {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 196, 232, 0.18); /* Sử dụng viền xanh dương sáng #63c4e8 */
+  box-shadow: 0 10px 30px -5px rgba(17, 24, 51, 0.04), 0 8px 12px -6px rgba(17, 24, 51, 0.02);
+}
+
+.medical-gradient {
+  background: linear-gradient(135deg, #111833 0%, #63c4e8 100%); /* Gradient từ navy sang sky blue */
+}
+
+.pulse-soft {
+  animation: pulse-animation 2s infinite;
+}
+
+@keyframes pulse-animation {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 196, 232, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(99, 196, 232, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 196, 232, 0);
+  }
+}
+
+/* Loading Overlay đồng bộ 100% với website dymmedicalcenter.com.vn */
+.page-loader {
+  background: #ffffff;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.page-loader-logo {
+  width: 180px;
+  height: auto;
+}
+
+.page-loader-dots {
+  width: 86px;
+  aspect-ratio: 3;
+  --_g: no-repeat radial-gradient(circle closest-side, #63c4e8 90%, #0000);
+  background: 
+    var(--_g) 0% 100%,
+    var(--_g) 50% 100%,
+    var(--_g) 100% 100%;
+  background-size: calc(100%/3) 50%;
+  animation: l3 1.5s infinite linear;
+}
+
+@keyframes l3 {
+  0%, 100% {
+    background-position: 0% 100%, 50% 100%, 100% 100%;
+  }
+  16.67% {
+    background-position: 0% 0%, 50% 100%, 100% 100%;
+  }
+  33.33% {
+    background-position: 0% 100%, 50% 100%, 100% 100%;
+  }
+  50% {
+    background-position: 0% 100%, 50% 0%, 100% 100%;
+  }
+  66.67% {
+    background-position: 0% 100%, 50% 100%, 100% 100%;
+  }
+  83.33% {
+    background-position: 0% 100%, 50% 100%, 100% 0%;
+  }
+}
+

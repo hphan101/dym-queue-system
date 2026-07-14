@@ -1,0 +1,117 @@
+// Hàm chính xử lý request POST gửi từ Frontend React
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); // Giảm thời gian chờ lock xuống tối đa 10s để phản hồi nhanh hơn nếu quá tải
+  } catch (error) {
+    return createJsonResponse({ success: false, error: "Hệ thống đang bận. Vui lòng thử lại!" });
+  }
+
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      throw new Error("Không nhận được dữ liệu");
+    }
+    
+    // Parse dữ liệu JSON nhận được
+    var data = JSON.parse(e.postData.contents);
+    var fullName = (data.fullName || "").trim();
+    var phoneNumber = (data.phoneNumber || "").trim();
+    var birthDate = (data.birthDate || "").trim();
+    var gender = (data.gender || "").trim();
+    var service = (data.service || "").trim();
+    var branch = (data.branch || "").trim();
+    
+    // Kiểm tra dữ liệu bắt buộc
+    if (!fullName || !phoneNumber || !birthDate || !gender || !service || !branch) {
+      throw new Error("Vui lòng điền đầy đủ các thông tin!");
+    }
+    
+    // Lấy sheet hoạt động
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getActiveSheet();
+    var lastRow = sheet.getLastRow(); // Gọi 1 lần duy nhất để tối ưu tốc độ đọc ghi
+    
+    // Tạo dòng tiêu đề nếu sheet hoàn toàn trống (lastRow == 0)
+    if (lastRow === 0) {
+      setupHeader(sheet);
+      lastRow = 1; // Sau khi tạo dòng tiêu đề, dòng cuối cùng hiện tại là dòng 1
+    }
+    
+    var vnTimeZone = "Asia/Ho_Chi_Minh";
+    var now = new Date();
+    var formattedSubmitTime = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy HH:mm:ss");
+    var todayDateString = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy");
+    
+    // Sinh số thứ tự mới tự động với tham số lastRow đã tối ưu
+    var queueNumber = generateQueueNumber(sheet, lastRow, todayDateString);
+    
+    // Lưu thông tin vào Sheet, dùng dấu nháy đơn (') để ép định dạng chữ (tránh mất số 0 ở đầu)
+    sheet.appendRow([
+      "'" + queueNumber,
+      formattedSubmitTime,
+      fullName,
+      "'" + phoneNumber,
+      birthDate,
+      gender,
+      service,
+      branch,
+      "Chờ khám"
+    ]);
+    
+    lock.releaseLock(); // Giải phóng lock
+    return createJsonResponse({ success: true, queueNumber: queueNumber });
+    
+  } catch (err) {
+    if (lock.hasLock()) {
+      lock.releaseLock();
+    }
+    return createJsonResponse({ success: false, error: err.message || "Lỗi hệ thống" });
+  }
+}
+
+// Tạo dòng tiêu đề cho Google Sheet nếu chưa có dữ liệu
+function setupHeader(sheet) {
+  var headers = ["Số thứ tự", "Thời gian submit", "Họ tên", "Số điện thoại", "Ngày sinh", "Giới tính", "Dịch vụ đăng ký", "Chi nhánh", "Trạng thái xử lý"];
+  sheet.appendRow(headers);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+}
+
+// Hàm sinh số thứ tự, reset về 0001 mỗi ngày (Đã tối ưu hóa giảm tối đa lệnh gọi API Spreadsheet)
+function generateQueueNumber(sheet, lastRow, todayStr) {
+  if (lastRow <= 1) {
+    return "0001";
+  }
+  
+  // Đọc đồng thời 2 ô (cột 1 và cột 2) của dòng cuối cùng trong 1 lệnh gọi duy nhất (tiết kiệm ~300ms)
+  var lastRowValues = sheet.getRange(lastRow, 1, 1, 2).getDisplayValues()[0];
+  var lastQueueNumVal = lastRowValues[0];
+  var lastSubmitTimeVal = lastRowValues[1];
+  
+  var lastDateStr = lastSubmitTimeVal ? lastSubmitTimeVal.split(" ")[0] : "";
+  
+  // Nếu trùng ngày thì cộng thêm 1, ngược lại reset về 0001
+  if (lastDateStr === todayStr) {
+    var lastNum = parseInt(lastQueueNumVal, 10);
+    var nextNum = (isNaN(lastNum) ? 0 : lastNum) + 1;
+    return padZero(nextNum, 4);
+  } else {
+    return "0001";
+  }
+}
+
+// Thêm các số 0 ở trước (ví dụ: 5 -> 0005)
+function padZero(num, size) {
+  var s = num + "";
+  while (s.length < size) s = "0" + s;
+  return s;
+}
+
+// Trả về JSON đúng chuẩn để Frontend nhận được dữ liệu
+function createJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Kiểm tra phiên bản đang chạy bằng cách mở link Web App trên trình duyệt
+function doGet(e) {
+  return ContentService.createTextOutput("DYM Queue System Backend - Phiên bản 3.0 (Đã tối ưu hóa tốc độ)");
+}
