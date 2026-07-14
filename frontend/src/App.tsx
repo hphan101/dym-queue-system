@@ -98,7 +98,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f9fc] flex flex-col justify-between py-6">
+    <div className="min-h-screen bg-[#f4f9fc] flex flex-col justify-between pt-6">
       {/* Full-screen Loading Overlay đồng bộ 100% với website dymmedicalcenter.com.vn */}
       {isLoading && (
         <div className="page-loader animate-fade-in">
