@@ -180,7 +180,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             type="date"
             {...register("birthDate")}
             disabled={isLoading}
-            className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-900 focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full min-w-0 px-3 sm:px-4 py-2.5 bg-white border rounded-lg text-slate-900 text-left min-h-[46px] appearance-none focus:outline-none focus:ring-2 transition-all ${
               errors.birthDate
                 ? "border-red-500 focus:ring-red-200"
                 : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"

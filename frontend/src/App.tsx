@@ -139,7 +139,7 @@ function App() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8 medical-card">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-8 medical-card">
           {/* Tiêu đề phụ */}
           {step === 'form' && (
             <div className="mb-6 text-center">
