@@ -38,7 +38,7 @@ export const translations = {
     
     // Màn hình thành công
     successTitle: 'Đăng ký thành công!',
-    successThanks: 'DYM Medical Center chân thành cảm ơn quý khách.',
+    successThanks: 'DYM chân thành cảm ơn quý khách.',
     queueLabel: 'Số Thứ Tự Của Quý Khách',
     successNote: 'Vui lòng chụp màn hình hoặc lưu lại số thứ tự này để xuất trình tại quầy lễ tân.',
     btnNewTurn: 'Đăng ký lượt mới',
@@ -87,7 +87,7 @@ export const translations = {
     
     // Success View
     successTitle: 'Registration Successful!',
-    successThanks: 'DYM Medical Center sincerely thanks you.',
+    successThanks: 'DYM sincerely thanks you.',
     queueLabel: 'Your Queue Number',
     successNote: 'Please take a screenshot or save this queue number to present at the clinic reception.',
     btnNewTurn: 'Register New Turn',
