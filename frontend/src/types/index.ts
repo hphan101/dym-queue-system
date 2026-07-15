@@ -3,6 +3,11 @@ export interface RegistrationData {
   phoneNumber: string;
   birthDate: string;
   gender: 'Nam' | 'Nữ';
+  cccd: string;
+  province: string;
+  ward: string;
+  addressDetail: string;
+  companyName: string;
   service: string;
   branch: string;
 }

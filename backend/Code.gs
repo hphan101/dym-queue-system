@@ -18,12 +18,17 @@ function doPost(e) {
     var phoneNumber = (data.phoneNumber || "").trim();
     var birthDate = (data.birthDate || "").trim();
     var gender = (data.gender || "").trim();
+    var cccd = (data.cccd || "").trim();
+    var companyName = (data.companyName || "").trim();
+    var province = (data.province || "").trim();
+    var ward = (data.ward || "").trim();
+    var addressDetail = (data.addressDetail || "").trim();
     var service = (data.service || "").trim();
     var branch = (data.branch || "").trim();
     
-    // Kiểm tra dữ liệu bắt buộc
-    if (!fullName || !phoneNumber || !birthDate || !gender || !service || !branch) {
-      throw new Error("Vui lòng điền đầy đủ các thông tin!");
+    // Kiểm tra dữ liệu bắt buộc (ngoại trừ tên công ty là tự chọn)
+    if (!fullName || !phoneNumber || !birthDate || !gender || !cccd || !province || !ward || !addressDetail) {
+      throw new Error("Vui lòng điền đầy đủ các thông tin bắt buộc!");
     }
     
     // Lấy sheet hoạt động
@@ -53,8 +58,11 @@ function doPost(e) {
       "'" + phoneNumber,
       birthDate,
       gender,
-      service,
-      branch,
+      "'" + cccd,
+      companyName,
+      province,
+      ward,
+      addressDetail,
       "Chờ khám"
     ]);
     
@@ -71,7 +79,20 @@ function doPost(e) {
 
 // Tạo dòng tiêu đề cho Google Sheet nếu chưa có dữ liệu
 function setupHeader(sheet) {
-  var headers = ["Số thứ tự", "Thời gian submit", "Họ tên", "Số điện thoại", "Ngày sinh", "Giới tính", "Dịch vụ đăng ký", "Chi nhánh", "Trạng thái xử lý"];
+  var headers = [
+    "Số thứ tự", 
+    "Thời gian submit", 
+    "Họ tên", 
+    "Số điện thoại", 
+    "Ngày sinh", 
+    "Giới tính", 
+    "CCCD", 
+    "Tên công ty", 
+    "Tỉnh/Thành phố", 
+    "Phường/Xã", 
+    "Địa chỉ chi tiết", 
+    "Trạng thái xử lý"
+  ];
   sheet.appendRow(headers);
   sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
 }

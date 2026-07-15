@@ -179,7 +179,6 @@ function App() {
         </div>
       </main>
 
-      {/* Footer liên hệ đồng bộ 100% với website dymmedicalcenter.com.vn (Responsive) */}
       <footer className="bg-[#111833] text-slate-300 py-10 text-xs border-t border-slate-800/80">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">

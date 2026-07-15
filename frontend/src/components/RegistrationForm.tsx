@@ -7,53 +7,44 @@ import {
   Phone,
   Calendar,
   Heart,
-  Award,
   MapPin,
   Loader2,
+  CreditCard,
+  Building,
+  Home,
 } from "lucide-react";
 import type { RegistrationData } from "../types";
 import { translations } from "../translations";
 
-// Danh sách Chi nhánh DYM
-export const BRANCHES = [
-  "DYM Medical Center Lê Duẩn (Quận 1, TP. HCM)",
-  "DYM Medical Center Phú Mỹ Hưng (Quận 7, TP. HCM)",
-  "DYM Medical Center Cầu Giấy (Hà Nội)",
-];
+import provincesData from "../assets/province.json";
+import wardsData from "../assets/ward.json";
 
-// Danh sách Gói khám/Dịch vụ
-export const SERVICES = ["Khám sức khỏe công ty", "Khám Work Permit"];
+interface Province {
+  name: string;
+  slug: string;
+  type: string;
+  name_with_type: string;
+  code: string;
+}
 
-// Bản dịch nhãn chi nhánh hiển thị trong giao diện
-export const BRANCH_TRANSLATIONS: Record<string, { vi: string; en: string }> = {
-  "DYM Medical Center Lê Duẩn (Quận 1, TP. HCM)": {
-    vi: "DYM Medical Center Lê Duẩn (Quận 1, TP. HCM)",
-    en: "DYM Medical Center Le Duan (District 1, HCMC)",
-  },
-  "DYM Medical Center Phú Mỹ Hưng (Quận 7, TP. HCM)": {
-    vi: "DYM Medical Center Phú Mỹ Hưng (Quận 7, TP. HCM)",
-    en: "DYM Medical Center Phu My Hung (District 7, HCMC)",
-  },
-  "DYM Medical Center Cầu Giấy (Hà Nội)": {
-    vi: "DYM Medical Center Cầu Giấy (Hà Nội)",
-    en: "DYM Medical Center Cau Giay (Ha Noi)",
-  },
-};
+interface Ward {
+  name: string;
+  type: string;
+  slug: string;
+  name_with_type: string;
+  path: string;
+  path_with_type: string;
+  code: string;
+  parent_code: string;
+}
 
-// Bản dịch nhãn gói khám hiển thị trong giao diện
-export const SERVICE_TRANSLATIONS: Record<string, { vi: string; en: string }> =
-  {
-    "Khám sức khỏe công ty": {
-      vi: "Khám sức khỏe công ty",
-      en: "Company Health Checkup",
-    },
-    "Khám Work Permit": {
-      vi: "Khám Work Permit",
-      en: "Work Permit Health Checkup",
-    },
-  };
+// Chuyển đối tượng JSON thành mảng và sắp xếp theo bảng chữ cái tiếng Việt
+const provinces: Province[] = Object.values(provincesData).sort((a, b) =>
+  a.name.localeCompare(b.name, "vi"),
+);
 
-// Định dạng kiểm tra số điện thoại Việt Nam (10 số, bắt đầu bằng 03, 05, 07, 08, 09)
+const wards: Ward[] = Object.values(wardsData);
+
 const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
 
 interface RegistrationFormProps {
@@ -91,8 +82,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     gender: z.enum(["Nam", "Nữ"] as const, {
       message: t.errGenderRequired,
     }),
-    service: z.string().min(1, t.errServiceRequired),
-    branch: z.string().min(1, t.errBranchRequired),
+    cccd: z
+      .string()
+      .min(1, t.errCccdRequired)
+      .transform((val) => val.trim()),
+    province: z.string().min(1, t.errProvinceRequired),
+    ward: z.string().min(1, t.errWardRequired),
+    addressDetail: z
+      .string()
+      .min(1, t.errAddressDetailRequired)
+      .transform((val) => val.trim()),
+    companyName: z.string().transform((val) => val.trim()),
   });
 
   type FormSchemaType = z.infer<typeof formSchema>;
@@ -101,6 +101,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
@@ -109,14 +111,44 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       phoneNumber: "",
       birthDate: "",
       gender: undefined,
-      service: "",
-      branch: "",
+      cccd: "",
+      province: "",
+      ward: "",
+      addressDetail: "",
+      companyName: "",
     },
   });
 
+  // Quan sát sự thay đổi của Tỉnh/Thành phố
+  const selectedProvince = watch("province");
+
+  // Reset Phường/Xã khi thay đổi Tỉnh/Thành phố
+  React.useEffect(() => {
+    setValue("ward", "");
+  }, [selectedProvince, setValue]);
+
+  // Lọc danh sách Phường/Xã tương ứng với Tỉnh/Thành phố đã chọn
+  const filteredWards = React.useMemo(() => {
+    if (!selectedProvince) return [];
+    return wards
+      .filter((w) => w.parent_code === selectedProvince)
+      .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  }, [selectedProvince]);
+
+  // Xử lý mapping code Tỉnh/Thành phố sang Tên đầy đủ trước khi gửi dữ liệu lên App.tsx
+  const handleFormSubmit = (formData: FormSchemaType) => {
+    const provinceObj = provinces.find((p) => p.code === formData.province);
+    const mappedData: RegistrationData = {
+      ...formData,
+      // Map mã code tỉnh (ví dụ '11') sang tên thật (ví dụ 'Thành phố Hà Nội')
+      province: provinceObj ? provinceObj.name_with_type : formData.province,
+    } as RegistrationData;
+    onSubmit(mappedData);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      {/* Họ tên */}
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+      {/* 1. Họ tên */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <User className="w-4 h-4 text-dym-blue-500" />
@@ -127,8 +159,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             type="text"
             {...register("fullName")}
             disabled={isLoading}
-            placeholder={lang === "vi" ? "Nguyễn Văn A" : "John Doe"}
-            className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
+            placeholder={lang === "vi" ? "Nhập họ tên" : "Enter full name"}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
               errors.fullName
                 ? "border-red-500 focus:ring-red-200"
                 : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
@@ -142,33 +174,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         )}
       </div>
 
-      {/* Số điện thoại */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
-          <Phone className="w-4 h-4 text-dym-blue-500" />
-          {t.phoneNumber} <span className="text-red-500">*</span>
-        </label>
-        <div className="relative rounded-lg shadow-sm">
-          <input
-            type="tel"
-            {...register("phoneNumber")}
-            disabled={isLoading}
-            placeholder="09xxxxxxxx"
-            className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
-              errors.phoneNumber
-                ? "border-red-500 focus:ring-red-200"
-                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
-            }`}
-          />
-        </div>
-        {errors.phoneNumber && (
-          <p className="mt-1 text-xs text-red-500 font-medium">
-            {errors.phoneNumber.message}
-          </p>
-        )}
-      </div>
-
-      {/* Ngày sinh & Giới tính */}
+      {/* 2. Ngày sinh & Giới tính */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Ngày sinh */}
         <div>
@@ -180,7 +186,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             type="date"
             {...register("birthDate")}
             disabled={isLoading}
-            className={`w-full min-w-0 px-3 sm:px-4 py-2.5 bg-white border rounded-lg text-slate-900 text-left min-h-[46px] appearance-none focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full min-w-0 px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 text-left min-h-[38px] appearance-none focus:outline-none focus:ring-2 transition-all ${
               errors.birthDate
                 ? "border-red-500 focus:ring-red-200"
                 : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
@@ -199,7 +205,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <Heart className="w-4 h-4 text-dym-blue-500" />
             {t.gender} <span className="text-red-500">*</span>
           </label>
-          <div className="w-full px-4 flex items-center gap-6 h-[46px]">
+          <div className="w-full px-3 flex items-center gap-6 h-[38px]">
             {["Nam", "Nữ"].map((g) => (
               <label
                 key={g}
@@ -224,69 +230,169 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </div>
       </div>
 
-      {/* Chi nhánh */}
+      {/* 3. CCCD */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-dym-blue-500" />
-          {t.branchLabel} <span className="text-red-500">*</span>
+          <CreditCard className="w-4 h-4 text-dym-blue-500" />
+          {t.cccd} <span className="text-red-500">*</span>
         </label>
-        <select
-          {...register("branch")}
-          disabled={isLoading}
-          className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-900 focus:outline-none focus:ring-2 transition-all ${
-            errors.branch
-              ? "border-red-500 focus:ring-red-200"
-              : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
-          }`}
-        >
-          <option value="">{t.selectBranch}</option>
-          {BRANCHES.map((b) => (
-            <option key={b} value={b}>
-              {BRANCH_TRANSLATIONS[b][lang]}
-            </option>
-          ))}
-        </select>
-        {errors.branch && (
+        <div className="relative rounded-lg shadow-sm">
+          <input
+            type="text"
+            {...register("cccd")}
+            disabled={isLoading}
+            placeholder={t.placeholderCccd}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
+              errors.cccd
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+            }`}
+          />
+        </div>
+        {errors.cccd && (
           <p className="mt-1 text-xs text-red-500 font-medium">
-            {errors.branch.message}
+            {errors.cccd.message}
           </p>
         )}
       </div>
 
-      {/* Dịch vụ/Gói khám */}
+      {/* 4. Số điện thoại */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
-          <Award className="w-4 h-4 text-dym-blue-500" />
-          {t.serviceLabel} <span className="text-red-500">*</span>
+          <Phone className="w-4 h-4 text-dym-blue-500" />
+          {t.phoneNumber} <span className="text-red-500">*</span>
         </label>
-        <select
-          {...register("service")}
-          disabled={isLoading}
-          className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-900 focus:outline-none focus:ring-2 transition-all ${
-            errors.service
-              ? "border-red-500 focus:ring-red-200"
-              : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
-          }`}
-        >
-          <option value="">{t.selectService}</option>
-          {SERVICES.map((s) => (
-            <option key={s} value={s}>
-              {SERVICE_TRANSLATIONS[s][lang]}
-            </option>
-          ))}
-        </select>
-        {errors.service && (
+        <div className="relative rounded-lg shadow-sm">
+          <input
+            type="tel"
+            {...register("phoneNumber")}
+            disabled={isLoading}
+            placeholder={
+              lang === "vi" ? "Nhập số điện thoại" : "Enter phone number"
+            }
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
+              errors.phoneNumber
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+            }`}
+          />
+        </div>
+        {errors.phoneNumber && (
           <p className="mt-1 text-xs text-red-500 font-medium">
-            {errors.service.message}
+            {errors.phoneNumber.message}
           </p>
         )}
+      </div>
+
+      {/* 5. Địa chỉ: Tỉnh/Thành phố & Phường/Xã (Lưới 2 cột) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Tỉnh / Thành phố */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
+            <Building className="w-4 h-4 text-dym-blue-500" />
+            {t.province} <span className="text-red-500">*</span>
+          </label>
+          <select
+            {...register("province")}
+            disabled={isLoading}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${
+              errors.province
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+            }`}
+          >
+            <option value="">{t.selectProvince}</option>
+            {provinces.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.name_with_type}
+              </option>
+            ))}
+          </select>
+          {errors.province && (
+            <p className="mt-1 text-xs text-red-500 font-medium">
+              {errors.province.message}
+            </p>
+          )}
+        </div>
+
+        {/* Phường / Xã */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-dym-blue-500" />
+            {t.ward} <span className="text-red-500">*</span>
+          </label>
+          <select
+            {...register("ward")}
+            disabled={isLoading || !selectedProvince}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${
+              errors.ward
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+            }`}
+          >
+            <option value="">{t.selectWard}</option>
+            {filteredWards.map((w) => (
+              <option key={w.code} value={w.name_with_type}>
+                {w.name_with_type}
+              </option>
+            ))}
+          </select>
+          {errors.ward && (
+            <p className="mt-1 text-xs text-red-500 font-medium">
+              {errors.ward.message}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Địa chỉ chi tiết */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
+          <Home className="w-4 h-4 text-dym-blue-500" />
+          {t.addressDetail} <span className="text-red-500">*</span>
+        </label>
+        <div className="relative rounded-lg shadow-sm">
+          <input
+            type="text"
+            {...register("addressDetail")}
+            disabled={isLoading}
+            placeholder={t.placeholderAddressDetail}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
+              errors.addressDetail
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+            }`}
+          />
+        </div>
+        {errors.addressDetail && (
+          <p className="mt-1 text-xs text-red-500 font-medium">
+            {errors.addressDetail.message}
+          </p>
+        )}
+      </div>
+
+      {/* 6. Tên công ty */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
+          <Building className="w-4 h-4 text-dym-blue-500" />
+          {t.companyName}
+        </label>
+        <div className="relative rounded-lg shadow-sm">
+          <input
+            type="text"
+            {...register("companyName")}
+            disabled={isLoading}
+            placeholder={t.placeholderCompany}
+            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100`}
+          />
+        </div>
       </div>
 
       {/* Nút Submit */}
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full mt-4 bg-dym-blue-500 hover:bg-dym-blue-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-dym-blue-100 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full mt-4 bg-dym-blue-500 hover:bg-dym-blue-600 text-white font-semibold py-2.5 px-4 rounded-lg text-sm shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-dym-blue-100 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isLoading ? (
           <>

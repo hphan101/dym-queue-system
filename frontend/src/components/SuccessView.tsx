@@ -1,8 +1,7 @@
 import React from 'react';
-import { CheckCircle2, Calendar, MapPin, Award, User, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Calendar, User, Phone, CreditCard, Building, Home, Heart, RefreshCw } from 'lucide-react';
 import type { RegistrationData } from '../types';
 import { translations } from '../translations';
-import { BRANCH_TRANSLATIONS, SERVICE_TRANSLATIONS } from './RegistrationForm';
 
 interface SuccessViewProps {
   queueNumber: string;
@@ -14,6 +13,9 @@ interface SuccessViewProps {
 // Component hiển thị thông tin khi khách hàng đăng ký thành công
 export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang }) => {
   const t = translations[lang];
+
+  // Ghép địa chỉ đầy đủ từ 3 ô: Địa chỉ chi tiết, Phường/Xã, Tỉnh/Thành phố
+  const fullAddress = [data.addressDetail, data.ward, data.province].filter(Boolean).join(', ');
 
   return (
     <div className="text-center space-y-6 animate-fade-in">
@@ -47,7 +49,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
           {t.summaryTitle}
         </h3>
 
-        {/* Khách hàng */}
+        {/* 1. Họ và tên */}
         <div className="flex items-start gap-2.5">
           <User className="w-4 h-4 text-slate-400 mt-0.5" />
           <div>
@@ -56,29 +58,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
           </div>
         </div>
 
-        {/* Chi nhánh */}
-        <div className="flex items-start gap-2.5">
-          <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-          <div>
-            <p className="text-xs text-slate-400">{t.branchLabel}</p>
-            <p className="font-medium text-slate-700">
-              {BRANCH_TRANSLATIONS[data.branch] ? BRANCH_TRANSLATIONS[data.branch][lang] : data.branch}
-            </p>
-          </div>
-        </div>
-
-        {/* Dịch vụ */}
-        <div className="flex items-start gap-2.5">
-          <Award className="w-4 h-4 text-slate-400 mt-0.5" />
-          <div>
-            <p className="text-xs text-slate-400">{t.serviceLabel}</p>
-            <p className="font-medium text-slate-700">
-              {SERVICE_TRANSLATIONS[data.service] ? SERVICE_TRANSLATIONS[data.service][lang] : data.service}
-            </p>
-          </div>
-        </div>
-
-        {/* Ngày sinh */}
+        {/* 2. Ngày sinh */}
         <div className="flex items-start gap-2.5">
           <Calendar className="w-4 h-4 text-slate-400 mt-0.5" />
           <div>
@@ -88,6 +68,55 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
             </p>
           </div>
         </div>
+
+        {/* 3. Giới tính */}
+        <div className="flex items-start gap-2.5">
+          <Heart className="w-4 h-4 text-slate-400 mt-0.5" />
+          <div>
+            <p className="text-xs text-slate-400">{t.gender}</p>
+            <p className="font-medium text-slate-700">
+              {data.gender === 'Nam' ? t.genderNam : t.genderNu}
+            </p>
+          </div>
+        </div>
+
+        {/* 4. Số CCCD / Hộ chiếu */}
+        <div className="flex items-start gap-2.5">
+          <CreditCard className="w-4 h-4 text-slate-400 mt-0.5" />
+          <div>
+            <p className="text-xs text-slate-400">{t.cccd}</p>
+            <p className="font-medium text-slate-700">{data.cccd}</p>
+          </div>
+        </div>
+
+        {/* 5. Số điện thoại */}
+        <div className="flex items-start gap-2.5">
+          <Phone className="w-4 h-4 text-slate-400 mt-0.5" />
+          <div>
+            <p className="text-xs text-slate-400">{t.phoneNumber}</p>
+            <p className="font-medium text-slate-700">{data.phoneNumber}</p>
+          </div>
+        </div>
+
+        {/* 6. Địa chỉ */}
+        <div className="flex items-start gap-2.5">
+          <Home className="w-4 h-4 text-slate-400 mt-0.5" />
+          <div>
+            <p className="text-xs text-slate-400">{t.address}</p>
+            <p className="font-medium text-slate-700 leading-relaxed">{fullAddress}</p>
+          </div>
+        </div>
+
+        {/* 7. Tên công ty (Chỉ hiển thị nếu người dùng có điền) */}
+        {data.companyName && (
+          <div className="flex items-start gap-2.5">
+            <Building className="w-4 h-4 text-slate-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-slate-400">{t.companyName}</p>
+              <p className="font-semibold text-dym-blue-700">{data.companyName}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hành động tiếp theo */}
