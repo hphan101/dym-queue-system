@@ -186,6 +186,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
           </label>
           <input
             type="date"
+            max={new Date().toISOString().split("T")[0]}
             {...register("birthDate")}
             disabled={isLoading}
             className={`w-full min-w-0 px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 text-left min-h-[38px] appearance-none focus:outline-none focus:ring-2 transition-all ${
@@ -207,11 +208,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <Heart className="w-4 h-4 text-dym-blue-500" />
             {t.gender} <span className="text-red-500">*</span>
           </label>
-          <div className="w-full px-3 flex items-center gap-6 h-[38px]">
+          <div className="w-full px-0 flex items-center gap-4 h-[38px]">
             {["Nam", "Nữ"].map((g) => (
               <label
                 key={g}
-                className="flex items-center gap-2 cursor-pointer text-slate-700 text-sm"
+                className="flex items-center gap-2 cursor-pointer text-slate-700 text-sm shrink-0"
               >
                 <input
                   type="radio"
