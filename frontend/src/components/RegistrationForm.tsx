@@ -1,6 +1,7 @@
 import React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SearchableSelect } from "./SearchableSelect";
 import * as z from "zod";
 import {
   User,
@@ -105,6 +106,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
@@ -136,6 +138,16 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .filter((w) => w.parent_code === selectedProvince)
       .sort((a, b) => a.name.localeCompare(b.name, "vi"));
   }, [selectedProvince]);
+
+  // Định dạng danh sách tùy chọn cho ô tìm kiếm Tỉnh/Thành phố
+  const provinceOptions = React.useMemo(() => {
+    return provinces.map((p) => ({ value: p.code, label: p.name_with_type }));
+  }, []);
+
+  // Định dạng danh sách tùy chọn cho ô tìm kiếm Phường/Xã
+  const wardOptions = React.useMemo(() => {
+    return filteredWards.map((w) => ({ value: w.name_with_type, label: w.name_with_type }));
+  }, [filteredWards]);
 
   // Xử lý mapping code Tỉnh/Thành phố sang Tên đầy đủ trước khi gửi dữ liệu lên App.tsx
   const handleFormSubmit = (formData: FormSchemaType) => {
@@ -295,22 +307,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <Building className="w-4 h-4 text-dym-blue-500" />
             {t.province} <span className="text-red-500">*</span>
           </label>
-          <select
-            {...register("province")}
-            disabled={isLoading}
-            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${
-              errors.province
-                ? "border-red-500 focus:ring-red-200"
-                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
-            }`}
-          >
-            <option value="">{t.selectProvince}</option>
-            {provinces.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name_with_type}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="province"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                options={provinceOptions}
+                value={field.value}
+                onChange={field.onChange}
+                placeholder={t.selectProvince}
+                disabled={isLoading}
+                error={!!errors.province}
+              />
+            )}
+          />
           {errors.province && (
             <p className="mt-1 text-xs text-red-500 font-medium">
               {errors.province.message}
@@ -324,22 +334,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <MapPin className="w-4 h-4 text-dym-blue-500" />
             {t.ward} <span className="text-red-500">*</span>
           </label>
-          <select
-            {...register("ward")}
-            disabled={isLoading || !selectedProvince}
-            className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 transition-all ${
-              errors.ward
-                ? "border-red-500 focus:ring-red-200"
-                : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
-            }`}
-          >
-            <option value="">{t.selectWard}</option>
-            {filteredWards.map((w) => (
-              <option key={w.code} value={w.name_with_type}>
-                {w.name_with_type}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="ward"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                options={wardOptions}
+                value={field.value}
+                onChange={field.onChange}
+                placeholder={t.selectWard}
+                disabled={isLoading || !selectedProvince}
+                error={!!errors.ward}
+              />
+            )}
+          />
           {errors.ward && (
             <p className="mt-1 text-xs text-red-500 font-medium">
               {errors.ward.message}
