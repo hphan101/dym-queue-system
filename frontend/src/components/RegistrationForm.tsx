@@ -46,6 +46,7 @@ const provinces: Province[] = Object.values(provincesData).sort((a, b) =>
 const wards: Ward[] = Object.values(wardsData);
 
 const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
+const cccdPassportRegex = /^(?:[0-9]{12}|[A-Za-z][A-Za-z0-9]{6,12})$/;
 
 interface RegistrationFormProps {
   onSubmit: (data: RegistrationData) => void;
@@ -85,7 +86,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     cccd: z
       .string()
       .min(1, t.errCccdRequired)
-      .transform((val) => val.trim()),
+      .transform((val) => val.trim())
+      .refine((val) => cccdPassportRegex.test(val), t.errCccdInvalid),
     province: z.string().min(1, t.errProvinceRequired),
     ward: z.string().min(1, t.errWardRequired),
     addressDetail: z
