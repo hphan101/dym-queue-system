@@ -1,124 +1,211 @@
-# Hướng dẫn Cài đặt & Triển khai Hệ thống QR Đăng ký Khám bệnh
+# Hệ thống QR Đăng ký Số thứ tự Khám bệnh — DYM Medical Center
 
-Hệ thống này được xây dựng dành riêng cho **DYM Medical Center** để khách hàng quét mã QR tại phòng khám và đăng ký số thứ tự khám bệnh trực tiếp bằng điện thoại di động.
+Khách hàng quét mã QR tại phòng khám, mở form trên điện thoại, điền thông tin và nhận **số thứ tự khám** (queue number) tự động theo ngày.
 
-Hệ thống gồm 2 phần:
-1. **Frontend (React + Vite + Tailwind CSS)**: Giao diện form đăng ký chạy trên điện thoại khách hàng.
-2. **Backend (Google Apps Script)**: Lưu thông tin đăng ký vào Google Sheet và tự động cấp số thứ tự (Queue Number) tăng dần theo ngày.
+## Kiến trúc
+
+| Phần | Công nghệ | Vai trò |
+|------|-----------|---------|
+| **Frontend** | React 19 + Vite + TypeScript + Tailwind CSS + React Hook Form + Zod | Form đăng ký mobile-first, song ngữ VI/EN |
+| **Backend** | Google Apps Script (`backend/Code.gs` v3.0) | Nhận POST JSON, cấp STT, ghi Google Sheet |
+| **Dữ liệu** | Google Sheet gắn với Apps Script | Không cần máy chủ riêng |
+
+```
+[Điện thoại khách] --POST JSON--> [Google Apps Script Web App] --> [Google Sheet]
+        ^
+   QR → Frontend (Vercel/Netlify/local)
+```
+
+## Trường dữ liệu (đồng bộ Form ↔ Backend ↔ Sheet)
+
+| Cột Sheet | Field JSON | Bắt buộc | Ghi chú |
+|-----------|------------|----------|---------|
+| Số thứ tự | `queueNumber` (response) | — | `0001`…, **reset mỗi ngày** (múi giờ `Asia/Ho_Chi_Minh`) |
+| Thời gian submit | — | — | Backend tự ghi `dd/MM/yyyy HH:mm:ss` |
+| Họ tên | `fullName` | Có | |
+| Số điện thoại | `phoneNumber` | Có | 10 số VN, đầu `03/05/07/08/09` |
+| Ngày sinh | `birthDate` | Có | `YYYY-MM-DD` từ `<input type="date">` |
+| Giới tính | `gender` | Có | `Nam` \| `Nữ` (luôn lưu tiếng Việt) |
+| CCCD | `cccd` | Có | 12 số CCCD **hoặc** hộ chiếu |
+| Tên công ty | `companyName` | Không | |
+| Tỉnh/Thành phố | `province` | Có | Tên đầy đủ (vd. `Thành phố Hà Nội`) |
+| Phường/Xã | `ward` | Có | Tên đầy đủ |
+| Địa chỉ chi tiết | `addressDetail` | Có | Số nhà, đường… |
+| Trạng thái xử lý | — | — | Mặc định `Chờ khám` |
+| *(không lưu Sheet)* | `honeypot` | Không | Bẫy bot: nếu có giá trị → không ghi Sheet, trả STT giả `0999` |
+
+> **Không còn** field Dịch vụ / Chi nhánh trên form hiện tại. Mọi đăng ký ghi vào **một Sheet** gắn với script đã deploy.
 
 ---
 
-## PHẦN 1: THIẾT LẬP BẢNG GOOGLE SHEET & BACKEND
+## PHẦN 1: Google Sheet & Backend (Apps Script)
 
-Vì hệ thống không sử dụng máy chủ riêng phức tạp, toàn bộ dữ liệu sẽ được lưu trực tiếp vào tài khoản Google Drive của bạn.
+### Bước 1: Tạo Google Sheet
 
-### Bước 1: Tạo Google Sheet mới
-1. Truy cập vào [Google Sheets](https://sheets.google.com) và tạo một bảng tính trống mới.
-2. Đặt tên cho Google Sheet (ví dụ: `DYM_DangKyKhamBenh_Queue`).
-3. Bạn **không cần** điền gì vào bảng tính. Khi có lượt đăng ký đầu tiên, hệ thống sẽ tự động tạo dòng tiêu đề cột:
-   `Số thứ tự | Thời gian submit | Họ tên | Số điện thoại | Ngày sinh | Giới tính | Dịch vụ đăng ký | Chi nhánh | Trạng thái xử lý`
+1. Vào [Google Sheets](https://sheets.google.com), tạo bảng trống.
+2. Đặt tên (vd. `DYM_DangKyKhamBenh_Queue`).
+3. **Không cần** tạo header tay. Lượt đăng ký đầu tiên, script sẽ ghi dòng tiêu đề:
 
-### Bước 2: Dán code vào Google Apps Script
-1. Trên thanh công cụ của Google Sheet vừa tạo, chọn **Tiện ích mở rộng** (Extensions) → **Apps Script**.
-2. Một cửa sổ viết code sẽ hiện ra. Xóa sạch mọi mã nguồn mặc định có trong đó.
-3. Mở file [Code.gs](file:///d:/FIGHT/QueueSystem/backend/Code.gs) trong thư mục dự án này, copy toàn bộ nội dung và dán vào cửa sổ Apps Script.
-4. Nhấn nút **Lưu** (biểu tượng đĩa mềm phía trên) hoặc nhấn tổ hợp phím `Ctrl + S`.
-5. Bạn có thể đổi tên dự án Apps Script này thành `DYM_Queue_Backend` ở góc trên bên trái.
+   `Số thứ tự | Thời gian submit | Họ tên | Số điện thoại | Ngày sinh | Giới tính | CCCD | Tên công ty | Tỉnh/Thành phố | Phường/Xã | Địa chỉ chi tiết | Trạng thái xử lý`
 
-### Bước 3: Deploy (Triển khai) Apps Script làm Web App
-Để React App ở điện thoại có thể gửi dữ liệu tới Google Sheet, bạn cần xuất bản (deploy) script này dưới dạng Web App:
-1. Ở góc trên bên phải màn hình Apps Script, nhấn nút **Triển khai** (Deploy) → chọn **Triển khai mới** (New deployment).
-2. Nhấn vào biểu tượng bánh răng cưa ở mục *Chọn loại* (Select type) và chọn **Ứng dụng web** (Web app).
-3. Điền các cấu hình chính xác như sau:
-   - **Mô tả (Description)**: `DYM Queue System V1`
-   - **Thực thi dưới dạng (Execute as)**: Chọn **Tôi (tài khoản email của bạn)** - *Me*.
-   - **Ai có quyền truy cập (Who has access)**: Chọn **Mọi người** - *Anyone* (đây là cấu hình bắt buộc để điện thoại khách hàng quét QR có thể gửi data lên mà không cần đăng nhập tài khoản Google).
-4. Nhấn nút **Triển khai** (Deploy).
-5. Nếu là lần đầu tiên, Google sẽ yêu cầu bạn cấp quyền truy cập (**Ủy quyền truy cập** / *Authorize access*):
-   - Nhấn chọn tài khoản Google của bạn.
-   - Nhấn vào chữ **Nâng cao** (Advanced) ở góc dưới → chọn **Đi tới DYM_Queue_Backend (không an toàn)**.
-   - Nhấn **Cho phép** (Allow).
-6. Sau khi triển khai thành công, hệ thống sẽ cung cấp cho bạn một **URL ứng dụng web** (Web app URL). Nó có dạng:
+### Bước 2: Dán code Apps Script
+
+1. Sheet → **Tiện ích mở rộng** → **Apps Script**.
+2. Xóa code mặc định, dán toàn bộ nội dung file [`backend/Code.gs`](backend/Code.gs).
+3. Lưu (`Ctrl+S`). Đặt tên project (vd. `DYM_Queue_Backend`).
+
+### Bước 3: Deploy Web App
+
+1. **Triển khai** → **Triển khai mới** → loại **Ứng dụng web**.
+2. Cấu hình:
+   - **Mô tả**: `DYM Queue System V3`
+   - **Thực thi dưới dạng**: *Tôi (Me)*
+   - **Ai có quyền truy cập**: *Mọi người (Anyone)* — bắt buộc để khách không cần đăng nhập Google.
+3. **Triển khai** → ủy quyền lần đầu (Advanced → Đi tới … → Allow).
+4. Copy **Web app URL** dạng:
+
    `https://script.google.com/macros/s/AKfycb.../exec`
-7. Hãy **sao chép (Copy) URL này** lại để chuẩn bị dán vào cấu hình Frontend ở bước sau.
+
+5. Kiểm tra nhanh: mở URL trên trình duyệt → phải thấy text  
+   `DYM Queue System Backend - Phiên bản 3.0 (Đã tối ưu hóa tốc độ)`  
+   (endpoint `doGet`).
+
+> Mỗi lần sửa `Code.gs`, cần **Triển khai** → **Quản lý triển khai** → chỉnh phiên bản → **Phiên bản mới**, nếu không frontend vẫn gọi bản cũ.
 
 ---
 
-## PHẦN 2: THIẾT LẬP FRONTEND (REACT APP)
+## PHẦN 2: Frontend (React)
 
-### Bước 1: Cấu hình biến môi trường
-1. Tìm file [.env](file:///d:/FIGHT/QueueSystem/frontend/.env) trong thư mục `frontend/`.
-2. Dán URL ứng dụng web đã copy ở Bước 3 phía trên vào sau dấu `=`, ví dụ:
-   ```env
-   VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxx/exec
-   ```
-3. Lưu file lại.
+### Bước 1: Biến môi trường
 
-### Bước 2: Chạy thử ở máy tính cá nhân (Local)
-Yêu cầu máy tính của bạn đã cài đặt [Node.js](https://nodejs.org/).
-1. Mở Terminal/PowerShell tại thư mục `frontend/`.
-2. Chạy lệnh cài đặt các thư viện (nếu chưa chạy trước đó):
-   ```bash
-   npm install
-   ```
-3. Chạy ứng dụng ở chế độ thử nghiệm:
-   ```bash
-   npm run dev
-   ```
-4. Click vào liên kết hiển thị trên màn hình (thường là `http://localhost:5173`) để mở trang web đăng ký trên trình duyệt. Thử điền form và gửi để kiểm tra xem Google Sheet đã nhận dữ liệu và sinh số thứ tự chưa.
+Trong thư mục `frontend/`, tạo/sửa file `.env` (đã có trong `.gitignore`):
 
----
+```env
+VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxx/exec
+```
 
-## PHẦN 3: ĐƯA WEBSITE LÊN INTERNET & TẠO MÃ QR
+### Bước 2: Chạy local
 
-Để khách hàng có thể quét mã QR bằng điện thoại của họ, website phải được đưa lên Internet (Deploy Online). Dưới đây là cách làm miễn phí, cực kỳ đơn giản và nhanh gọn qua **Vercel** hoặc **Netlify**.
+Yêu cầu [Node.js](https://nodejs.org/) (khuyến nghị 20+).
 
-### Cách 1: Deploy bằng Vercel (Khuyên dùng - Cực kỳ nhanh)
-1. Truy cập vào trang web [Vercel](https://vercel.com) và đăng ký/đăng nhập bằng tài khoản Github hoặc Email.
-2. Cài đặt công cụ Vercel trên máy tính của bạn bằng cách chạy lệnh sau tại thư mục `frontend/`:
-   ```bash
-   npm install -g vercel
-   ```
-3. Chạy lệnh deploy:
-   ```bash
-   vercel
-   ```
-4. Công cụ sẽ hỏi bạn một số câu hỏi thiết lập ban đầu (chỉ cần bấm Enter để chọn mặc định):
-   - *Set up and deploy?* → Nhấn `y` rồi Enter.
-   - *Which scope?* → Nhấn Enter.
-   - *Link to existing project?* → Nhấn `n` rồi Enter.
-   - *What's your project's name?* → Nhập `dym-queue-system` rồi Enter.
-   - *In which directory?* → Nhấn Enter (để chọn `./`).
-   - *Want to modify settings?* → Nhấn `n` rồi Enter.
-5. Vercel sẽ tự động tải dự án lên và build. Khi hoàn thành, bạn sẽ nhận được một đường link Production dạng: `https://dym-queue-system.vercel.app`.
-6. **Lưu ý quan trọng**: Bạn cần thêm Biến môi trường lên Vercel. 
-   - Truy cập vào Dashboard dự án trên trang vercel.com.
-   - Chọn tab **Settings** → **Environment Variables**.
-   - Thêm Key: `VITE_APPS_SCRIPT_URL`, Value: *[Đường dẫn URL Google Apps Script của bạn]*.
-   - Tiến hành Redeploy lại dự án để nhận biến môi trường mới.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-### Cách 2: Deploy thủ công bằng Netlify (Kéo thả không cần gõ lệnh)
-Nếu bạn không muốn cài đặt dòng lệnh, bạn có thể tự build file trên máy và kéo thả:
-1. Mở Terminal tại thư mục `frontend/` và chạy lệnh build dự án:
-   ```bash
-   npm run build
-   ```
-2. Sau khi chạy xong, trong thư mục `frontend/` sẽ xuất hiện thêm một thư mục tên là `dist`. Đây là thư mục chứa toàn bộ trang web đã được đóng gói tối ưu.
-3. Truy cập vào trang web [Netlify Drop](https://app.netlify.com/drop).
-4. Kéo thư mục `dist` từ máy tính thả vào khung tải lên của Netlify.
-5. Trong vòng 10 giây, Netlify sẽ tạo cho bạn một đường link website hoạt động online (ví dụ: `https://xxx-xxxx-xxxx.netlify.app`).
-6. Để thêm cấu hình biến môi trường trên Netlify:
-   - Vào **Site settings** → **Environment variables** → **Add a variable**.
-   - Thêm Key: `VITE_APPS_SCRIPT_URL`, Value: *[Đường dẫn URL Google Apps Script]* và lưu lại.
-   - Thực hiện Trigger deploy lại trang web.
+Mở link Vite in ra (thường `http://localhost:5173`), điền form thử, kiểm tra Google Sheet có dòng mới + STT tăng dần.
+
+Script hữu ích:
+
+```bash
+npm run build    # production build (tsc + vite)
+npm run preview  # xem bản build
+npm run lint     # oxlint
+```
+
+### Tính năng frontend đáng chú ý
+
+- Song ngữ **Tiếng Việt / English** (lưu `localStorage`)
+- Dropdown Tỉnh/Phường **có tìm kiếm, không dấu** (`province.json` / `ward.json` — đơn vị hành chính mới)
+- Honeypot chống bot + cooldown **10 phút** trước khi “Đăng ký lượt mới” (cùng thiết bị)
+- Giữ màn success khi reload (localStorage)
+- Full-screen loader theo brand DYM
 
 ---
 
-## PHẦN 4: TẠO MÃ QR CODE CHO PHÒNG KHÁM
+## PHẦN 3: Deploy online & QR
 
-Sau khi đã có link website chạy online (từ Vercel hoặc Netlify):
-1. Truy cập vào các trang tạo mã QR miễn phí như: [me-qr.com](https://me-qr.com), [qr-code-generator.com](https://www.qr-code-generator.com) hoặc [qrgene.com](https://qrgene.com).
-2. Dán link website của bạn vào (ví dụ: `https://dym-queue-system.vercel.app`).
-3. Bạn có thể tùy chỉnh mã QR: thêm logo DYM ở giữa, chọn màu xanh y tế chủ đạo để tăng độ tin cậy và thẩm mỹ thương hiệu.
-4. Tải file ảnh QR Code về máy tính dưới định dạng PNG hoặc SVG có chất lượng cao.
-5. In ảnh QR Code này ra decal hoặc thiết kế trên standee đặt tại quầy tiếp đón của DYM Medical Center kèm theo dòng hướng dẫn: **"Quét mã QR để đăng ký thứ tự khám bệnh nhanh chóng"**.
+### Cách 1: Vercel (khuyên dùng)
+
+```bash
+cd frontend
+npm install -g vercel
+vercel
+```
+
+Thêm Environment Variable trên dashboard:
+
+- Key: `VITE_APPS_SCRIPT_URL`
+- Value: URL Apps Script Web App
+
+**Redeploy** sau khi thêm biến (Vite nhúng env lúc **build**).
+
+### Cách 2: Netlify Drop
+
+```bash
+cd frontend
+# PowerShell / bash: export env trước khi build nếu cần
+npm run build
+```
+
+Kéo thả thư mục `frontend/dist` lên [Netlify Drop](https://app.netlify.com/drop).  
+Với Netlify project đầy đủ: set env `VITE_APPS_SCRIPT_URL` rồi rebuild (không chỉ kéo `dist` đã build thiếu env).
+
+### Tạo mã QR
+
+1. Lấy URL production (vd. `https://dym-queue-system.vercel.app`).
+2. Tạo QR tại me-qr.com / qr-code-generator.com / tương đương.
+3. In decal/standee: *“Quét mã QR để đăng ký thứ tự khám bệnh nhanh chóng”*.
+
+---
+
+## Bảo mật & vận hành (tóm tắt)
+
+| Cơ chế | Nơi | Ghi chú |
+|--------|-----|---------|
+| Honeypot | FE + BE | Bot điền field ẩn → STT giả `0999`, không ghi Sheet |
+| Sanitize formula injection | BE | Prefix `'` nếu giá trị bắt đầu `= + - @` |
+| LockService | BE | Tránh trùng STT khi nhiều người submit cùng lúc |
+| Cooldown 10 phút | FE only | Chỉ chặn cùng trình duyệt/thiết bị; clear storage vẫn đăng ký lại |
+| Web App “Anyone” | GAS | URL Web App coi như secret nhẹ — không public post lung tung nếu không cần |
+
+**Hạn chế hiện tại (cần biết khi vận hành):**
+
+1. **Không chọn chi nhánh / dịch vụ** trên form — 3 cơ sở DYM dùng chung một hàng đợi Sheet nếu dùng 1 deploy.
+2. Cooldown & chống spam **không** server-side theo SĐT/CCCD.
+3. `fetch` tới Apps Script đôi khi gặp CORS/redirect tùy mạng/browser — nếu submit fail trên mobile thật, cần test kỹ production URL.
+4. Bundle frontend ~1MB (chủ yếu JSON địa giới) — lần tải đầu trên 3G có thể chậm; có thể code-split sau.
+
+---
+
+## Cấu trúc thư mục
+
+```
+QueueSystem/
+├── README.md                 ← file này
+├── .gitignore
+├── backend/
+│   └── Code.gs               ← Google Apps Script (doPost / doGet)
+└── frontend/
+    ├── .env                  ← VITE_APPS_SCRIPT_URL (không commit)
+    ├── package.json
+    ├── vite.config.ts
+    └── src/
+        ├── App.tsx
+        ├── translations.ts
+        ├── types/index.ts
+        ├── assets/           ← logo + province.json + ward.json
+        └── components/
+            ├── RegistrationForm.tsx
+            ├── SearchableSelect.tsx
+            └── SuccessView.tsx
+```
+
+## API Backend (Apps Script)
+
+**POST** body JSON (các field như bảng trên).
+
+**Response thành công:**
+
+```json
+{ "success": true, "queueNumber": "0007" }
+```
+
+**Response lỗi:**
+
+```json
+{ "success": false, "error": "Vui lòng điền đầy đủ các thông tin bắt buộc!" }
+```
+
+**GET** Web App URL: health-check text (không JSON).

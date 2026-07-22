@@ -8,8 +8,8 @@ export interface RegistrationData {
   ward: string;
   addressDetail: string;
   companyName: string;
-  service: string;
-  branch: string;
+  /** Hidden anti-spam field; bots that fill it are rejected/faked */
+  honeypot?: string;
 }
 
 export interface RegistrationResponse {

@@ -14,6 +14,35 @@ interface SuccessViewProps {
 export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang }) => {
   const t = translations[lang];
 
+  // Trạng thái đếm ngược cooldown 10 phút (chống spam từ cùng thiết bị)
+  const [cooldownRemaining, setCooldownRemaining] = React.useState(0);
+
+  React.useEffect(() => {
+    const checkCooldown = () => {
+      const lastTime = localStorage.getItem("dym_last_registration_time");
+      if (lastTime) {
+        const timePassed = Date.now() - parseInt(lastTime, 10);
+        const cooldownDuration = 10 * 60 * 1000; // 10 phút
+        if (timePassed < cooldownDuration) {
+          setCooldownRemaining(Math.ceil((cooldownDuration - timePassed) / 1000));
+          return;
+        }
+      }
+      setCooldownRemaining(0);
+    };
+
+    checkCooldown();
+    const interval = setInterval(checkCooldown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Định dạng thời gian MM:SS
+  const formatCooldownTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
+    return `${mins}:${secs}`;
+  };
+
   // Ghép địa chỉ đầy đủ từ 3 ô: Địa chỉ chi tiết, Phường/Xã, Tỉnh/Thành phố
   const fullAddress = [data.addressDetail, data.ward, data.province].filter(Boolean).join(', ');
 
@@ -123,10 +152,11 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
       <div className="pt-2">
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-2 text-dym-blue-600 hover:text-dym-blue-700 font-semibold text-sm transition-all focus:outline-none"
+          disabled={cooldownRemaining > 0}
+          className="inline-flex items-center gap-2 text-dym-blue-600 hover:text-dym-blue-700 font-semibold text-sm transition-all focus:outline-none disabled:text-slate-400 disabled:cursor-not-allowed"
         >
-          <RefreshCw className="w-4 h-4" />
-          {t.btnNewTurn}
+          <RefreshCw className={`w-4 h-4 ${cooldownRemaining > 0 ? '' : 'hover:rotate-180 transition-transform duration-500'}`} />
+          {cooldownRemaining > 0 ? `${t.btnNewTurn} (${formatCooldownTime(cooldownRemaining)})` : t.btnNewTurn}
         </button>
       </div>
     </div>

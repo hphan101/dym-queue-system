@@ -41,6 +41,22 @@ function App() {
     setIsLoading(true);
     setError(null);
 
+    // Phát hiện spam bot bằng bẫy Honeypot
+    const dataWithHoneypot = formData as any;
+    if (dataWithHoneypot.honeypot) {
+      setTimeout(() => {
+        setIsLoading(false);
+        setQueueNumber("0999");
+        setRegisteredData(formData);
+        setStep("success");
+        localStorage.setItem("dym_registration_step", "success");
+        localStorage.setItem("dym_registration_data", JSON.stringify(formData));
+        localStorage.setItem("dym_registration_queue", "0999");
+        localStorage.setItem("dym_last_registration_time", Date.now().toString());
+      }, 1500);
+      return;
+    }
+
     // Kiểm tra cấu hình URL
     if (!appsScriptUrl) {
       setError(translations[lang].errorUrl);
@@ -71,6 +87,7 @@ function App() {
         localStorage.setItem('dym_registration_step', 'success');
         localStorage.setItem('dym_registration_data', JSON.stringify(formData));
         localStorage.setItem('dym_registration_queue', result.queueNumber);
+        localStorage.setItem('dym_last_registration_time', Date.now().toString());
       } else {
         throw new Error(result.error || (lang === 'vi' ? 'Có lỗi xảy ra khi lưu thông tin.' : 'An error occurred while saving information.'));
       }

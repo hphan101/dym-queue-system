@@ -96,6 +96,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .min(1, t.errAddressDetailRequired)
       .transform((val) => val.trim()),
     companyName: z.string().transform((val) => val.trim()),
+    honeypot: z.string().optional(), // Bẫy chống spam bot
   });
 
   type FormSchemaType = z.infer<typeof formSchema>;
@@ -120,6 +121,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       ward: "",
       addressDetail: "",
       companyName: "",
+      honeypot: "",
     },
   });
 
@@ -397,6 +399,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100`}
           />
         </div>
+      </div>
+
+      {/* Honeypot field ẩn để bẫy bot spam */}
+      <div className="absolute opacity-0 pointer-events-none -z-10" aria-hidden="true">
+        <input
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          {...register("honeypot")}
+          placeholder="Do not fill this field"
+        />
       </div>
 
       {/* Nút Submit */}

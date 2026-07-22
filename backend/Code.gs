@@ -14,17 +14,36 @@ function doPost(e) {
     
     // Parse dữ liệu JSON nhận được
     var data = JSON.parse(e.postData.contents);
-    var fullName = (data.fullName || "").trim();
-    var phoneNumber = (data.phoneNumber || "").trim();
-    var birthDate = (data.birthDate || "").trim();
-    var gender = (data.gender || "").trim();
-    var cccd = (data.cccd || "").trim();
-    var companyName = (data.companyName || "").trim();
-    var province = (data.province || "").trim();
-    var ward = (data.ward || "").trim();
-    var addressDetail = (data.addressDetail || "").trim();
-    var service = (data.service || "").trim();
-    var branch = (data.branch || "").trim();
+    
+    // 1. Kiểm tra và phát hiện bẫy Honeypot chống spam bot
+    var honeypot = (data.honeypot || "").trim();
+    if (honeypot.length > 0) {
+      // Trả về số thứ tự giả cho bot, không lưu vào Sheet
+      lock.releaseLock();
+      return createJsonResponse({ success: true, queueNumber: "0999" });
+    }
+    
+    // Hàm làm sạch dữ liệu chống Formula Injection (Ngăn chạy mã độc công thức)
+    function sanitizeInput(val) {
+      var str = (val === null || val === undefined) ? "" : String(val).trim();
+      if (str.length > 0) {
+        var firstChar = str.charAt(0);
+        if (firstChar === '=' || firstChar === '+' || firstChar === '-' || firstChar === '@') {
+          return "'" + str; // Thêm nháy đơn ở đầu để Excel/Sheets coi là chữ thường
+        }
+      }
+      return str;
+    }
+    
+    var fullName = sanitizeInput(data.fullName);
+    var phoneNumber = sanitizeInput(data.phoneNumber);
+    var birthDate = sanitizeInput(data.birthDate);
+    var gender = sanitizeInput(data.gender);
+    var cccd = sanitizeInput(data.cccd);
+    var companyName = sanitizeInput(data.companyName);
+    var province = sanitizeInput(data.province);
+    var ward = sanitizeInput(data.ward);
+    var addressDetail = sanitizeInput(data.addressDetail);
     
     // Kiểm tra dữ liệu bắt buộc (ngoại trừ tên công ty là tự chọn)
     if (!fullName || !phoneNumber || !birthDate || !gender || !cccd || !province || !ward || !addressDetail) {
