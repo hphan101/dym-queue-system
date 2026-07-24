@@ -139,7 +139,7 @@ function doPost(e) {
     
     var vnTimeZone = "Asia/Ho_Chi_Minh";
     var now = new Date();
-    var formattedRegistrationTime = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy HH:mm:ss");
+    var formattedSubmitTime = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy HH:mm:ss");
     var todayDateString = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy");
     
     // Sinh STT độc lập theo chi nhánh/ngày, không phụ thuộc vào vị trí hoặc thứ tự dòng Sheet.
@@ -148,7 +148,7 @@ function doPost(e) {
     // Lưu thông tin vào Sheet, dùng dấu nháy đơn (') để ép định dạng chữ (tránh mất số 0 ở đầu)
     sheet.appendRow([
       "'" + queueNumber,
-      formattedRegistrationTime,
+      formattedSubmitTime,
       branchConfig.label,
       fullName,
       birthDate,
@@ -207,8 +207,7 @@ function migrateBranchSheetsToNewLayout() {
     }
 
     var oldHeaders = sheet.getRange(1, 1, 1, 12).getDisplayValues()[0];
-    if (oldHeaders[0] !== "Số thứ tự" ||
-        (oldHeaders[1] !== "Thời gian submit" && oldHeaders[1] !== "Thời gian đăng ký") ||
+    if (oldHeaders[0] !== "Số thứ tự" || oldHeaders[1] !== "Thời gian submit" ||
         oldHeaders[2] !== "Họ tên" || oldHeaders[3] !== "Số điện thoại") {
       throw new Error("Sheet " + config.sheetName + " không có cấu trúc cũ như dự kiến. Không tự chuyển dữ liệu.");
     }
