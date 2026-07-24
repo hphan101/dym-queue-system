@@ -1,34 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RegistrationForm } from './components/RegistrationForm';
 import { SuccessView } from './components/SuccessView';
-import type { RegistrationData, RegistrationResponse } from './types';
+import type { BranchCode, RegistrationData, RegistrationResponse } from './types';
 import { AlertCircle, Phone, Mail, MapPin, Clock } from 'lucide-react';
 import dymLogo from './assets/dym-logo.png';
 import dymLogoDark from './assets/dym-logo-dark.png';
 import { translations } from './translations';
 
+const branches: Record<BranchCode, { label: string }> = {
+  q1: { label: 'DYM mPlaza Quận 1' },
+  q7: { label: 'DYM The Grace Quận 7' },
+  hn: { label: 'DYM Epic Tower Cầu Giấy' },
+};
+
+function getBranchFromUrl(): BranchCode | null {
+  const branch = new URLSearchParams(window.location.search).get('branch')?.toLowerCase();
+  return branch && branch in branches ? branch as BranchCode : null;
+}
+
 function App() {
+  const branch = getBranchFromUrl();
   // Quản lý trạng thái ngôn ngữ (mặc định là tiếng Việt 'vi')
   const [lang, setLang] = useState<'vi' | 'en'>(() => {
     return (localStorage.getItem('dym_registration_lang') as 'vi' | 'en') || 'vi';
   });
 
-  // Quản lý các bước hiển thị (form đăng ký hoặc màn hình thành công), tự động tải lại trạng thái nếu có
+  // Chỉ khôi phục màn thành công khi còn STT. Dữ liệu định danh không được lưu qua lần tải lại.
   const [step, setStep] = useState<'form' | 'success'>(() => {
-    return (localStorage.getItem('dym_registration_step') as 'form' | 'success') || 'form';
+    const savedStep = localStorage.getItem('dym_registration_step');
+    const savedQueue = localStorage.getItem('dym_registration_queue');
+    return savedStep === 'success' && savedQueue ? 'success' : 'form';
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [registeredData, setRegisteredData] = useState<RegistrationData | null>(() => {
-    const saved = localStorage.getItem('dym_registration_data');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // Chỉ giữ dữ liệu đầy đủ trong bộ nhớ để hiển thị ngay sau khi đăng ký.
+  const [registeredData, setRegisteredData] = useState<RegistrationData | null>(null);
   const [queueNumber, setQueueNumber] = useState<string>(() => {
     return localStorage.getItem('dym_registration_queue') || '';
   });
 
   // Lấy URL Google Apps Script từ biến môi trường (.env)
   const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+
+  // Xóa dữ liệu nhạy cảm còn sót lại từ các phiên bản cũ của website.
+  useEffect(() => {
+    localStorage.removeItem('dym_registration_data');
+  }, []);
 
   // Thay đổi ngôn ngữ và lưu vào localStorage
   const handleLangChange = (newLang: 'vi' | 'en') => {
@@ -50,7 +67,6 @@ function App() {
         setRegisteredData(formData);
         setStep("success");
         localStorage.setItem("dym_registration_step", "success");
-        localStorage.setItem("dym_registration_data", JSON.stringify(formData));
         localStorage.setItem("dym_registration_queue", "0999");
         localStorage.setItem("dym_last_registration_time", Date.now().toString());
       }, 1500);
@@ -83,9 +99,8 @@ function App() {
         setRegisteredData(formData);
         setStep('success'); // Chuyển sang màn hình thành công
         
-        // Lưu trạng thái đăng ký vào localStorage để không bị mất khi tải lại trang (reload)
+        // Chỉ lưu STT và thời điểm cooldown; thông tin định danh chỉ tồn tại trong bộ nhớ trang.
         localStorage.setItem('dym_registration_step', 'success');
-        localStorage.setItem('dym_registration_data', JSON.stringify(formData));
         localStorage.setItem('dym_registration_queue', result.queueNumber);
         localStorage.setItem('dym_last_registration_time', Date.now().toString());
       } else {
@@ -166,6 +181,11 @@ function App() {
               <p className="text-xs text-slate-500 mt-1">
                 {translations[lang].subtitle}
               </p>
+              {branch && (
+                <p className="mt-2 inline-flex rounded-full bg-dym-blue-50 px-3 py-1 text-xs font-semibold text-dym-blue-700">
+                  {branches[branch].label}
+                </p>
+              )}
             </div>
           )}
 
@@ -182,16 +202,27 @@ function App() {
 
           {/* Hiển thị màn hình Form hoặc màn hình Thành công */}
           {step === 'form' ? (
-            <RegistrationForm onSubmit={handleFormSubmit} isLoading={isLoading} lang={lang} />
-          ) : (
-            registeredData && (
-              <SuccessView
-                queueNumber={queueNumber}
-                data={registeredData}
-                onReset={handleReset}
+            branch ? (
+              <RegistrationForm
+                onSubmit={handleFormSubmit}
+                isLoading={isLoading}
                 lang={lang}
+                branch={branch}
               />
+            ) : (
+              <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-center text-sm text-red-700">
+                {lang === 'vi'
+                  ? 'Liên kết đăng ký không xác định chi nhánh. Vui lòng quét lại mã QR tại cơ sở DYM.'
+                  : 'This registration link does not identify a branch. Please scan the QR code at the DYM location.'}
+              </div>
             )
+          ) : (
+            <SuccessView
+              queueNumber={queueNumber}
+              data={registeredData}
+              onReset={handleReset}
+              lang={lang}
+            />
           )}
         </div>
       </main>

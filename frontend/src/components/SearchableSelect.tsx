@@ -13,6 +13,9 @@ interface SearchableSelectProps {
   placeholder: string;
   disabled?: boolean;
   error?: boolean;
+  onFocus?: () => void;
+  isLoadingOptions?: boolean;
+  loadingMessage?: string;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -22,6 +25,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder,
   disabled = false,
   error = false,
+  onFocus,
+  isLoadingOptions = false,
+  loadingMessage = "Loading...",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,6 +76,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   // Khi người dùng tập trung vào ô nhập, mở danh sách và reset từ khóa
   const handleFocus = () => {
     if (disabled) return;
+    onFocus?.();
     setIsOpen(true);
     setSearchTerm("");
   };
@@ -108,7 +115,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {/* Danh sách kết quả lọc */}
       {isOpen && !disabled && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto py-1">
-          {filteredOptions.length > 0 ? (
+          {isLoadingOptions ? (
+            <div className="px-4 py-3 text-xs text-slate-400 text-center">
+              {loadingMessage}
+            </div>
+          ) : filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
               <button
                 key={opt.value}

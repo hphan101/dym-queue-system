@@ -14,11 +14,8 @@ import {
   Building,
   Home,
 } from "lucide-react";
-import type { RegistrationData } from "../types";
+import type { BranchCode, RegistrationData } from "../types";
 import { translations } from "../translations";
-
-import provincesData from "../assets/province.json";
-import wardsData from "../assets/ward.json";
 
 interface Province {
   name: string;
@@ -39,12 +36,33 @@ interface Ward {
   parent_code: string;
 }
 
-// Chuyển đối tượng JSON thành mảng và sắp xếp theo bảng chữ cái tiếng Việt
-const provinces: Province[] = Object.values(provincesData).sort((a, b) =>
-  a.name.localeCompare(b.name, "vi"),
-);
+interface LocationData {
+  provinces: Province[];
+  wards: Ward[];
+}
 
-const wards: Ward[] = Object.values(wardsData);
+let locationDataPromise: Promise<LocationData> | null = null;
+
+function loadLocationData(): Promise<LocationData> {
+  if (!locationDataPromise) {
+    locationDataPromise = Promise.all([
+      import("../assets/province.json"),
+      import("../assets/ward.json"),
+    ])
+      .then(([provinceModule, wardModule]) => ({
+        provinces: (Object.values(provinceModule.default) as Province[]).sort((a, b) =>
+          a.name.localeCompare(b.name, "vi"),
+        ),
+        wards: Object.values(wardModule.default) as Ward[],
+      }))
+      .catch((error: unknown) => {
+        locationDataPromise = null;
+        throw error;
+      });
+  }
+
+  return locationDataPromise;
+}
 
 const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
 const cccdPassportRegex = /^(?:[0-9]{12}|[A-Za-z][A-Za-z0-9]{6,12})$/;
@@ -53,14 +71,21 @@ interface RegistrationFormProps {
   onSubmit: (data: RegistrationData) => void;
   isLoading: boolean;
   lang: "vi" | "en";
+  branch: BranchCode;
 }
 
 export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   onSubmit,
   isLoading,
   lang,
+  branch,
 }) => {
   const t = translations[lang];
+  const [provinces, setProvinces] = React.useState<Province[]>([]);
+  const [wards, setWards] = React.useState<Ward[]>([]);
+  const [locationsLoaded, setLocationsLoaded] = React.useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
+  const [locationLoadError, setLocationLoadError] = React.useState(false);
 
   // Khởi tạo Schema kiểm tra điều kiện (Validation) dựa trên ngôn ngữ hiện tại
   const formSchema = z.object({
@@ -128,6 +153,21 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   // Quan sát sự thay đổi của Tỉnh/Thành phố
   const selectedProvince = watch("province");
 
+  const loadLocations = React.useCallback(() => {
+    if (locationsLoaded || isLoadingLocations) return;
+
+    setIsLoadingLocations(true);
+    setLocationLoadError(false);
+    void loadLocationData()
+      .then((data) => {
+        setProvinces(data.provinces);
+        setWards(data.wards);
+        setLocationsLoaded(true);
+      })
+      .catch(() => setLocationLoadError(true))
+      .finally(() => setIsLoadingLocations(false));
+  }, [isLoadingLocations, locationsLoaded]);
+
   // Reset Phường/Xã khi thay đổi Tỉnh/Thành phố
   React.useEffect(() => {
     setValue("ward", "");
@@ -139,12 +179,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     return wards
       .filter((w) => w.parent_code === selectedProvince)
       .sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [selectedProvince]);
+  }, [selectedProvince, wards]);
 
   // Định dạng danh sách tùy chọn cho ô tìm kiếm Tỉnh/Thành phố
   const provinceOptions = React.useMemo(() => {
     return provinces.map((p) => ({ value: p.code, label: p.name_with_type }));
-  }, []);
+  }, [provinces]);
 
   // Định dạng danh sách tùy chọn cho ô tìm kiếm Phường/Xã
   const wardOptions = React.useMemo(() => {
@@ -156,6 +196,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     const provinceObj = provinces.find((p) => p.code === formData.province);
     const mappedData: RegistrationData = {
       ...formData,
+      branch,
       // Map mã code tỉnh (ví dụ '11') sang tên thật (ví dụ 'Thành phố Hà Nội')
       province: provinceObj ? provinceObj.name_with_type : formData.province,
     } as RegistrationData;
@@ -320,6 +361,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 placeholder={t.selectProvince}
                 disabled={isLoading}
                 error={!!errors.province}
+                onFocus={loadLocations}
+                isLoadingOptions={isLoadingLocations}
+                loadingMessage={t.loadingLocations}
               />
             )}
           />
@@ -327,6 +371,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <p className="mt-1 text-xs text-red-500 font-medium">
               {errors.province.message}
             </p>
+          )}
+          {locationLoadError && (
+            <p className="mt-1 text-xs text-red-500 font-medium">{t.locationLoadError}</p>
           )}
         </div>
 
@@ -347,6 +394,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 placeholder={t.selectWard}
                 disabled={isLoading || !selectedProvince}
                 error={!!errors.ward}
+                isLoadingOptions={isLoadingLocations}
+                loadingMessage={t.loadingLocations}
               />
             )}
           />

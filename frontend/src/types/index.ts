@@ -1,4 +1,7 @@
+export type BranchCode = 'q1' | 'q7' | 'hn';
+
 export interface RegistrationData {
+  branch: BranchCode;
   fullName: string;
   phoneNumber: string;
   birthDate: string;

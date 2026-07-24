@@ -36,6 +36,8 @@ export const translations = {
     errProvinceRequired: 'Vui lòng chọn Tỉnh/Thành phố',
     errWardRequired: 'Vui lòng chọn Phường/Xã',
     errAddressDetailRequired: 'Địa chỉ chi tiết không được để trống',
+    loadingLocations: 'Đang tải danh sách địa chỉ…',
+    locationLoadError: 'Không thể tải danh sách địa chỉ. Vui lòng chạm lại để thử lại.',
     
     // Màn hình thành công
     successTitle: 'Đăng ký thành công!',
@@ -86,6 +88,8 @@ export const translations = {
     errProvinceRequired: 'Please select a Province/City',
     errWardRequired: 'Please select a Ward/Commune',
     errAddressDetailRequired: 'Detailed address is required',
+    loadingLocations: 'Loading the address list…',
+    locationLoadError: 'The address list could not be loaded. Please tap again to retry.',
     
     // Success View
     successTitle: 'Registration Successful!',

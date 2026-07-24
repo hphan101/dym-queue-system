@@ -5,7 +5,7 @@ import { translations } from '../translations';
 
 interface SuccessViewProps {
   queueNumber: string;
-  data: RegistrationData;
+  data: RegistrationData | null;
   onReset: () => void;
   lang: 'vi' | 'en';
 }
@@ -44,7 +44,9 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
   };
 
   // Ghép địa chỉ đầy đủ từ 3 ô: Địa chỉ chi tiết, Phường/Xã, Tỉnh/Thành phố
-  const fullAddress = [data.addressDetail, data.ward, data.province].filter(Boolean).join(', ');
+  const fullAddress = data
+    ? [data.addressDetail, data.ward, data.province].filter(Boolean).join(', ')
+    : '';
 
   return (
     <div className="text-center space-y-6 animate-fade-in">
@@ -73,7 +75,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
       </div>
 
       {/* Tóm tắt thông tin đăng ký */}
-      <div className="text-left bg-white border border-slate-100 rounded-xl p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
+      {data && <div className="text-left bg-white border border-slate-100 rounded-xl p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
         <h3 className="font-bold text-slate-700 border-b border-slate-100 pb-2 flex items-center gap-1.5">
           {t.summaryTitle}
         </h3>
@@ -146,7 +148,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Hành động tiếp theo */}
       <div className="pt-2">
