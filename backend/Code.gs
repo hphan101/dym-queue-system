@@ -134,64 +134,69 @@ function doPost(e) {
     }
 
     try {
-    var lastRow = sheet.getLastRow(); // Gọi 1 lần duy nhất để tối ưu tốc độ đọc ghi
+      var lastRow = sheet.getLastRow(); // Gọi 1 lần duy nhất để tối ưu tốc độ đọc ghi
 
-    // Tạo dòng tiêu đề nếu sheet hoàn toàn trống (lastRow == 0)
-    if (lastRow === 0) {
-      setupHeader(sheet);
-      lastRow = 1; // Sau khi tạo dòng tiêu đề, dòng cuối cùng hiện tại là dòng 1
-    } else if (!hasCurrentHeaderLayout(sheet)) {
-      return createJsonResponse({
-        success: false,
-        error:
-          "Sheet đang dùng cấu trúc cũ. Vui lòng chạy migration trước khi nhận đăng ký mới.",
-      });
-    }
+      // Tạo dòng tiêu đề nếu sheet hoàn toàn trống (lastRow == 0)
+      if (lastRow === 0) {
+        setupHeader(sheet);
+        lastRow = 1; // Sau khi tạo dòng tiêu đề, dòng cuối cùng hiện tại là dòng 1
+      } else if (!hasCurrentHeaderLayout(sheet)) {
+        return createJsonResponse({
+          success: false,
+          error:
+            "Sheet đang dùng cấu trúc cũ. Vui lòng chạy migration trước khi nhận đăng ký mới.",
+        });
+      }
 
-    var rateLimit = enforceRegistrationCooldown(phoneNumber, cccd, branch);
-    if (!rateLimit.allowed) {
-      return createJsonResponse({
-        success: false,
-        code: "RATE_LIMITED",
-        error: "Vui lòng thử lại sau " + rateLimit.retryAfterMinutes + " phút.",
-      });
-    }
+      var rateLimit = enforceRegistrationCooldown(phoneNumber, cccd, branch);
+      if (!rateLimit.allowed) {
+        return createJsonResponse({
+          success: false,
+          code: "RATE_LIMITED",
+          error:
+            "Vui lòng thử lại sau " + rateLimit.retryAfterMinutes + " phút.",
+        });
+      }
 
-    var vnTimeZone = "Asia/Ho_Chi_Minh";
-    var now = new Date();
-    var formattedRegistrationTime = Utilities.formatDate(
-      now,
-      vnTimeZone,
-      "dd/MM/yyyy HH:mm:ss",
-    );
-    var todayDateString = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy");
+      var vnTimeZone = "Asia/Ho_Chi_Minh";
+      var now = new Date();
+      var formattedRegistrationTime = Utilities.formatDate(
+        now,
+        vnTimeZone,
+        "dd/MM/yyyy HH:mm:ss",
+      );
+      var todayDateString = Utilities.formatDate(now, vnTimeZone, "dd/MM/yyyy");
 
-    // Sinh STT độc lập theo chi nhánh/ngày, không phụ thuộc vào vị trí hoặc thứ tự dòng Sheet.
-    var queueNumber = generateQueueNumber(
-      branch,
-      sheet,
-      lastRow,
-      todayDateString,
-    );
+      // Sinh STT độc lập theo chi nhánh/ngày, không phụ thuộc vào vị trí hoặc thứ tự dòng Sheet.
+      var queueInfo = generateQueueNumber(
+        branch,
+        sheet,
+        lastRow,
+        todayDateString,
+      );
+      if (queueInfo.shouldAddDateSeparator) {
+        addDateSeparator(sheet, todayDateString);
+      }
+      var queueNumber = queueInfo.queueNumber;
 
-    // Lưu thông tin vào Sheet, dùng dấu nháy đơn (') để ép định dạng chữ (tránh mất số 0 ở đầu)
-    sheet.appendRow([
-      "'" + queueNumber,
-      formattedRegistrationTime,
-      branchConfig.label,
-      fullName,
-      birthDate,
-      gender,
-      "'" + phoneNumber,
-      "'" + cccd,
-      companyName,
-      province,
-      ward,
-      addressDetail,
-      "Chờ khám",
-    ]);
+      // Lưu thông tin vào Sheet, dùng dấu nháy đơn (') để ép định dạng chữ (tránh mất số 0 ở đầu)
+      sheet.appendRow([
+        "'" + queueNumber,
+        formattedRegistrationTime,
+        branchConfig.label,
+        fullName,
+        birthDate,
+        gender,
+        "'" + phoneNumber,
+        "'" + cccd,
+        companyName,
+        province,
+        ward,
+        addressDetail,
+        "Chờ khám",
+      ]);
 
-    return createJsonResponse({ success: true, queueNumber: queueNumber });
+      return createJsonResponse({ success: true, queueNumber: queueNumber });
     } finally {
       if (lock.hasLock()) {
         lock.releaseLock();
@@ -306,19 +311,43 @@ function generateQueueNumber(branch, sheet, lastRow, todayStr) {
 
   // Lần đầu deploy hoặc khi property bị xóa: khôi phục STT lớn nhất của ngày hiện tại,
   // nên không sinh trùng số ngay cả khi Sheet đã có dữ liệu hoặc bị sort.
-  var lastIssuedNumber =
-    counter && counter.date === todayStr
-      ? counter.number
-      : counter
-        ? 0
-        : findHighestQueueNumberForDate(sheet, lastRow, todayStr);
+  var hasCounterForToday = counter && counter.date === todayStr;
+  var recoveredHighestNumber = !counter
+    ? findHighestQueueNumberForDate(sheet, lastRow, todayStr)
+    : 0;
+  var lastIssuedNumber = hasCounterForToday
+    ? counter.number
+    : counter
+      ? 0
+      : recoveredHighestNumber;
+  var shouldAddDateSeparator =
+    lastRow > 1 &&
+    !hasCounterForToday &&
+    (counter || recoveredHighestNumber === 0);
 
   var nextNumber = (parseInt(lastIssuedNumber, 10) || 0) + 1;
   properties.setProperty(
     propertyKey,
     JSON.stringify({ date: todayStr, number: nextNumber }),
   );
-  return padZero(nextNumber, 4);
+  return {
+    queueNumber: padZero(nextNumber, 4),
+    shouldAddDateSeparator: shouldAddDateSeparator,
+  };
+}
+
+function addDateSeparator(sheet, dateString) {
+  var separatorRow = [];
+  for (var i = 0; i < REGISTRATION_HEADERS.length; i++) {
+    separatorRow.push(i === 0 ? "Ngày đăng ký: " + dateString : "");
+  }
+
+  sheet.appendRow(separatorRow);
+  var rowNumber = sheet.getLastRow();
+  sheet
+    .getRange(rowNumber, 1, 1, REGISTRATION_HEADERS.length)
+    .setBackground("#E0F2FE")
+    .setFontWeight("bold");
 }
 
 function findHighestQueueNumberForDate(sheet, lastRow, todayStr) {
