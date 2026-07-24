@@ -1,12 +1,28 @@
 // Google Spreadsheet dùng chung cho ba chi nhánh. Không đổi ID này theo dữ liệu từ client.
 var SPREADSHEET_ID = "1TpuxeEFs9ToqK-xnXplmJ40P0Jk7xC55TAFCggfa8eg";
 
-// Chỉ các mã chi nhánh này mới được phép ghi. Giá trị là tên tab cố định trong Spreadsheet.
-var BRANCH_SHEETS = {
-  q1: "D1",
-  q7: "D7",
-  hn: "HN"
+// Chỉ các mã chi nhánh này mới được phép ghi. Tên tab và nhãn hiển thị đều cố định.
+var BRANCH_CONFIG = {
+  q1: { sheetName: "D1", label: "DYM mPlaza Quận 1" },
+  q7: { sheetName: "D7", label: "DYM The Grace Quận 7" },
+  hn: { sheetName: "HN", label: "DYM Epic Tower Cầu Giấy" }
 };
+
+var REGISTRATION_HEADERS = [
+  "Số thứ tự",
+  "Thời gian submit",
+  "Chi nhánh",
+  "Họ tên",
+  "Ngày sinh",
+  "Giới tính",
+  "Số điện thoại",
+  "CCCD",
+  "Tên công ty",
+  "Tỉnh/Thành phố",
+  "Phường/Xã",
+  "Địa chỉ chi tiết",
+  "Trạng thái xử lý"
+];
 
 // Hàm chính xử lý request POST gửi từ Frontend React
 function doPost(e) {
@@ -31,8 +47,8 @@ function doPost(e) {
     }
 
     var branch = data.branch.trim().toLowerCase();
-    var sheetName = BRANCH_SHEETS[branch];
-    if (!sheetName) {
+    var branchConfig = BRANCH_CONFIG[branch];
+    if (!branchConfig) {
       lock.releaseLock();
       return createInvalidDataResponse();
     }
@@ -87,20 +103,11 @@ function doPost(e) {
       return createInvalidDataResponse();
     }
     
-    var rateLimit = enforceRegistrationCooldown(phoneNumber, cccd, branch);
-    if (!rateLimit.allowed) {
-      return createJsonResponse({
-        success: false,
-        code: "RATE_LIMITED",
-        error: "Vui lòng thử lại sau " + rateLimit.retryAfterMinutes + " phút."
-      });
-    }
-
     // Mở đúng Spreadsheet và tab đã được whitelist; không bao giờ dùng getActiveSheet().
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var sheet = ss.getSheetByName(sheetName);
+    var sheet = ss.getSheetByName(branchConfig.sheetName);
     if (!sheet) {
-      console.error("Configured branch sheet was not found: " + sheetName);
+      console.error("Configured branch sheet was not found: " + branchConfig.sheetName);
       lock.releaseLock();
       return createJsonResponse({
         success: false,
@@ -113,6 +120,21 @@ function doPost(e) {
     if (lastRow === 0) {
       setupHeader(sheet);
       lastRow = 1; // Sau khi tạo dòng tiêu đề, dòng cuối cùng hiện tại là dòng 1
+    } else if (!hasCurrentHeaderLayout(sheet)) {
+      lock.releaseLock();
+      return createJsonResponse({
+        success: false,
+        error: "Sheet đang dùng cấu trúc cũ. Vui lòng chạy migration trước khi nhận đăng ký mới."
+      });
+    }
+
+    var rateLimit = enforceRegistrationCooldown(phoneNumber, cccd, branch);
+    if (!rateLimit.allowed) {
+      return createJsonResponse({
+        success: false,
+        code: "RATE_LIMITED",
+        error: "Vui lòng thử lại sau " + rateLimit.retryAfterMinutes + " phút."
+      });
     }
     
     var vnTimeZone = "Asia/Ho_Chi_Minh";
@@ -127,10 +149,11 @@ function doPost(e) {
     sheet.appendRow([
       "'" + queueNumber,
       formattedSubmitTime,
+      branchConfig.label,
       fullName,
-      "'" + phoneNumber,
       birthDate,
       gender,
+      "'" + phoneNumber,
       "'" + cccd,
       companyName,
       province,
@@ -152,22 +175,61 @@ function doPost(e) {
 
 // Tạo dòng tiêu đề cho Google Sheet nếu chưa có dữ liệu
 function setupHeader(sheet) {
-  var headers = [
-    "Số thứ tự", 
-    "Thời gian submit", 
-    "Họ tên", 
-    "Số điện thoại", 
-    "Ngày sinh", 
-    "Giới tính", 
-    "CCCD", 
-    "Tên công ty", 
-    "Tỉnh/Thành phố", 
-    "Phường/Xã", 
-    "Địa chỉ chi tiết", 
-    "Trạng thái xử lý"
-  ];
-  sheet.appendRow(headers);
-  sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+  sheet.appendRow(REGISTRATION_HEADERS);
+  sheet.getRange(1, 1, 1, REGISTRATION_HEADERS.length).setFontWeight("bold");
+}
+
+function hasCurrentHeaderLayout(sheet) {
+  var headers = sheet.getRange(1, 1, 1, REGISTRATION_HEADERS.length).getDisplayValues()[0];
+  return headers.join("|") === REGISTRATION_HEADERS.join("|");
+}
+
+// Chạy một lần thủ công trong Apps Script Editor sau khi dán Code.gs mới.
+// Hàm này chuyển dữ liệu cũ của D1, D7, HN sang cấu trúc cột mới mà không làm mất dữ liệu.
+function migrateBranchSheetsToNewLayout() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var branchCodes = Object.keys(BRANCH_CONFIG);
+
+  for (var i = 0; i < branchCodes.length; i++) {
+    var config = BRANCH_CONFIG[branchCodes[i]];
+    var sheet = ss.getSheetByName(config.sheetName);
+    if (!sheet) {
+      throw new Error("Không tìm thấy Sheet tab: " + config.sheetName);
+    }
+
+    if (sheet.getLastRow() === 0) {
+      setupHeader(sheet);
+      continue;
+    }
+
+    if (hasCurrentHeaderLayout(sheet)) {
+      continue;
+    }
+
+    var oldHeaders = sheet.getRange(1, 1, 1, 12).getDisplayValues()[0];
+    if (oldHeaders[0] !== "Số thứ tự" || oldHeaders[1] !== "Thời gian submit" ||
+        oldHeaders[2] !== "Họ tên" || oldHeaders[3] !== "Số điện thoại") {
+      throw new Error("Sheet " + config.sheetName + " không có cấu trúc cũ như dự kiến. Không tự chuyển dữ liệu.");
+    }
+
+    var lastRow = sheet.getLastRow();
+    var oldRows = lastRow > 1
+      ? sheet.getRange(2, 1, lastRow - 1, 12).getValues()
+      : [];
+    var newRows = [REGISTRATION_HEADERS];
+
+    for (var rowIndex = 0; rowIndex < oldRows.length; rowIndex++) {
+      var row = oldRows[rowIndex];
+      newRows.push([
+        row[0], row[1], config.label, row[2], row[4], row[5], row[3], row[6],
+        row[7], row[8], row[9], row[10], row[11]
+      ]);
+    }
+
+    sheet.clearContents();
+    sheet.getRange(1, 1, newRows.length, REGISTRATION_HEADERS.length).setValues(newRows);
+    sheet.getRange(1, 1, 1, REGISTRATION_HEADERS.length).setFontWeight("bold");
+  }
 }
 
 // Bộ đếm được lưu riêng cho từng chi nhánh. Script Lock trong doPost bảo đảm thao tác tăng là nguyên tử.
