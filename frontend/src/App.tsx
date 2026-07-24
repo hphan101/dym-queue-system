@@ -32,6 +32,7 @@ function App() {
     return savedStep === 'success' && savedQueue ? 'success' : 'form';
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPageLoader, setShowPageLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Chỉ giữ dữ liệu đầy đủ trong bộ nhớ để hiển thị ngay sau khi đăng ký.
   const [registeredData, setRegisteredData] = useState<RegistrationData | null>(null);
@@ -56,13 +57,20 @@ function App() {
   // Xử lý khi người dùng submit form
   const handleFormSubmit = async (formData: RegistrationData) => {
     setIsLoading(true);
+    setShowPageLoader(false);
     setError(null);
+    const loaderTimer = window.setTimeout(() => setShowPageLoader(true), 500);
+    const finishLoading = () => {
+      window.clearTimeout(loaderTimer);
+      setShowPageLoader(false);
+      setIsLoading(false);
+    };
 
     // Phát hiện spam bot bằng bẫy Honeypot
     const dataWithHoneypot = formData as any;
     if (dataWithHoneypot.honeypot) {
       setTimeout(() => {
-        setIsLoading(false);
+        finishLoading();
         setQueueNumber("0999");
         setRegisteredData(formData);
         setStep("success");
@@ -76,7 +84,7 @@ function App() {
     // Kiểm tra cấu hình URL
     if (!appsScriptUrl) {
       setError(translations[lang].errorUrl);
-      setIsLoading(false);
+      finishLoading();
       return;
     }
 
@@ -112,7 +120,7 @@ function App() {
         err.message || (lang === 'vi' ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.' : 'Unable to connect to the server. Please check your network connection.')
       );
     } finally {
-      setIsLoading(false);
+      finishLoading();
     }
   };
 
@@ -132,7 +140,7 @@ function App() {
   return (
     <div className="min-h-screen bg-[#f4f9fc] flex flex-col justify-between pt-6">
       {/* Full-screen Loading Overlay đồng bộ 100% với website dymmedicalcenter.com.vn */}
-      {isLoading && (
+      {showPageLoader && (
         <div className="page-loader animate-fade-in">
           <img
             src={dymLogoDark}
