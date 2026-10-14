@@ -1,211 +1,107 @@
-# Hệ thống QR Đăng ký Số thứ tự Khám bệnh — DYM Medical Center
+# DYM Queue System
 
-Khách hàng quét mã QR tại phòng khám, mở form trên điện thoại, điền thông tin và nhận **số thứ tự khám** (queue number) tự động theo ngày.
+Hệ thống đăng ký số thứ tự, điều phối tại lễ tân và màn hình gọi số cho ba chi nhánh DYM.
 
 ## Kiến trúc
 
-| Phần | Công nghệ | Vai trò |
-|------|-----------|---------|
-| **Frontend** | React 19 + Vite + TypeScript + Tailwind CSS + React Hook Form + Zod | Form đăng ký mobile-first, song ngữ VI/EN |
-| **Backend** | Google Apps Script (`backend/Code.gs` v3.0) | Nhận POST JSON, cấp STT, ghi Google Sheet |
-| **Dữ liệu** | Google Sheet gắn với Apps Script | Không cần máy chủ riêng |
+- `frontend/`: React 19, Vite, TypeScript, Tailwind CSS và Astryx.
+- `supabase/functions/register/`: API công khai tiếp nhận đăng ký.
+- `supabase/functions/manage-staff/`: API quản trị tài khoản nhân viên.
+- `supabase/migrations/`: schema PostgreSQL, RLS, RPC và lịch sử thay đổi database.
+- Supabase Auth: đăng nhập nhân viên.
+- Supabase Realtime: đồng bộ danh sách và màn hình gọi số.
+- Vercel: hosting frontend và security headers.
 
-```
-[Điện thoại khách] --POST JSON--> [Google Apps Script Web App] --> [Google Sheet]
-        ^
-   QR → Frontend (Vercel/Netlify/local)
-```
+Google Apps Script và Google Sheet không còn nằm trong luồng chạy hiện tại.
 
-## Trường dữ liệu (đồng bộ Form ↔ Backend ↔ Sheet)
+## Chạy local
 
-| Cột Sheet | Field JSON | Bắt buộc | Ghi chú |
-|-----------|------------|----------|---------|
-| Số thứ tự | `queueNumber` (response) | — | `0001`…, **reset mỗi ngày** (múi giờ `Asia/Ho_Chi_Minh`) |
-| Thời gian đăng ký | — | — | Backend tự ghi `dd/MM/yyyy HH:mm:ss` |
-| Họ tên | `fullName` | Có | |
-| Số điện thoại | `phoneNumber` | Có | 10 số VN, đầu `03/05/07/08/09` |
-| Ngày sinh | `birthDate` | Có | `YYYY-MM-DD` từ `<input type="date">` |
-| Giới tính | `gender` | Có | `Nam` \| `Nữ` (luôn lưu tiếng Việt) |
-| CCCD | `cccd` | Có | 12 số CCCD **hoặc** hộ chiếu |
-| Tên công ty | `companyName` | Không | |
-| Tỉnh/Thành phố | `province` | Có | Tên đầy đủ (vd. `Thành phố Hà Nội`) |
-| Phường/Xã | `ward` | Có | Tên đầy đủ |
-| Địa chỉ chi tiết | `addressDetail` | Có | Số nhà, đường… |
-| Trạng thái xử lý | — | — | Mặc định `Chờ khám` |
-| *(không lưu Sheet)* | `honeypot` | Không | Bẫy bot: nếu có giá trị → không ghi Sheet, trả STT giả `0999` |
-
-> **Không còn** field Dịch vụ / Chi nhánh trên form hiện tại. Mọi đăng ký ghi vào **một Sheet** gắn với script đã deploy.
-
----
-
-## PHẦN 1: Google Sheet & Backend (Apps Script)
-
-### Bước 1: Tạo Google Sheet
-
-1. Vào [Google Sheets](https://sheets.google.com), tạo bảng trống.
-2. Đặt tên (vd. `DYM_DangKyKhamBenh_Queue`).
-3. **Không cần** tạo header tay. Lượt đăng ký đầu tiên, script sẽ ghi dòng tiêu đề:
-
-   `Số thứ tự | Thời gian đăng ký | Họ tên | Số điện thoại | Ngày sinh | Giới tính | CCCD | Tên công ty | Tỉnh/Thành phố | Phường/Xã | Địa chỉ chi tiết | Trạng thái xử lý`
-
-### Bước 2: Dán code Apps Script
-
-1. Sheet → **Tiện ích mở rộng** → **Apps Script**.
-2. Xóa code mặc định, dán toàn bộ nội dung file [`backend/Code.gs`](backend/Code.gs).
-3. Lưu (`Ctrl+S`). Đặt tên project (vd. `DYM_Queue_Backend`).
-
-### Bước 3: Deploy Web App
-
-1. **Triển khai** → **Triển khai mới** → loại **Ứng dụng web**.
-2. Cấu hình:
-   - **Mô tả**: `DYM Queue System V3`
-   - **Thực thi dưới dạng**: *Tôi (Me)*
-   - **Ai có quyền truy cập**: *Mọi người (Anyone)* — bắt buộc để khách không cần đăng nhập Google.
-3. **Triển khai** → ủy quyền lần đầu (Advanced → Đi tới … → Allow).
-4. Copy **Web app URL** dạng:
-
-   `https://script.google.com/macros/s/AKfycb.../exec`
-
-5. Kiểm tra nhanh: mở URL trên trình duyệt → phải thấy text  
-   `DYM Queue System Backend - Phiên bản 3.0 (Đã tối ưu hóa tốc độ)`  
-   (endpoint `doGet`).
-
-> Mỗi lần sửa `Code.gs`, cần **Triển khai** → **Quản lý triển khai** → chỉnh phiên bản → **Phiên bản mới**, nếu không frontend vẫn gọi bản cũ.
-
----
-
-## PHẦN 2: Frontend (React)
-
-### Bước 1: Biến môi trường
-
-Trong thư mục `frontend/`, tạo/sửa file `.env` (đã có trong `.gitignore`):
-
-```env
-VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxx/exec
-```
-
-### Bước 2: Chạy local
-
-Yêu cầu [Node.js](https://nodejs.org/) (khuyến nghị 20+).
+Yêu cầu Node.js 20 trở lên.
 
 ```bash
-cd frontend
 npm install
+npm --prefix frontend install
 npm run dev
 ```
 
-Mở link Vite in ra (thường `http://localhost:5173`), điền form thử, kiểm tra Google Sheet có dòng mới + STT tăng dần.
+Frontend chạy mặc định tại `http://localhost:5173`.
 
-Script hữu ích:
+Tạo `frontend/.env` với các biến:
 
-```bash
-npm run build    # production build (tsc + vite)
-npm run preview  # xem bản build
-npm run lint     # oxlint
+```dotenv
+VITE_REGISTRATION_API_URL=https://<project-ref>.supabase.co/functions/v1/register
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 ```
 
-### Tính năng frontend đáng chú ý
+Publishable key được phép xuất hiện ở frontend. Không đặt service-role key, database password hoặc secret HMAC trong bất kỳ biến `VITE_*` nào.
 
-- Song ngữ **Tiếng Việt / English** (lưu `localStorage`)
-- Dropdown Tỉnh/Phường **có tìm kiếm, không dấu** (`province.json` / `ward.json` — đơn vị hành chính mới)
-- Honeypot chống bot + cooldown **10 phút** trước khi “Đăng ký lượt mới” (cùng thiết bị)
-- Giữ màn success khi reload (localStorage)
-- Full-screen loader theo brand DYM
+## Đường dẫn
 
----
+- Đăng ký: `/?branch=q1`, `/?branch=q7`, `/?branch=hn`
+- Đăng nhập: `/login`
+- Quản trị: `/admin`
+- Danh sách đăng ký: `/registrations`
+- Quản lý nhân viên: `/staff` (chỉ quản trị viên)
+- Màn hình chờ: `/display?branch=q1`
 
-## PHẦN 3: Deploy online & QR
+Mã chi nhánh:
 
-### Cách 1: Vercel (khuyên dùng)
+- `q1`: DYM mPlaza Quận 1
+- `q7`: DYM The Grace Quận 7
+- `hn`: DYM Epic Tower Cầu Giấy
 
-```bash
-cd frontend
-npm install -g vercel
-vercel
-```
-
-Thêm Environment Variable trên dashboard:
-
-- Key: `VITE_APPS_SCRIPT_URL`
-- Value: URL Apps Script Web App
-
-**Redeploy** sau khi thêm biến (Vite nhúng env lúc **build**).
-
-### Cách 2: Netlify Drop
+## Lệnh kiểm tra và deploy
 
 ```bash
-cd frontend
-# PowerShell / bash: export env trước khi build nếu cần
+npm run lint
 npm run build
+npm run db:lint
+npm run db:push
+npm run deploy:register
+npm run deploy:staff
 ```
 
-Kéo thả thư mục `frontend/dist` lên [Netlify Drop](https://app.netlify.com/drop).  
-Với Netlify project đầy đủ: set env `VITE_APPS_SCRIPT_URL` rồi rebuild (không chỉ kéo `dist` đã build thiếu env).
+Frontend được deploy từ thư mục `frontend/`. Edge Function và migration được deploy độc lập bằng Supabase CLI.
 
-### Tạo mã QR
+## Quy tắc dữ liệu và bảo mật
 
-1. Lấy URL production (vd. `https://dym-queue-system.vercel.app`).
-2. Tạo QR tại me-qr.com / qr-code-generator.com / tương đương.
-3. In decal/standee: *“Quét mã QR để đăng ký thứ tự khám bệnh nhanh chóng”*.
+- Dữ liệu đăng ký được kiểm tra ở cả frontend, Edge Function và PostgreSQL.
+- Trình duyệt không lưu CCCD, SĐT, ngày sinh hoặc địa chỉ trong `localStorage`.
+- API đăng ký dùng honeypot, cooldown SĐT + CCCD và giới hạn theo IP đã băm; không dùng CAPTCHA.
+- IP gốc không được lưu. Bộ đếm IP băm hết hạn sau 30 ngày.
+- RLS giới hạn nhân viên theo trạng thái tài khoản và chi nhánh được cấp quyền.
+- Vai trò công khai chỉ đọc metadata chi nhánh và trạng thái số đang gọi; không đọc hồ sơ đăng ký.
+- Frontend chỉ dùng Supabase publishable key. Service-role key chỉ tồn tại trong Edge Function secrets.
+- CSP, HSTS, chống iframe, `nosniff`, referrer policy và permissions policy được cấu hình trong `frontend/vercel.json`.
+- Đăng ký tài khoản nhân viên công khai bị tắt. Tài khoản được tạo và cấp chi nhánh bởi quản trị viên.
+- API nhân viên xác thực lại access token, kiểm tra vai trò quản trị ở server và không đưa service-role key ra trình duyệt.
+- Quản trị viên không thể tự khóa hoặc tự hạ quyền chính mình; thao tác tạo, sửa và khóa tài khoản được ghi audit log.
 
----
+## Cấu trúc nguồn
 
-## Bảo mật & vận hành (tóm tắt)
-
-| Cơ chế | Nơi | Ghi chú |
-|--------|-----|---------|
-| Honeypot | FE + BE | Bot điền field ẩn → STT giả `0999`, không ghi Sheet |
-| Sanitize formula injection | BE | Prefix `'` nếu giá trị bắt đầu `= + - @` |
-| LockService | BE | Tránh trùng STT khi nhiều người submit cùng lúc |
-| Cooldown 10 phút | FE only | Chỉ chặn cùng trình duyệt/thiết bị; clear storage vẫn đăng ký lại |
-| Web App “Anyone” | GAS | URL Web App coi như secret nhẹ — không public post lung tung nếu không cần |
-
-**Hạn chế hiện tại (cần biết khi vận hành):**
-
-1. **Không chọn chi nhánh / dịch vụ** trên form — 3 cơ sở DYM dùng chung một hàng đợi Sheet nếu dùng 1 deploy.
-2. Cooldown & chống spam **không** server-side theo SĐT/CCCD.
-3. `fetch` tới Apps Script đôi khi gặp CORS/redirect tùy mạng/browser — nếu submit fail trên mobile thật, cần test kỹ production URL.
-4. Bundle frontend ~1MB (chủ yếu JSON địa giới) — lần tải đầu trên 3G có thể chậm; có thể code-split sau.
-
----
-
-## Cấu trúc thư mục
-
-```
-QueueSystem/
-├── README.md                 ← file này
-├── .gitignore
-├── backend/
-│   └── Code.gs               ← Google Apps Script (doPost / doGet)
-└── frontend/
-    ├── .env                  ← VITE_APPS_SCRIPT_URL (không commit)
-    ├── package.json
-    ├── vite.config.ts
-    └── src/
-        ├── App.tsx
-        ├── translations.ts
-        ├── types/index.ts
-        ├── assets/           ← logo + province.json + ward.json
-        └── components/
-            ├── RegistrationForm.tsx
-            ├── SearchableSelect.tsx
-            └── SuccessView.tsx
+```text
+.
+├─ frontend/
+│  ├─ public/
+│  └─ src/
+│     ├─ assets/
+│     ├─ config/
+│     ├─ features/
+│     │  ├─ admin/
+│     │  ├─ auth/
+│     │  ├─ display/
+│     │  └─ registration/
+│     ├─ lib/
+│     ├─ styles/
+│     ├─ types/
+│     ├─ App.tsx
+│     └─ main.tsx
+└─ supabase/
+   ├─ functions/
+   │  ├─ _shared/
+   │  └─ register/
+   └─ migrations/
 ```
 
-## API Backend (Apps Script)
-
-**POST** body JSON (các field như bảng trên).
-
-**Response thành công:**
-
-```json
-{ "success": true, "queueNumber": "0007" }
-```
-
-**Response lỗi:**
-
-```json
-{ "success": false, "error": "Vui lòng điền đầy đủ các thông tin bắt buộc!" }
-```
-
-**GET** Web App URL: health-check text (không JSON).
+Không chỉnh sửa migration đã chạy. Mọi thay đổi database mới phải được thêm bằng một migration mới.

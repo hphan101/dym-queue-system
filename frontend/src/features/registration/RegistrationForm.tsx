@@ -14,8 +14,8 @@ import {
   Building,
   Home,
 } from "lucide-react";
-import type { BranchCode, RegistrationData } from "../types";
-import { translations } from "../translations";
+import type { BranchCode, RegistrationData } from "./types";
+import { translations } from "./translations";
 
 interface Province {
   name: string;
@@ -27,11 +27,11 @@ interface Province {
 
 interface Ward {
   name: string;
-  type: string;
-  slug: string;
+  type?: string;
+  slug?: string;
   name_with_type: string;
-  path: string;
-  path_with_type: string;
+  path?: string;
+  path_with_type?: string;
   code: string;
   parent_code: string;
 }
@@ -46,15 +46,26 @@ let locationDataPromise: Promise<LocationData> | null = null;
 function loadLocationData(): Promise<LocationData> {
   if (!locationDataPromise) {
     locationDataPromise = Promise.all([
-      import("../assets/province.json"),
-      import("../assets/ward.json"),
+      fetch("/data/provinces.json"),
+      fetch("/data/wards.json"),
     ])
-      .then(([provinceModule, wardModule]) => ({
-        provinces: (Object.values(provinceModule.default) as Province[]).sort((a, b) =>
+      .then(async ([provinceResponse, wardResponse]) => {
+        if (!provinceResponse.ok || !wardResponse.ok) {
+          throw new Error("LOCATION_DATA_UNAVAILABLE");
+        }
+
+        const [provinceData, wardData] = await Promise.all([
+          provinceResponse.json() as Promise<Record<string, Province>>,
+          wardResponse.json() as Promise<Record<string, Ward>>,
+        ]);
+
+        return {
+          provinces: (Object.values(provinceData) as Province[]).sort((a, b) =>
           a.name.localeCompare(b.name, "vi"),
-        ),
-        wards: Object.values(wardModule.default) as Ward[],
-      }))
+          ),
+          wards: Object.values(wardData) as Ward[],
+        };
+      })
       .catch((error: unknown) => {
         locationDataPromise = null;
         throw error;
@@ -87,7 +98,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
   const [locationLoadError, setLocationLoadError] = React.useState(false);
 
-  // Khởi tạo Schema kiểm tra điều kiện (Validation) dựa trên ngôn ngữ hiện tại
   const formSchema = z.object({
     fullName: z
       .string()
@@ -121,12 +131,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .min(1, t.errAddressDetailRequired)
       .transform((val) => val.trim()),
     companyName: z.string().transform((val) => val.trim()),
-    honeypot: z.string().optional(), // Bẫy chống spam bot
+    honeypot: z.string().optional(),
   });
 
   type FormSchemaType = z.infer<typeof formSchema>;
 
-  // Khởi tạo Form sử dụng react-hook-form kết hợp Zod validation
   const {
     register,
     handleSubmit,
@@ -150,7 +159,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     },
   });
 
-  // Quan sát sự thay đổi của Tỉnh/Thành phố
   const selectedProvince = watch("province");
 
   const loadLocations = React.useCallback(() => {
@@ -168,12 +176,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .finally(() => setIsLoadingLocations(false));
   }, [isLoadingLocations, locationsLoaded]);
 
-  // Reset Phường/Xã khi thay đổi Tỉnh/Thành phố
   React.useEffect(() => {
     setValue("ward", "");
   }, [selectedProvince, setValue]);
 
-  // Lọc danh sách Phường/Xã tương ứng với Tỉnh/Thành phố đã chọn
   const filteredWards = React.useMemo(() => {
     if (!selectedProvince) return [];
     return wards
@@ -181,23 +187,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name, "vi"));
   }, [selectedProvince, wards]);
 
-  // Định dạng danh sách tùy chọn cho ô tìm kiếm Tỉnh/Thành phố
   const provinceOptions = React.useMemo(() => {
     return provinces.map((p) => ({ value: p.code, label: p.name_with_type }));
   }, [provinces]);
 
-  // Định dạng danh sách tùy chọn cho ô tìm kiếm Phường/Xã
   const wardOptions = React.useMemo(() => {
     return filteredWards.map((w) => ({ value: w.name_with_type, label: w.name_with_type }));
   }, [filteredWards]);
 
-  // Xử lý mapping code Tỉnh/Thành phố sang Tên đầy đủ trước khi gửi dữ liệu lên App.tsx
+  // Store the readable province name instead of its dataset code.
   const handleFormSubmit = (formData: FormSchemaType) => {
     const provinceObj = provinces.find((p) => p.code === formData.province);
     const mappedData: RegistrationData = {
       ...formData,
       branch,
-      // Map mã code tỉnh (ví dụ '11') sang tên thật (ví dụ 'Thành phố Hà Nội')
       province: provinceObj ? provinceObj.name_with_type : formData.province,
     } as RegistrationData;
     onSubmit(mappedData);
@@ -205,7 +208,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
-      {/* 1. Họ tên */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <User className="w-4 h-4 text-dym-blue-500" />
@@ -231,9 +233,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         )}
       </div>
 
-      {/* 2. Ngày sinh & Giới tính */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Ngày sinh */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-dym-blue-500" />
@@ -257,7 +257,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
           )}
         </div>
 
-        {/* Giới tính */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
             <Heart className="w-4 h-4 text-dym-blue-500" />
@@ -288,7 +287,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </div>
       </div>
 
-      {/* 3. CCCD */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-dym-blue-500" />
@@ -314,7 +312,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         )}
       </div>
 
-      {/* 4. Số điện thoại */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <Phone className="w-4 h-4 text-dym-blue-500" />
@@ -342,9 +339,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         )}
       </div>
 
-      {/* 5. Địa chỉ: Tỉnh/Thành phố & Phường/Xã (Lưới 2 cột) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Tỉnh / Thành phố */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
             <Building className="w-4 h-4 text-dym-blue-500" />
@@ -373,11 +368,19 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             </p>
           )}
           {locationLoadError && (
-            <p className="mt-1 text-xs text-red-500 font-medium">{t.locationLoadError}</p>
+            <div className="mt-1 flex items-center gap-2 text-xs text-red-500 font-medium">
+              <span>{t.locationLoadError}</span>
+              <button
+                type="button"
+                className="font-bold underline underline-offset-2"
+                onClick={loadLocations}
+              >
+                {lang === "vi" ? "Thử lại" : "Retry"}
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Phường / Xã */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-dym-blue-500" />
@@ -407,7 +410,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </div>
       </div>
 
-      {/* Địa chỉ chi tiết */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <Home className="w-4 h-4 text-dym-blue-500" />
@@ -433,7 +435,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         )}
       </div>
 
-      {/* 6. Tên công ty */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
           <Building className="w-4 h-4 text-dym-blue-500" />
@@ -450,7 +451,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </div>
       </div>
 
-      {/* Honeypot field ẩn để bẫy bot spam */}
+      {/* Hidden honeypot; real users never interact with this field. */}
       <div className="absolute opacity-0 pointer-events-none -z-10" aria-hidden="true">
         <input
           type="text"
@@ -461,7 +462,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         />
       </div>
 
-      {/* Nút Submit */}
       <button
         type="submit"
         disabled={isLoading}

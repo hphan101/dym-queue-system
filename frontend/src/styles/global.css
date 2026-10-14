@@ -1,3 +1,5 @@
+@import "./tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,22 +7,17 @@
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f4f9fc; /* Đồng bộ với màu nền xanh nhạt của website dymmedicalcenter.com.vn */
-  color: #0d1227; /* Màu chữ tối đặc trưng */
+  background-color: #f4f9fc;
+  color: #0d1227;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Các tùy chỉnh phong cách y tế dựa trên tông màu của DYM */
 .medical-card {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(99, 196, 232, 0.18); /* Sử dụng viền xanh dương sáng #63c4e8 */
+  border: 1px solid rgba(99, 196, 232, 0.18);
   box-shadow: 0 10px 30px -5px rgba(17, 24, 51, 0.04), 0 8px 12px -6px rgba(17, 24, 51, 0.02);
-}
-
-.medical-gradient {
-  background: linear-gradient(135deg, #111833 0%, #63c4e8 100%); /* Gradient từ navy sang sky blue */
 }
 
 .pulse-soft {
@@ -39,7 +36,6 @@ body {
   }
 }
 
-/* Loading Overlay đồng bộ 100% với website dymmedicalcenter.com.vn */
 .page-loader {
   background: #ffffff;
   width: 100%;
@@ -92,4 +88,3 @@ body {
     background-position: 0% 100%, 50% 100%, 100% 0%;
   }
 }
-

@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  --color-paper: oklch(13% 0.018 238);
+  --color-paper-2: oklch(16.5% 0.021 238);
+  --color-paper-3: oklch(20% 0.024 238);
+  --color-paper-raised: oklch(23% 0.026 238);
+  --color-ink: oklch(94% 0.012 225);
+  --color-ink-2: oklch(77% 0.022 225);
+  --color-muted: oklch(67% 0.022 225);
+  --color-rule: oklch(29% 0.029 232);
+  --color-rule-2: oklch(35% 0.034 230);
+  --color-brand-accent: oklch(72% 0.13 220);
+  --color-brand-accent-muted: oklch(29% 0.055 220);
+  --color-brand-accent-ink: oklch(14% 0.025 235);
+  --color-focus: var(--color-brand-accent);
+  --color-success: oklch(74% 0.13 153);
+  --color-warning: oklch(80% 0.13 85);
+  --color-error: oklch(72% 0.16 28);
+  --color-shadow-deep: oklch(5% 0.012 238 / 0.56);
+  --color-overlay-hover-soft: oklch(96% 0.018 220 / 0.055);
+  --color-overlay-pressed-soft: oklch(96% 0.018 220 / 0.1);
+
+  --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: clamp(1.25rem, 1.6vw, 1.5rem);
+  --text-2xl: clamp(1.75rem, 3vw, 2.5rem);
+  --text-display: clamp(4.5rem, 10vw, 8.5rem);
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-medium: 220ms;
+
+  --rule-thin: 1px;
+  --rule-heavy: 2px;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+  --radius-pill: 999px;
+
+  --shadow-raised: 0 1.25rem 3.5rem var(--color-shadow-deep);
+}
+
+:is(.dym-admin-shell[data-color-mode="light"], .dym-display-shell) {
+  --color-paper: #f4f9fc;
+  --color-paper-2: #ffffff;
+  --color-paper-3: #eff9fd;
+  --color-paper-raised: #ffffff;
+  --color-ink: #0d1227;
+  --color-ink-2: #334155;
+  --color-muted: #536274;
+  --color-rule: rgb(99 196 232 / 18%);
+  --color-rule-2: #a8cbd9;
+  --color-brand-accent: #63c4e8;
+  --color-brand-accent-muted: #d3f0fc;
+  --color-brand-accent-ink: #111833;
+  --color-focus: #258eb7;
+  --color-success: oklch(49% 0.13 153);
+  --color-warning: oklch(57% 0.14 78);
+  --color-error: oklch(54% 0.18 28);
+  --color-shadow-deep: rgb(17 24 51 / 14%);
+  --color-overlay-hover-soft: rgb(17 24 51 / 5%);
+  --color-overlay-pressed-soft: rgb(17 24 51 / 9%);
+
+  --color-accent: var(--color-brand-accent);
+  --color-accent-muted: var(--color-brand-accent-muted);
+  --color-on-accent: var(--color-brand-accent-ink);
+  --color-background-body: var(--color-paper);
+  --color-background-surface: var(--color-paper-2);
+  --color-background-card: var(--color-paper-2);
+  --color-background-muted: var(--color-paper-3);
+  --color-background-popover: var(--color-paper-raised);
+  --color-text-primary: var(--color-ink);
+  --color-text-secondary: var(--color-muted);
+  --color-text-accent: var(--color-brand-accent);
+  --color-icon-primary: var(--color-ink);
+  --color-icon-secondary: var(--color-muted);
+  --color-icon-accent: var(--color-brand-accent);
+  --color-border: var(--color-rule);
+  --color-border-emphasized: var(--color-rule-2);
+  --color-shadow: var(--color-shadow-deep);
+  --color-overlay-hover: var(--color-overlay-hover-soft);
+  --color-overlay-pressed: var(--color-overlay-pressed-soft);
+
+  color-scheme: light;
+}

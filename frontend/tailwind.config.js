@@ -9,13 +9,13 @@ export default {
       colors: {
         dym: {
           blue: {
-            50: '#eff9fd', // Màu nền xanh nhạt đặc trưng của website
+            50: '#eff9fd',
             100: '#d3f0fc',
-            500: '#63c4e8', // Màu xanh dương sáng (Primary button / Accent) của DYM
-            600: '#4eb3d8', // Màu hover cho button
+            500: '#63c4e8',
+            600: '#4eb3d8',
             700: '#39a2c8',
-            800: '#111833', // Màu xanh navy đậm (Footer / Header) của DYM
-            900: '#0d1227', // Màu chữ tối
+            800: '#111833',
+            900: '#0d1227',
           },
           accent: {
             50: '#fffbeb',

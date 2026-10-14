@@ -48,7 +48,7 @@ export const translations = {
     
     // Lỗi hệ thống
     failedTitle: 'Đăng ký thất bại',
-    errorUrl: 'Chưa cấu hình URL Google Apps Script. Vui lòng thêm VITE_APPS_SCRIPT_URL vào file .env'
+    errorUrl: 'Chưa cấu hình máy chủ đăng ký. Vui lòng liên hệ quản trị viên.'
   },
   en: {
     title: 'Medical Registration',
@@ -99,6 +99,6 @@ export const translations = {
     
     // Errors
     failedTitle: 'Registration Failed',
-    errorUrl: 'Google Apps Script URL is not configured. Please add VITE_APPS_SCRIPT_URL to .env'
+    errorUrl: 'The registration server is not configured. Please contact an administrator.'
   }
 };

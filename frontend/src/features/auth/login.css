@@ -1,0 +1,129 @@
+.dym-admin-theme {
+  color-scheme: light;
+  min-height: 100dvh;
+  background: #eff9fd;
+  --color-accent: #111833;
+  --color-accent-muted: rgba(99, 196, 232, 0.2);
+  --color-on-accent: #f8fbfd;
+  --color-background-body: #eff9fd;
+  --color-background-surface: #f8fbfd;
+  --color-background-card: #f8fbfd;
+  --color-text-primary: #111833;
+  --color-text-secondary: #536274;
+  --color-text-accent: #197fa6;
+  --color-icon-accent: #197fa6;
+  --color-border: rgba(37, 142, 183, 0.22);
+  --color-border-emphasized: #a8cbd9;
+  --color-shadow: rgba(17, 24, 51, 0.14);
+}
+
+.dym-admin-logo {
+  display: block;
+  width: 176px;
+  height: auto;
+}
+
+.dym-admin-card {
+  border-radius: 16px;
+  box-shadow: 0 20px 55px -32px rgba(17, 24, 51, 0.38);
+}
+
+.dym-admin-theme .astryx-heading {
+  color: #111833;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dym-admin-theme .astryx-field-label {
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.dym-admin-theme .astryx-text-input {
+  min-height: 44px;
+  border: 1px solid #a8cbd9;
+  border-radius: 8px;
+  background: #ffffff;
+  transition: border-color 130ms ease, box-shadow 130ms ease;
+}
+
+.dym-admin-theme .astryx-text-input:focus-within {
+  border-color: #258eb7;
+  box-shadow: 0 0 0 3px rgba(99, 196, 232, 0.25);
+}
+
+.dym-admin-theme .astryx-text-input input {
+  padding-inline: 12px;
+  color: #111833;
+}
+
+.dym-admin-theme .astryx-text-input input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.dym-admin-theme .astryx-button {
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 700;
+  transition: background-color 130ms ease, border-color 130ms ease, transform 130ms ease;
+}
+
+.dym-admin-theme .astryx-button.primary {
+  background: #111833;
+  color: #f8fbfd;
+}
+
+.dym-admin-theme .astryx-button.primary:hover {
+  background: #1b2852;
+}
+
+.dym-admin-theme .astryx-button.secondary {
+  border: 1px solid #a8cbd9;
+  background: #ffffff;
+  color: #111833;
+}
+
+.dym-admin-theme .astryx-button.secondary:hover {
+  border-color: #63c4e8;
+  background: #f7fcfe;
+}
+
+.dym-admin-theme .astryx-button:active {
+  transform: translateY(1px);
+}
+
+.dym-admin-theme .astryx-button:focus-visible,
+.dym-admin-theme .astryx-link:focus-visible {
+  outline: 2px solid #258eb7;
+  outline-offset: 2px;
+}
+
+.dym-admin-error {
+  border: 1px solid rgba(227, 25, 59, 0.22);
+  border-radius: 8px;
+  background: rgba(227, 25, 59, 0.08);
+  padding: 12px;
+  color: #a80720;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.dym-admin-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (max-width: 479px) {
+  .dym-admin-logo {
+    width: 156px;
+  }
+
+  .dym-admin-card {
+    border-radius: 12px;
+  }
+}

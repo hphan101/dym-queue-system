@@ -1,0 +1,17 @@
+{
+  "name": "dym-queue-system",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "db:lint": "supabase db lint --linked --level warning",
+    "db:push": "supabase db push",
+    "deploy:register": "supabase functions deploy register --project-ref vpnctivvbdgebctyyoez --use-api",
+    "deploy:staff": "supabase functions deploy manage-staff --project-ref vpnctivvbdgebctyyoez --use-api --no-verify-jwt",
+    "deploy:login": "supabase functions deploy login --project-ref vpnctivvbdgebctyyoez --use-api --no-verify-jwt"
+  },
+  "devDependencies": {
+    "supabase": "^2.110.0"
+  }
+}

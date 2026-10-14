@@ -1,4 +1,6 @@
-export type BranchCode = 'q1' | 'q7' | 'hn';
+import type { BranchCode } from '../../types/domain';
+
+export type { BranchCode } from '../../types/domain';
 
 export interface RegistrationData {
   branch: BranchCode;

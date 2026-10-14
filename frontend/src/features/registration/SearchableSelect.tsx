@@ -33,12 +33,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Lấy nhãn của tùy chọn hiện tại để hiển thị trong input khi đóng
   const selectedOption = useMemo(() => {
     return options.find((opt) => opt.value === value);
   }, [options, value]);
 
-  // Hàm loại bỏ dấu tiếng Việt để tìm kiếm không dấu
   const removeDiacritics = (str: string) => {
     return str
       .normalize("NFD")
@@ -48,7 +46,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       .toLowerCase();
   };
 
-  // Lọc tùy chọn theo từ khóa tìm kiếm
   const filteredOptions = useMemo(() => {
     if (!searchTerm.trim()) return options;
     const cleanSearch = removeDiacritics(searchTerm);
@@ -57,7 +54,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     );
   }, [options, searchTerm]);
 
-  // Click ra ngoài để đóng dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -73,7 +69,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     };
   }, []);
 
-  // Khi người dùng tập trung vào ô nhập, mở danh sách và reset từ khóa
   const handleFocus = () => {
     if (disabled) return;
     onFocus?.();
@@ -104,7 +99,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
           }`}
         />
-        {/* Biểu tượng mũi tên hướng xuống */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-slate-400 pointer-events-none">
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
@@ -112,7 +106,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         </div>
       </div>
 
-      {/* Danh sách kết quả lọc */}
       {isOpen && !disabled && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto py-1">
           {isLoadingOptions ? (

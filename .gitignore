@@ -5,12 +5,15 @@
 **/dist
 **/dist-ssr
 
-# Environments
+# Local environments and deployment metadata
 **/.env
 **/.env.local
 **/.env.development.local
 **/.env.test.local
 **/.env.production.local
+**/.vercel
+**/.hallmark
+supabase/.temp
 
 # Logs
 **/logs
