@@ -7,6 +7,9 @@ import {
 import { createAdminClient } from "../_shared/supabase.ts";
 
 function getSupabaseSecretKey(): string | null {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (serviceRoleKey) return serviceRoleKey;
+
   const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (secretKeys) {
     try {
@@ -19,7 +22,7 @@ function getSupabaseSecretKey(): string | null {
       console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
     }
   }
-  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? null;
+  return null;
 }
 
 function getSupabasePublishableKey(): string | null {

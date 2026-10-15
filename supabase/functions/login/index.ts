@@ -14,6 +14,9 @@ const RATE_MAX_ATTEMPTS = 20;
 const attempts = new Map<string, { count: number; expiresAt: number }>();
 
 function getSupabaseSecretKey(): string | null {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (serviceRoleKey) return serviceRoleKey;
+
   const keys = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (keys) {
     try {
@@ -23,7 +26,7 @@ function getSupabaseSecretKey(): string | null {
       console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
     }
   }
-  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? null;
+  return null;
 }
 
 function getSupabasePublishableKey(): string | null {
