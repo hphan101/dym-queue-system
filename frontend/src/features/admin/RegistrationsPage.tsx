@@ -19,6 +19,7 @@ import '@astryxdesign/core/astryx.css';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { TT25PrintModal } from '../registration/TT25PrintModal';
+import type { TT25RegistrationData } from '../registration/tt25Types';
 
 import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
@@ -137,7 +138,7 @@ export function RegistrationsPage({
   const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
-      navigator.onLine ? 'connecting' : 'offline',
+      navigator.onLine ? 'connected' : 'offline',
     );
   const [newRegistrationNotice, setNewRegistrationNotice] =
     useState<CustomerNotificationItem | null>(null);
@@ -159,6 +160,36 @@ export function RegistrationsPage({
 
   const rows = useMemo(() => fetchedRows ?? [], [fetchedRows]);
   const error = queryError ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.' : null;
+
+  const printModalData = useMemo<TT25RegistrationData | null>(() => {
+    if (!printModalRow) return null;
+    return {
+      branch,
+      fullName: printModalRow.full_name,
+      gender: (printModalRow.gender as 'Nam' | 'Nữ') || 'Nam',
+      birthDate: printModalRow.birth_date,
+      ethnicity: 'Kinh',
+      bloodGroup: 'Chưa rõ',
+      cccd: printModalRow.identity_document,
+      insuranceNumber: '',
+      province: printModalRow.province,
+      ward: printModalRow.ward,
+      addressDetail: printModalRow.address_detail,
+      occupation: '',
+      workplace: printModalRow.company_name || '',
+      workplaceWard: '',
+      phoneNumber: printModalRow.phone_number,
+      checkupReason: 'Khám sức khỏe tổng quát',
+      medicalHistory: {
+        familyHistory: { hasDisease: false, diseaseDetails: '' },
+        personalHistory: {},
+        personalOtherDetails: '',
+        currentTreatment: { isTreating: false, medications: '' },
+        pregnancyHistory: { hasHistory: false, details: '' },
+        commitmentAgreed: true,
+      },
+    };
+  }, [branch, printModalRow]);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -406,7 +437,8 @@ export function RegistrationsPage({
 
           <main className="dym-admin-content">
             {/* Connection alert if offline or error */}
-            {connectionState !== 'connected' && (
+            {(connectionState === 'offline' ||
+              connectionState === 'disconnected') && (
               <div
                 className="dym-connection-alert"
                 data-state={connectionState}
@@ -418,9 +450,7 @@ export function RegistrationsPage({
                   <strong>
                     {connectionState === 'offline'
                       ? 'Thiết bị đang mất Internet'
-                      : connectionState === 'connecting'
-                        ? 'Đang kết nối dữ liệu trực tiếp'
-                        : 'Mất kết nối Supabase Realtime'}
+                      : 'Mất kết nối Supabase Realtime'}
                   </strong>
                   <span>
                     {connectionState === 'offline'
@@ -954,36 +984,11 @@ export function RegistrationsPage({
             )}
 
             {/* TT25 Print Preview Modal */}
-            {printModalRow && (
+            {printModalRow && printModalData && (
               <TT25PrintModal
                 isOpen={Boolean(printModalRow)}
                 onClose={() => setPrintModalRow(null)}
-                data={{
-                  branch: branch,
-                  fullName: printModalRow.full_name,
-                  gender: (printModalRow.gender as 'Nam' | 'Nữ') || 'Nam',
-                  birthDate: printModalRow.birth_date,
-                  ethnicity: 'Kinh',
-                  bloodGroup: 'Chưa rõ',
-                  cccd: printModalRow.identity_document,
-                  insuranceNumber: '',
-                  province: printModalRow.province,
-                  ward: printModalRow.ward,
-                  addressDetail: printModalRow.address_detail,
-                  occupation: '',
-                  workplace: printModalRow.company_name || '',
-                  workplaceWard: '',
-                  phoneNumber: printModalRow.phone_number,
-                  checkupReason: 'Khám sức khỏe tổng quát',
-                  medicalHistory: {
-                    familyHistory: { hasDisease: false, diseaseDetails: '' },
-                    personalHistory: {},
-                    personalOtherDetails: '',
-                    currentTreatment: { isTreating: false, medications: '' },
-                    pregnancyHistory: { hasHistory: false, details: '' },
-                    commitmentAgreed: true,
-                  },
-                }}
+                data={printModalData}
                 registrationNumber={formatQueueNumber(printModalRow.queue_number)}
               />
             )}

@@ -80,7 +80,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
   );
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
-      navigator.onLine ? 'connecting' : 'offline',
+      navigator.onLine ? 'connected' : 'offline',
     );
   const [customerNotification, setCustomerNotification] =
     useState<CustomerNotificationItem | null>(null);
@@ -186,7 +186,9 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (!branchId) return;
 
     let isCurrentChannel = true;
-    setConnectionState(navigator.onLine ? 'connecting' : 'offline');
+    if (!navigator.onLine) {
+      setConnectionState('offline');
+    }
 
     const channel = supabase
       .channel(`admin:${branchId}:${date}`)
@@ -561,7 +563,8 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
           />
 
           <main id="overview" className="dym-admin-content">
-            {connectionState !== 'connected' && (
+            {(connectionState === 'offline' ||
+              connectionState === 'disconnected') && (
               <div
                 className="dym-connection-alert"
                 data-state={connectionState}
@@ -573,9 +576,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
                   <strong>
                     {connectionState === 'offline'
                       ? 'Thiết bị đang mất Internet'
-                      : connectionState === 'connecting'
-                        ? 'Đang kết nối dữ liệu trực tiếp'
-                        : 'Mất kết nối Supabase Realtime'}
+                      : 'Mất kết nối Supabase Realtime'}
                   </strong>
                   <span>
                     {connectionState === 'offline'

@@ -24,13 +24,21 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'pdf' | 'web'>('pdf');
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const pdfUrlRef = useRef<string | null>(null);
+
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   const loadPdf = useCallback(() => {
     setIsLoading(true);
     setError(null);
 
-    generateTT25OriginalPdf(data, registrationNumber)
+    generateTT25OriginalPdf(dataRef.current, registrationNumber)
       .then(({ url }) => {
+        if (pdfUrlRef.current && pdfUrlRef.current !== url) {
+          URL.revokeObjectURL(pdfUrlRef.current);
+        }
+        pdfUrlRef.current = url;
         setPdfUrl(url);
         setIsLoading(false);
       })
@@ -39,7 +47,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         setError(err instanceof Error ? err.message : 'Không thể tải file mẫu gốc.');
         setIsLoading(false);
       });
-  }, [data, registrationNumber]);
+  }, [registrationNumber]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,11 +73,12 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
   useEffect(() => {
     return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
       }
     };
-  }, [pdfUrl]);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -213,12 +222,18 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
           )}
 
           {!isLoading && !error && pdfUrl && (
-            <iframe
-              ref={iframeRef}
-              src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
-              title="Phiếu khám sức khỏe Mẫu 03 TT25"
+            <object
+              data={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+              type="application/pdf"
               className="w-full h-full border-0"
-            />
+            >
+              <iframe
+                ref={iframeRef}
+                src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                title="Phiếu khám sức khỏe Mẫu 03 TT25"
+                className="w-full h-full border-0"
+              />
+            </object>
           )}
         </div>
       ) : (

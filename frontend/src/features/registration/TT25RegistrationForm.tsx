@@ -8,6 +8,7 @@ import {
   Building,
   Heart,
   Activity,
+  Check,
   CheckCircle2,
   AlertCircle,
   ChevronRight,
@@ -284,34 +285,74 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   return (
     <div className="w-full">
       {/* Step Indicator Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between max-w-sm mx-auto mb-2 relative">
-          <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 -z-0" />
-          <div
-            className="absolute left-6 top-1/2 -translate-y-1/2 h-0.5 bg-dym-blue-500 transition-all duration-300 -z-0"
-            style={{ width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%' }}
-          />
+      <div className="mb-7">
+        <div className="max-w-xs sm:max-w-sm mx-auto relative">
+          {/* Connecting Track Line: aligned to center of 32px circle (top-4) */}
+          <div className="absolute top-4 left-6 right-6 -translate-y-1/2 h-[2.5px] bg-slate-200 rounded-full overflow-hidden pointer-events-none">
+            <div
+              className="h-full bg-dym-blue-500 rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%',
+              }}
+            />
+          </div>
 
-          {[
-            { step: 1, label: 'Hành chính' },
-            { step: 2, label: 'Tiền sử bệnh' },
-            { step: 3, label: 'Xác nhận' },
-          ].map((item) => (
-            <div key={item.step} className="flex flex-col items-center z-10">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  currentStep >= item.step
-                    ? 'bg-dym-blue-500 text-white shadow-md'
-                    : 'bg-white border-2 border-slate-300 text-slate-400'
-                }`}
-              >
-                {currentStep > item.step ? '✓' : item.step}
-              </div>
-              <span className="text-[11px] font-medium text-slate-600 mt-1">
-                {item.label}
-              </span>
-            </div>
-          ))}
+          {/* Step Items */}
+          <div className="flex items-start justify-between relative z-10">
+            {([
+              { step: 1, label: 'Hành chính' },
+              { step: 2, label: 'Tiền sử bệnh' },
+              { step: 3, label: 'Xác nhận' },
+            ] as const).map((item) => {
+              const isCompleted = currentStep > item.step;
+              const isCurrent = currentStep === item.step;
+              const isClickable = item.step < currentStep;
+
+              return (
+                <button
+                  key={item.step}
+                  type="button"
+                  disabled={!isClickable}
+                  onClick={() => {
+                    if (isClickable) {
+                      setCurrentStep(item.step);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  className={`flex flex-col items-center group transition-all ${
+                    isClickable ? 'cursor-pointer' : 'cursor-default'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+                      isCompleted
+                        ? 'bg-dym-blue-500 text-white shadow-sm ring-2 ring-dym-blue-100 group-hover:bg-dym-blue-600'
+                        : isCurrent
+                          ? 'bg-dym-blue-600 text-white shadow-md ring-4 ring-dym-blue-100 scale-105'
+                          : 'bg-white border-2 border-slate-300 text-slate-400'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-4 h-4 stroke-[2.5]" aria-hidden="true" />
+                    ) : (
+                      item.step
+                    )}
+                  </div>
+                  <span
+                    className={`text-xs mt-1.5 transition-colors ${
+                      isCurrent
+                        ? 'font-bold text-dym-blue-700'
+                        : isCompleted
+                          ? 'font-medium text-slate-700 group-hover:text-dym-blue-600'
+                          : 'font-medium text-slate-400'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
