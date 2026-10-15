@@ -663,13 +663,14 @@ Deno.serve(async (request: Request): Promise<Response> => {
         return await handleResetPassword(serviceClient, userClient, actor, payload, origin);
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(JSON.stringify({
       requestId,
       code: "MANAGE_STAFF_FAILED",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
     }));
     return jsonResponse(
-      { success: false, code: "SERVER_ERROR", requestId },
+      { success: false, code: "SERVER_ERROR", message: errorMessage, requestId },
       500,
       origin,
     );

@@ -5,7 +5,7 @@ export function createAdminClient(supabaseUrl: string, secretKey: string) {
     const headers = new Headers(init?.headers);
 
     // Opaque sb_secret keys belong in `apikey`; they are not JWT bearer tokens.
-    if (headers.get("authorization") === `Bearer ${secretKey}`) {
+    if (secretKey.startsWith("sb_secret_") && headers.get("authorization") === `Bearer ${secretKey}`) {
       headers.delete("authorization");
     }
 
