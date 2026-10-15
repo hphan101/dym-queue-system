@@ -626,7 +626,8 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   padding: var(--space-4) var(--space-4) var(--space-8);
 }
 
-.dym-connection-alert {
+.dym-connection-alert,
+.dym-connection-banner {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -638,27 +639,36 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   background: color-mix(in srgb, var(--color-warning) 12%, var(--color-paper-2));
 }
 
-.dym-connection-alert[data-state="offline"] {
+.dym-connection-alert[data-state="offline"],
+.dym-connection-banner[data-state="offline"] {
   border-color: color-mix(in srgb, var(--color-error) 45%, transparent);
   background: color-mix(in srgb, var(--color-error) 10%, var(--color-paper-2));
 }
 
-.dym-connection-alert > svg {
+.dym-connection-alert > svg,
+.dym-connection-banner > svg {
   width: 1.25rem;
-  flex: 0 0 auto;
+  height: 1.25rem;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
+  flex: 0 0 1.25rem;
   color: var(--color-warning);
 }
 
-.dym-connection-alert[data-state="offline"] > svg {
+.dym-connection-alert[data-state="offline"] > svg,
+.dym-connection-banner[data-state="offline"] > svg {
   color: var(--color-error);
 }
 
 .dym-connection-alert strong,
-.dym-connection-alert span {
+.dym-connection-banner strong,
+.dym-connection-alert span,
+.dym-connection-banner span {
   display: block;
 }
 
-.dym-connection-alert span {
+.dym-connection-alert span,
+.dym-connection-banner span {
   margin-top: var(--space-1);
   color: var(--color-muted);
   font-size: var(--text-xs);
@@ -1479,3 +1489,1840 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
     transition-duration: 0.01ms;
   }
 }
+
+/* ==========================================================================
+   DYM CLINICAL CONSOLE REDESIGN (Frontend-Design High-Craft System)
+   ========================================================================== */
+
+/* --- Admin Header Bar --- */
+.dym-admin-header-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-paper-2);
+}
+
+@media (min-width: 64rem) {
+  .dym-admin-header-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2rem;
+  }
+}
+
+.dym-header-branding {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dym-header-tagline {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.dym-badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #059669;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-badge-live {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.dym-header-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  line-height: 1.25;
+}
+
+.dym-header-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-ink-2);
+}
+
+.dym-header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.dym-btn-sound {
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-btn-sound:hover {
+  background: var(--color-paper-3);
+  border-color: var(--color-brand-accent);
+}
+
+.dym-sound-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.dym-sound-indicator-led {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dym-sound-indicator-led.led-on {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.dym-sound-indicator-led.led-off {
+  background: #94a3b8;
+}
+
+.dym-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dym-control-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dym-select-wrapper,
+.dym-date-wrapper {
+  position: relative;
+}
+
+.dym-control-select {
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dym-control-select:focus {
+  border-color: var(--color-brand-accent);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.dym-control-date-btn {
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  min-width: 9.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.dym-control-date-btn:hover {
+  background: var(--color-paper-3);
+  border-color: #0284c7;
+}
+
+.dym-control-date-btn:focus-visible {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.dym-control-date-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.dym-control-date-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #0284c7;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.dym-control-date-btn:hover .dym-control-date-icon {
+  transform: scale(1.1);
+}
+
+.dym-native-date-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dym-btn-today-link {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0284c7;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s ease;
+}
+
+.dym-btn-today-link:hover {
+  opacity: 0.8;
+}
+
+/* --- Header Action Buttons & Slots --- */
+.dym-header-actions-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dym-btn-action-primary {
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dym-btn-action-primary:hover:not(:disabled) {
+  background: #0369a1;
+  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.3);
+  transform: translateY(-1px);
+}
+
+.dym-btn-action-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dym-btn-action-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dym-btn-action-primary svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.dym-btn-action-secondary {
+  height: 2.5rem;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4375rem;
+  padding: 0 0.9375rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.dym-btn-action-secondary svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: #0284c7;
+  transition: transform 0.25s ease;
+}
+
+.dym-btn-action-secondary:hover:not(:disabled) {
+  background: var(--color-paper-3);
+  border-color: #0284c7;
+  color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px -2px rgba(2, 132, 199, 0.15);
+}
+
+.dym-btn-action-secondary:hover:not(:disabled) svg:not(.animate-spin) {
+  transform: rotate(45deg);
+}
+
+.dym-btn-action-secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dym-btn-action-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Compact variant for action buttons inside precision table cells */
+.dym-table-precision .dym-btn-action-secondary,
+.dym-table-precision .dym-btn-action-primary {
+  height: 2rem;
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+  gap: 0.25rem;
+}
+
+.dym-table-precision .dym-btn-action-secondary svg,
+.dym-table-precision .dym-btn-action-primary svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-action-primary {
+  background: #0284c7;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-action-primary:hover:not(:disabled) {
+  background: #38bdf8;
+  color: #0f172a;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-action-secondary:hover:not(:disabled) {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* --- Clinical Terminal (Hero Section) --- */
+.dym-clinical-terminal {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 64rem) {
+  .dym-clinical-terminal {
+    grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 0.9fr);
+  }
+}
+
+.dym-terminal-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-terminal-hero {
+  background: linear-gradient(145deg, #0f1d33 0%, #0a1424 100%);
+  border-color: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.dym-terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.dym-terminal-radar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dym-radar-pulse {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: dymPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes dymPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.dym-terminal-pill {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0284c7;
+}
+
+.dym-terminal-branch {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  border-left: 1px solid var(--color-rule-2);
+  padding-left: 0.5rem;
+}
+
+.dym-terminal-clock {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+  background: var(--color-paper);
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+}
+
+.dym-clock-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #0284c7;
+}
+
+/* Central Digital Display Card */
+.dym-terminal-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.dym-display-kicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}
+
+.dym-display-number-card {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  padding: 1.75rem 1.5rem;
+  border-radius: 1rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+  transition: all 0.2s ease;
+}
+
+.dym-display-number-card.is-active {
+  border-color: rgba(2, 132, 199, 0.4);
+  background: linear-gradient(180deg, var(--color-paper) 0%, rgba(2, 132, 199, 0.04) 100%);
+  box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.1);
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-display-number-card.is-active {
+  background: linear-gradient(180deg, #13243d 0%, #0d1a2d 100%);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 10px 30px rgba(2, 132, 199, 0.25);
+}
+
+.dym-number-ticket-header {
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--color-muted);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.dym-display-digits {
+  font-size: 4rem;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  display: block;
+}
+
+.dym-display-number-card.is-active .dym-display-digits {
+  color: #0284c7;
+  text-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-display-number-card.is-active .dym-display-digits {
+  color: #38bdf8;
+  text-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
+}
+
+.dym-display-patient-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-top: 0.875rem;
+}
+
+.dym-badge-serving {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-badge-serving {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.dym-badge-serving-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #10b981;
+}
+
+/* Announcement Speaker Bar */
+.dym-terminal-announcement {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 1.25rem;
+  border-radius: 0.5rem;
+  background: var(--color-paper-3);
+  border: 1px solid var(--color-rule);
+  color: var(--color-ink-2);
+  font-size: 0.75rem;
+}
+
+.dym-speaker-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.dym-announcement-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Action Button Bar */
+.dym-terminal-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 32rem) {
+  .dym-terminal-actions {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.dym-btn-call-next {
+  min-height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  border: none;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.dym-btn-call-next:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+}
+
+.dym-btn-call-next:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.dym-btn-call-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dym-btn-call-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dym-btn-call-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.dym-btn-call-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  margin-left: 0.875rem;
+  flex-grow: 1;
+}
+
+.dym-btn-call-title {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.dym-btn-call-sub {
+  font-size: 0.6875rem;
+  opacity: 0.85;
+}
+
+.dym-kbd-hint {
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.4375rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.dym-btn-recall {
+  min-height: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.dym-btn-recall:hover:not(:disabled) {
+  background: var(--color-paper-3);
+  border-color: #0284c7;
+}
+
+.dym-btn-recall:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dym-recall-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.dym-btn-recall-text {
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.dym-btn-recall .dym-kbd-hint {
+  background: var(--color-paper-3);
+  border-color: var(--color-rule-2);
+  color: var(--color-muted);
+  margin-top: 0.125rem;
+}
+
+.dym-btn-spinner {
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 9999px;
+  animation: dymSpin 0.75s linear infinite;
+}
+
+@keyframes dymSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Terminal Ledger & Analytics (Side Panel) --- */
+.dym-terminal-ledger {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+}
+
+.dym-ledger-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dym-ledger-subtitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  display: block;
+}
+
+.dym-ledger-title {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.dym-ledger-total-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+  color: var(--color-ink);
+}
+
+/* Progress Tracker */
+.dym-progress-card {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+}
+
+.dym-progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.dym-progress-label {
+  font-weight: 600;
+  color: var(--color-ink-2);
+}
+
+.dym-progress-value {
+  font-weight: 800;
+  color: #0284c7;
+}
+
+.dym-progress-track {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-paper-3);
+  overflow: hidden;
+}
+
+.dym-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #0284c7, #10b981);
+  transition: width 0.4s ease;
+}
+
+/* Status Breakdown Cards */
+.dym-status-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.dym-status-item {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  display: flex;
+  flex-direction: column;
+}
+
+.dym-status-item.item-waiting {
+  border-left: 3px solid #f59e0b;
+}
+
+.dym-status-item.item-called {
+  border-left: 3px solid #10b981;
+}
+
+.dym-status-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.item-waiting .dym-status-dot-indicator {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #f59e0b;
+}
+
+.item-called .dym-status-dot-indicator {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #10b981;
+}
+
+.dym-status-count-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.dym-status-number {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+
+.dym-status-unit {
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+}
+
+.dym-status-footnote {
+  font-size: 0.6875rem;
+  color: var(--color-ink-2);
+}
+
+/* --- Registry Ledger Panel (The Table Section) --- */
+.dym-registry-panel {
+  border-radius: 1rem;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  overflow: hidden;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+}
+
+.dym-registry-toolbar {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-rule);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 64rem) {
+  .dym-registry-toolbar {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+.dym-registry-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dym-registry-kicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+
+.dym-registry-heading,
+.dym-registry-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.dym-registry-desc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-ink-2);
+}
+
+.dym-registry-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Quick Filter Tab Group */
+.dym-tab-group,
+.dym-filter-tabs {
+  display: inline-flex;
+  padding: 0.25rem;
+  border-radius: 0.625rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+  gap: 0.25rem;
+}
+
+.dym-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: none;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-tab-btn:hover {
+  color: var(--color-ink);
+}
+
+.dym-tab-btn.is-active {
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dym-tab-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 9999px;
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+}
+
+.dym-tab-dot-waiting {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #f59e0b;
+}
+
+.dym-tab-dot-called {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #10b981;
+}
+
+/* Search Box */
+.dym-search-wrapper {
+  position: relative;
+  min-width: 16rem;
+}
+
+.dym-search-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dym-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.dym-search-field {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 2rem 0 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.dym-search-field:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.dym-search-clear-btn {
+  position: absolute;
+  right: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.dym-search-clear-btn:hover {
+  color: var(--color-ink);
+}
+
+.dym-search-shortcut {
+  position: absolute;
+  right: 0.625rem;
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  background: var(--color-paper-3);
+  color: var(--color-muted);
+  border: 1px solid var(--color-rule-2);
+  pointer-events: none;
+}
+
+/* --- Precision Table Styling --- */
+.dym-table-scroller {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.dym-table-precision {
+  width: 100%;
+  min-width: 58rem;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+
+.dym-table-precision thead tr {
+  background: var(--color-paper-3);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.dym-table-precision th {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.dym-table-precision tbody tr {
+  border-bottom: 1px solid var(--color-rule);
+  transition: background-color 0.1s ease;
+}
+
+.dym-table-precision tbody tr:hover {
+  background: rgba(2, 132, 199, 0.02);
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-table-precision tbody tr:hover {
+  background: rgba(56, 189, 248, 0.04);
+}
+
+.dym-table-precision td {
+  padding: 0.875rem 1.25rem;
+  vertical-align: middle;
+}
+
+/* Ticket Tag */
+.dym-ticket-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  background: rgba(2, 132, 199, 0.08);
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  color: #0284c7;
+  letter-spacing: -0.02em;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-ticket-tag {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+/* Time Cell */
+.dym-time-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+/* Patient Name Block */
+.dym-patient-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+
+.dym-patient-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.dym-patient-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+}
+
+.dym-meta-gender {
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  background: var(--color-paper-3);
+  font-weight: 600;
+}
+
+.dym-meta-age {
+  font-weight: 500;
+}
+
+/* Phone & Company */
+.dym-phone-text {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-ink-2);
+}
+
+.dym-company-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 14rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* Status Badges */
+.dym-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dym-status-badge.badge-waiting {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #d97706;
+}
+
+.dym-status-badge.badge-called {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #059669;
+}
+
+.dym-status-badge.badge-cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #dc2626;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-waiting {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-called {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.dym-status-indicator-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+/* Undo Button */
+.dym-btn-undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink-2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-btn-undo:hover:not(:disabled) {
+  background: var(--color-paper-3);
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.dym-btn-undo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Table Action Buttons Group --- */
+.dym-table-actions-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.dym-btn-table-action {
+  height: 2rem;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3125rem;
+  padding: 0 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.dym-btn-table-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.08);
+}
+
+.dym-btn-table-action:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dym-btn-table-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dym-btn-table-action svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.dym-btn-table-action:hover:not(:disabled) svg {
+  transform: scale(1.1);
+}
+
+/* Semantically tuned variants */
+.dym-btn-table-action.action-edit:hover:not(:disabled) {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.35);
+  color: #0284c7;
+}
+
+.dym-btn-table-action.action-key:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.35);
+  color: #d97706;
+}
+
+.dym-btn-table-action.action-lock:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+}
+
+.dym-btn-table-action.action-unlock:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.dym-btn-table-action.action-view:hover:not(:disabled) {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.35);
+  color: #0284c7;
+}
+
+/* Dark mode overrides for table row actions */
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action {
+  background: var(--color-paper-2);
+  border-color: var(--color-rule-2);
+  color: var(--color-ink);
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-edit:hover:not(:disabled) {
+  background: rgba(2, 132, 199, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-key:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-lock:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #f87171;
+  color: #f87171;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-unlock:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #34d399;
+  color: #34d399;
+}
+
+/* Pagination Bar */
+.dym-pagination-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-paper-3);
+}
+
+@media (min-width: 48rem) {
+  .dym-pagination-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.dym-pagination-summary {
+  font-size: 0.75rem;
+  color: var(--color-ink-2);
+}
+
+.dym-pagination-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dym-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-page-btn:hover:not(:disabled) {
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.dym-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dym-page-indicator {
+  font-size: 0.75rem;
+  color: var(--color-ink-2);
+  padding: 0 0.5rem;
+}
+
+/* Empty State Box */
+.dym-table-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+
+.dym-empty-icon-wrap {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  background: var(--color-paper-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.dym-empty-title {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.dym-empty-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  max-width: 24rem;
+}
+
+.dym-btn-reset-filter {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: #0284c7;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* --- Shared Admin Summary Metrics Grid --- */
+.dym-metrics-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.dym-metric-summary-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.875rem;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.04);
+}
+
+.dym-metric-summary-card:hover {
+  border-color: rgba(2, 132, 199, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -2px rgba(2, 132, 199, 0.08);
+}
+
+.dym-metric-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.dym-metric-summary-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dym-metric-summary-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #0284c7;
+  opacity: 0.85;
+}
+
+.dym-metric-summary-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.dym-metric-summary-number {
+  font-size: 2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+}
+
+.dym-metric-summary-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.dym-metric-summary-footnote {
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--color-ink-2);
+}
+
+/* --- Shared Role & Status Badges --- */
+.dym-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dym-role-badge.role-admin {
+  background: rgba(124, 58, 237, 0.1);
+  color: #8b5cf6;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.dym-role-badge.role-receptionist {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.2);
+}
+
+.dym-branch-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.4375rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  background: var(--color-paper-3);
+  border: 1px solid var(--color-rule-2);
+  color: var(--color-ink-2);
+}
+
+.dym-status-led-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.dym-status-led-badge.is-active {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.dym-status-led-badge.is-locked {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.dym-status-led-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+/* --- Clinical Drawer / Detail Modal --- */
+.dym-clinical-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(13, 18, 39, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: flex-end;
+  animation: dymFadeIn 0.2s ease;
+}
+
+.dym-clinical-drawer-panel {
+  width: 100%;
+  max-width: 32rem;
+  height: 100%;
+  background: var(--color-paper);
+  border-left: 1px solid var(--color-rule-2);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  animation: dymSlideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dymFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dymSlideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.dym-clinical-drawer-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-rule);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--color-paper);
+  z-index: 2;
+}
+
+.dym-clinical-drawer-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dym-clinical-drawer-kicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0284c7;
+}
+
+.dym-clinical-drawer-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.dym-clinical-drawer-close-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-clinical-drawer-close-btn:hover {
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  border-color: #0284c7;
+}
+
+.dym-clinical-drawer-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex-grow: 1;
+}
+
+.dym-detail-section {
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+}
+
+.dym-detail-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0284c7;
+  margin-bottom: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.dym-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem 1rem;
+}
+
+.dym-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dym-detail-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.dym-detail-value {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.dym-detail-full-width {
+  grid-column: 1 / -1;
+}
+

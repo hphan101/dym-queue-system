@@ -4,6 +4,10 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true, // Lắng nghe trên tất cả card mạng (0.0.0.0) để các máy trong mạng LAN truy cập được
+    allowedHosts: true, // Cho phép truy cập qua domain tunnel bên ngoài (Cloudflare, ngrok, localtunnel)
+  },
   build: {
     // The lazy-loaded ward dataset is 114 kB after compression.
     chunkSizeWarningLimit: 750,

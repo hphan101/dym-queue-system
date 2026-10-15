@@ -15,7 +15,7 @@ import {
   Home,
 } from "lucide-react";
 import type { BranchCode, RegistrationData } from "./types";
-import { translations } from "./translations";
+import { translations, type SupportedLanguage } from "./translations";
 
 interface Province {
   name: string;
@@ -36,43 +36,51 @@ interface Ward {
   parent_code: string;
 }
 
-interface LocationData {
-  provinces: Province[];
-  wards: Ward[];
-}
+let provincesPromise: Promise<Province[]> | null = null;
+const wardCache = new Map<string, Promise<Ward[]>>();
 
-let locationDataPromise: Promise<LocationData> | null = null;
-
-function loadLocationData(): Promise<LocationData> {
-  if (!locationDataPromise) {
-    locationDataPromise = Promise.all([
-      fetch("/data/provinces.json"),
-      fetch("/data/wards.json"),
-    ])
-      .then(async ([provinceResponse, wardResponse]) => {
-        if (!provinceResponse.ok || !wardResponse.ok) {
-          throw new Error("LOCATION_DATA_UNAVAILABLE");
-        }
-
-        const [provinceData, wardData] = await Promise.all([
-          provinceResponse.json() as Promise<Record<string, Province>>,
-          wardResponse.json() as Promise<Record<string, Ward>>,
-        ]);
-
-        return {
-          provinces: (Object.values(provinceData) as Province[]).sort((a, b) =>
-          a.name.localeCompare(b.name, "vi"),
-          ),
-          wards: Object.values(wardData) as Ward[],
-        };
+function loadProvinces(): Promise<Province[]> {
+  if (!provincesPromise) {
+    provincesPromise = fetch('/data/provinces.json')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('PROVINCES_UNAVAILABLE');
+        const data = (await res.json()) as Record<string, Province>;
+        return Object.values(data).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       })
-      .catch((error: unknown) => {
-        locationDataPromise = null;
-        throw error;
+      .catch((err) => {
+        provincesPromise = null;
+        throw err;
       });
   }
+  return provincesPromise;
+}
 
-  return locationDataPromise;
+function loadWardsForProvince(provinceCode: string): Promise<Ward[]> {
+  if (!provinceCode) return Promise.resolve([]);
+  const cached = wardCache.get(provinceCode);
+  if (cached) return cached;
+
+  const fetchPromise = fetch(`/data/wards/${provinceCode}.json`)
+    .then(async (res) => {
+      if (res.ok) {
+        const list = (await res.json()) as Ward[];
+        return list.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      }
+      // Fallback to complete wards dataset if specific province chunk is missing
+      const fallbackRes = await fetch('/data/wards.json');
+      if (!fallbackRes.ok) throw new Error('WARDS_UNAVAILABLE');
+      const allWards = (await fallbackRes.json()) as Record<string, Ward>;
+      return (Object.values(allWards) as Ward[])
+        .filter((w) => w.parent_code === provinceCode)
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    })
+    .catch((err) => {
+      wardCache.delete(provinceCode);
+      throw err;
+    });
+
+  wardCache.set(provinceCode, fetchPromise);
+  return fetchPromise;
 }
 
 const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
@@ -81,7 +89,7 @@ const cccdPassportRegex = /^(?:[0-9]{12}|[A-Za-z][A-Za-z0-9]{6,12})$/;
 interface RegistrationFormProps {
   onSubmit: (data: RegistrationData) => void;
   isLoading: boolean;
-  lang: "vi" | "en";
+  lang: SupportedLanguage;
   branch: BranchCode;
 }
 
@@ -166,10 +174,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
     setIsLoadingLocations(true);
     setLocationLoadError(false);
-    void loadLocationData()
+    void loadProvinces()
       .then((data) => {
-        setProvinces(data.provinces);
-        setWards(data.wards);
+        setProvinces(data);
         setLocationsLoaded(true);
       })
       .catch(() => setLocationLoadError(true))
@@ -178,22 +185,23 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
   React.useEffect(() => {
     setValue("ward", "");
-  }, [selectedProvince, setValue]);
+    if (!selectedProvince) {
+      setWards([]);
+      return;
+    }
 
-  const filteredWards = React.useMemo(() => {
-    if (!selectedProvince) return [];
-    return wards
-      .filter((w) => w.parent_code === selectedProvince)
-      .sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [selectedProvince, wards]);
+    void loadWardsForProvince(selectedProvince)
+      .then((data) => setWards(data))
+      .catch(() => setLocationLoadError(true));
+  }, [selectedProvince, setValue]);
 
   const provinceOptions = React.useMemo(() => {
     return provinces.map((p) => ({ value: p.code, label: p.name_with_type }));
   }, [provinces]);
 
   const wardOptions = React.useMemo(() => {
-    return filteredWards.map((w) => ({ value: w.name_with_type, label: w.name_with_type }));
-  }, [filteredWards]);
+    return wards.map((w) => ({ value: w.name_with_type, label: w.name_with_type }));
+  }, [wards]);
 
   // Store the readable province name instead of its dataset code.
   const handleFormSubmit = (formData: FormSchemaType) => {

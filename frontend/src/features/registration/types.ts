@@ -22,3 +22,6 @@ export interface RegistrationResponse {
   queueNumber?: string;
   error?: string;
 }
+
+export * from './tt25Types';
+export * from './tt25Constants';

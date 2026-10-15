@@ -34,6 +34,28 @@ function wildcardOriginMatches(origin: string, rule: string): boolean {
 
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
+
+  // Allow localhost & loopback on any port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+    return true;
+  }
+
+  // Allow LAN private IPs (10.x.x.x, 192.168.x.x, 172.16-31.x.x) on any port
+  if (
+    /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/i
+      .test(origin)
+  ) {
+    return true;
+  }
+
+  // Allow tunneling and preview domains (loca.lt, trycloudflare.com, ngrok, vercel)
+  if (
+    /^https?:\/\/([a-z0-9-]+\.)*(loca\.lt|trycloudflare\.com|ngrok-free\.app|ngrok\.io|vercel\.app)(:\d+)?$/i
+      .test(origin)
+  ) {
+    return true;
+  }
+
   return Array.from(configuredOrigins()).some((rule) =>
     wildcardOriginMatches(origin, rule)
   );

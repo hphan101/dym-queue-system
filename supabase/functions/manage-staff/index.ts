@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import {
   isOriginAllowed,
   jsonResponse,
@@ -8,7 +8,6 @@ import { createAdminClient } from "../_shared/supabase.ts";
 
 function getSupabaseSecretKey(): string | null {
   const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
-
   if (secretKeys) {
     try {
       const parsed = JSON.parse(secretKeys) as Record<string, unknown>;
@@ -20,13 +19,11 @@ function getSupabaseSecretKey(): string | null {
       console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
     }
   }
-
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? null;
 }
 
 function getSupabasePublishableKey(): string | null {
   const publishableKeys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
-
   if (publishableKeys) {
     try {
       const parsed = JSON.parse(publishableKeys) as Record<string, unknown>;
@@ -38,7 +35,6 @@ function getSupabasePublishableKey(): string | null {
       console.error(JSON.stringify({ code: "INVALID_SUPABASE_PUBLISHABLE_KEYS" }));
     }
   }
-
   return Deno.env.get("SUPABASE_ANON_KEY") ?? null;
 }
 
@@ -149,7 +145,7 @@ function parsePayload(value: unknown): StaffRequest | null {
     return { action: "update", userId, loginName, ...staff };
   }
 
-  if (value.action === "set-active") {
+  if (value.action === "set-active" || value.action === "set_active") {
     const userId = typeof value.userId === "string" ? value.userId : "";
     if (!USER_ID_PATTERN.test(userId) || typeof value.isActive !== "boolean") {
       return null;
@@ -157,7 +153,7 @@ function parsePayload(value: unknown): StaffRequest | null {
     return { action: "set-active", userId, isActive: value.isActive };
   }
 
-  if (value.action === "reset-password") {
+  if (value.action === "reset-password" || value.action === "reset_password") {
     const userId = typeof value.userId === "string" ? value.userId : "";
     const password = typeof value.password === "string" ? value.password : "";
     if (
@@ -263,20 +259,37 @@ async function replaceBranchAccess(
     .eq("user_id", userId);
   if (deleteError) throw deleteError;
 
-  if (branchIds.length > 0) {
-    const { error: insertError } = await serviceClient
-      .from("staff_branch_access")
-      .insert(branchIds.map((branchId) => ({ user_id: userId, branch_id: branchId })));
-    if (insertError) throw insertError;
+  if (branchIds.length === 0) return;
+
+  const { error: insertError } = await serviceClient
+    .from("staff_branch_access")
+    .insert(branchIds.map((branchId) => ({ user_id: userId, branch_id: branchId })));
+  if (insertError) throw insertError;
+}
+
+async function recordAuditLog(
+  client: SupabaseClient,
+  actorId: string,
+  action: string,
+  entityId: string,
+  metadata?: Record<string, unknown>,
+) {
+  try {
+    await client.from("audit_logs").insert({
+      actor_id: actorId,
+      action,
+      entity_type: "profile",
+      entity_id: entityId,
+      ...(metadata ? { metadata } : {}),
+    });
+  } catch (err) {
+    console.error("audit_log error:", err);
   }
 }
 
-async function listStaff(
-  authAdminClient: SupabaseClient,
-  databaseClient: SupabaseClient,
-) {
+async function listStaff(serviceClient: SupabaseClient, databaseClient: SupabaseClient) {
   const [usersResult, profilesResult, accessResult, branchesResult] = await Promise.all([
-    authAdminClient.auth.admin.listUsers({ page: 1, perPage: MAX_STAFF_ACCOUNTS }),
+    serviceClient.auth.admin.listUsers({ page: 1, perPage: MAX_STAFF_ACCOUNTS }),
     databaseClient.from("profiles").select(
       "user_id, display_name, role, is_active, created_at, updated_at",
     ),
@@ -326,6 +339,242 @@ async function listStaff(
     })
     .sort((left, right) => left.displayName.localeCompare(right.displayName, "vi"));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Action Handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleCreateStaff(
+  serviceClient: SupabaseClient,
+  _userClient: SupabaseClient,
+  actor: User,
+  payload: CreateStaffInput,
+  origin: string | null,
+): Promise<Response> {
+  const branches = await getBranchIds(serviceClient, payload.branchCodes);
+  const existingAccount = await findAuthUserByLoginName(
+    serviceClient,
+    payload.loginName,
+  );
+  if (existingAccount) {
+    return jsonResponse({ success: false, code: "ACCOUNT_EXISTS" }, 409, origin);
+  }
+
+  const { data: createdUser, error: createError } =
+    await serviceClient.auth.admin.createUser({
+      email: `${payload.loginName}@accounts.dym.internal`,
+      password: payload.password,
+      email_confirm: true,
+      user_metadata: {
+        display_name: payload.displayName,
+        login_name: payload.loginName,
+      },
+    });
+
+  if (createError || !createdUser?.user) {
+    const duplicateEmail = createError?.message.toLowerCase().includes("already");
+    return jsonResponse(
+      { success: false, code: duplicateEmail ? "ACCOUNT_EXISTS" : "CREATE_FAILED" },
+      duplicateEmail ? 409 : 400,
+      origin,
+    );
+  }
+
+  const targetUserId = createdUser.user.id;
+  try {
+    const { error: profileError } = await serviceClient.from("profiles").insert({
+      user_id: targetUserId,
+      display_name: payload.displayName,
+      role: payload.role,
+      is_active: true,
+    });
+    if (profileError) throw profileError;
+
+    await replaceBranchAccess(
+      serviceClient,
+      targetUserId,
+      branches.map((branch) => branch.id),
+    );
+  } catch (error) {
+    await serviceClient.auth.admin.deleteUser(targetUserId);
+    throw error;
+  }
+
+  await recordAuditLog(serviceClient, actor.id, "staff.created", targetUserId, {
+    display_name: payload.displayName,
+    role: payload.role,
+    branch_codes: payload.branchCodes,
+  });
+
+  return jsonResponse({ success: true, userId: targetUserId }, 201, origin);
+}
+
+async function handleUpdateStaff(
+  serviceClient: SupabaseClient,
+  _userClient: SupabaseClient,
+  actor: User,
+  payload: UpdateStaffInput,
+  origin: string | null,
+): Promise<Response> {
+  if (payload.userId === actor.id && payload.role !== "admin") {
+    return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
+  }
+
+  const branches = await getBranchIds(serviceClient, payload.branchCodes);
+  const duplicateAccount = await findAuthUserByLoginName(
+    serviceClient,
+    payload.loginName,
+    payload.userId,
+  );
+  if (duplicateAccount) {
+    return jsonResponse({ success: false, code: "ACCOUNT_EXISTS" }, 409, origin);
+  }
+
+  const { data: targetAuthData, error: targetAuthError } =
+    await serviceClient.auth.admin.getUserById(payload.userId);
+  if (targetAuthError || !targetAuthData.user) {
+    return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
+  }
+
+  const { data: oldProfile, error: oldProfileError } = await serviceClient
+    .from("profiles")
+    .select("display_name, role, is_active")
+    .eq("user_id", payload.userId)
+    .maybeSingle();
+  const { data: oldAccess, error: oldAccessError } = await serviceClient
+    .from("staff_branch_access")
+    .select("branch_id")
+    .eq("user_id", payload.userId);
+
+  if (oldProfileError || oldAccessError || !oldProfile) {
+    return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
+  }
+
+  const { error: profileError } = await serviceClient
+    .from("profiles")
+    .update({ display_name: payload.displayName, role: payload.role })
+    .eq("user_id", payload.userId);
+  if (profileError) throw profileError;
+
+  try {
+    await replaceBranchAccess(
+      serviceClient,
+      payload.userId,
+      branches.map((branch) => branch.id),
+    );
+  } catch (error) {
+    await serviceClient.from("profiles").update({
+      display_name: oldProfile.display_name,
+      role: oldProfile.role,
+    }).eq("user_id", payload.userId);
+    await replaceBranchAccess(
+      serviceClient,
+      payload.userId,
+      oldAccess.map((access) => String(access.branch_id)),
+    );
+    throw error;
+  }
+
+  const { error: authMetadataError } = await serviceClient.auth.admin.updateUserById(
+    payload.userId,
+    {
+      user_metadata: {
+        ...targetAuthData.user.user_metadata,
+        display_name: payload.displayName,
+        login_name: payload.loginName,
+      },
+    },
+  );
+  if (authMetadataError) throw authMetadataError;
+
+  await recordAuditLog(serviceClient, actor.id, "staff.updated", payload.userId, {
+    display_name: payload.displayName,
+    login_name: payload.loginName,
+    role: payload.role,
+    branch_codes: payload.branchCodes,
+  });
+
+  return jsonResponse({ success: true }, 200, origin);
+}
+
+async function handleSetActive(
+  serviceClient: SupabaseClient,
+  _userClient: SupabaseClient,
+  actor: User,
+  payload: SetActiveInput,
+  origin: string | null,
+): Promise<Response> {
+  if (payload.userId === actor.id && !payload.isActive) {
+    return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
+  }
+
+  const { data: targetProfile } = await serviceClient
+    .from("profiles")
+    .select("is_active")
+    .eq("user_id", payload.userId)
+    .maybeSingle();
+  if (!targetProfile) {
+    return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
+  }
+
+  const banDuration = payload.isActive ? "none" : "876000h";
+  const { error: authUpdateError } = await serviceClient.auth.admin.updateUserById(
+    payload.userId,
+    { ban_duration: banDuration },
+  );
+  if (authUpdateError) throw authUpdateError;
+
+  const { error: profileUpdateError } = await serviceClient
+    .from("profiles")
+    .update({ is_active: payload.isActive })
+    .eq("user_id", payload.userId);
+  if (profileUpdateError) {
+    await serviceClient.auth.admin.updateUserById(payload.userId, {
+      ban_duration: targetProfile.is_active ? "none" : "876000h",
+    });
+    throw profileUpdateError;
+  }
+
+  await recordAuditLog(
+    serviceClient,
+    actor.id,
+    payload.isActive ? "staff.unlocked" : "staff.locked",
+    payload.userId,
+  );
+
+  return jsonResponse({ success: true }, 200, origin);
+}
+
+async function handleResetPassword(
+  serviceClient: SupabaseClient,
+  _userClient: SupabaseClient,
+  actor: User,
+  payload: ResetPasswordInput,
+  origin: string | null,
+): Promise<Response> {
+  const { data: targetProfile } = await serviceClient
+    .from("profiles")
+    .select("user_id")
+    .eq("user_id", payload.userId)
+    .maybeSingle();
+  if (!targetProfile) {
+    return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
+  }
+
+  const { error: passwordError } = await serviceClient.auth.admin.updateUserById(
+    payload.userId,
+    { password: payload.password },
+  );
+  if (passwordError) throw passwordError;
+
+  await recordAuditLog(serviceClient, actor.id, "staff.password_reset", payload.userId);
+
+  return jsonResponse({ success: true }, 200, origin);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Dispatcher
+// ─────────────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (request: Request): Promise<Response> => {
   const requestId = crypto.randomUUID();
@@ -403,220 +652,16 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return jsonResponse({ success: false, code: "INVALID_DATA" }, 400, origin);
     }
 
-    if (payload.action === "create") {
-      const branches = await getBranchIds(userClient, payload.branchCodes);
-      const existingAccount = await findAuthUserByLoginName(
-        serviceClient,
-        payload.loginName,
-      );
-      if (existingAccount) {
-        return jsonResponse({ success: false, code: "ACCOUNT_EXISTS" }, 409, origin);
-      }
-      const { data: createdUser, error: createError } =
-        await serviceClient.auth.admin.createUser({
-          email: `${payload.loginName}@accounts.dym.internal`,
-          password: payload.password,
-          email_confirm: true,
-          user_metadata: {
-            display_name: payload.displayName,
-            login_name: payload.loginName,
-          },
-        });
-
-      if (createError || !createdUser?.user) {
-        const duplicateEmail = createError?.message.toLowerCase().includes("already");
-        return jsonResponse(
-          { success: false, code: duplicateEmail ? "ACCOUNT_EXISTS" : "CREATE_FAILED" },
-          duplicateEmail ? 409 : 400,
-          origin,
-        );
-      }
-
-      const targetUserId = createdUser.user.id;
-      try {
-        const { error: profileError } = await userClient.from("profiles").insert({
-          user_id: targetUserId,
-          display_name: payload.displayName,
-          role: payload.role,
-          is_active: true,
-        });
-        if (profileError) throw profileError;
-        await replaceBranchAccess(
-          userClient,
-          targetUserId,
-          branches.map((branch) => branch.id),
-        );
-      } catch (error) {
-        await serviceClient.auth.admin.deleteUser(targetUserId);
-        throw error;
-      }
-
-      await userClient.from("audit_logs").insert({
-        actor_id: actor.id,
-        action: "staff.created",
-        entity_type: "profile",
-        entity_id: targetUserId,
-        metadata: {
-          display_name: payload.displayName,
-          role: payload.role,
-          branch_codes: payload.branchCodes,
-        },
-      });
-
-      return jsonResponse({ success: true, userId: targetUserId }, 201, origin);
+    switch (payload.action) {
+      case "create":
+        return await handleCreateStaff(serviceClient, userClient, actor, payload, origin);
+      case "update":
+        return await handleUpdateStaff(serviceClient, userClient, actor, payload, origin);
+      case "set-active":
+        return await handleSetActive(serviceClient, userClient, actor, payload, origin);
+      case "reset-password":
+        return await handleResetPassword(serviceClient, userClient, actor, payload, origin);
     }
-
-    if (payload.action === "update") {
-      if (payload.userId === actor.id && payload.role !== "admin") {
-        return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
-      }
-
-      const branches = await getBranchIds(userClient, payload.branchCodes);
-      const duplicateAccount = await findAuthUserByLoginName(
-        serviceClient,
-        payload.loginName,
-        payload.userId,
-      );
-      if (duplicateAccount) {
-        return jsonResponse({ success: false, code: "ACCOUNT_EXISTS" }, 409, origin);
-      }
-      const { data: targetAuthData, error: targetAuthError } =
-        await serviceClient.auth.admin.getUserById(payload.userId);
-      if (targetAuthError || !targetAuthData.user) {
-        return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
-      }
-      const { data: oldProfile, error: oldProfileError } = await userClient
-        .from("profiles")
-        .select("display_name, role, is_active")
-        .eq("user_id", payload.userId)
-        .maybeSingle();
-      const { data: oldAccess, error: oldAccessError } = await userClient
-        .from("staff_branch_access")
-        .select("branch_id")
-        .eq("user_id", payload.userId);
-
-      if (oldProfileError || oldAccessError || !oldProfile) {
-        return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
-      }
-
-      const { error: profileError } = await userClient
-        .from("profiles")
-        .update({ display_name: payload.displayName, role: payload.role })
-        .eq("user_id", payload.userId);
-      if (profileError) throw profileError;
-
-      try {
-        await replaceBranchAccess(
-          userClient,
-          payload.userId,
-          branches.map((branch) => branch.id),
-        );
-      } catch (error) {
-        await userClient.from("profiles").update({
-          display_name: oldProfile.display_name,
-          role: oldProfile.role,
-        }).eq("user_id", payload.userId);
-        await replaceBranchAccess(
-          userClient,
-          payload.userId,
-          oldAccess.map((access) => String(access.branch_id)),
-        );
-        throw error;
-      }
-
-      const { error: authMetadataError } = await serviceClient.auth.admin.updateUserById(
-        payload.userId,
-        {
-          user_metadata: {
-            ...targetAuthData.user.user_metadata,
-            display_name: payload.displayName,
-            login_name: payload.loginName,
-          },
-        },
-      );
-      if (authMetadataError) throw authMetadataError;
-
-      await userClient.from("audit_logs").insert({
-        actor_id: actor.id,
-        action: "staff.updated",
-        entity_type: "profile",
-        entity_id: payload.userId,
-        metadata: {
-          display_name: payload.displayName,
-          login_name: payload.loginName,
-          role: payload.role,
-          branch_codes: payload.branchCodes,
-        },
-      });
-
-      return jsonResponse({ success: true }, 200, origin);
-    }
-
-    if (payload.action === "reset-password") {
-      const { data: targetProfile } = await userClient
-        .from("profiles")
-        .select("user_id")
-        .eq("user_id", payload.userId)
-        .maybeSingle();
-      if (!targetProfile) {
-        return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
-      }
-
-      const { error: passwordError } = await serviceClient.auth.admin.updateUserById(
-        payload.userId,
-        { password: payload.password },
-      );
-      if (passwordError) throw passwordError;
-
-      await userClient.from("audit_logs").insert({
-        actor_id: actor.id,
-        action: "staff.password_reset",
-        entity_type: "profile",
-        entity_id: payload.userId,
-      });
-
-      return jsonResponse({ success: true }, 200, origin);
-    }
-
-    if (payload.userId === actor.id && !payload.isActive) {
-      return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
-    }
-
-    const { data: targetProfile } = await userClient
-      .from("profiles")
-      .select("is_active")
-      .eq("user_id", payload.userId)
-      .maybeSingle();
-    if (!targetProfile) {
-      return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
-    }
-
-    const banDuration = payload.isActive ? "none" : "876000h";
-    const { error: authUpdateError } = await serviceClient.auth.admin.updateUserById(
-      payload.userId,
-      { ban_duration: banDuration },
-    );
-    if (authUpdateError) throw authUpdateError;
-
-    const { error: profileUpdateError } = await userClient
-      .from("profiles")
-      .update({ is_active: payload.isActive })
-      .eq("user_id", payload.userId);
-    if (profileUpdateError) {
-      await serviceClient.auth.admin.updateUserById(payload.userId, {
-        ban_duration: targetProfile.is_active ? "none" : "876000h",
-      });
-      throw profileUpdateError;
-    }
-
-    await userClient.from("audit_logs").insert({
-      actor_id: actor.id,
-      action: payload.isActive ? "staff.unlocked" : "staff.locked",
-      entity_type: "profile",
-      entity_id: payload.userId,
-    });
-
-    return jsonResponse({ success: true }, 200, origin);
   } catch (error) {
     console.error(JSON.stringify({
       requestId,

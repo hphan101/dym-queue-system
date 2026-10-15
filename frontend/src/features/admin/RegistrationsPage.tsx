@@ -1,17 +1,25 @@
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
-  CalendarDaysIcon,
   CheckCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  EyeIcon,
+  IdentificationIcon,
   MagnifyingGlassIcon,
+  PrinterIcon,
   SignalSlashIcon,
   UserGroupIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { Badge } from '@astryxdesign/core/Badge';
 import { Theme } from '@astryxdesign/core/theme';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@astryxdesign/core/astryx.css';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { TT25PrintModal } from '../registration/TT25PrintModal';
+
 import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
 import { formatQueueNumber } from '../../lib/queueNumber';
@@ -19,10 +27,7 @@ import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
 import { clearRememberedStaffName } from './adminIdentity';
-import {
-  getCachedRegistrationCount,
-  rememberRegistrationCount,
-} from './registrationCountCache';
+import { getCachedRegistrationCount } from './registrationCountCache';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 import './registrations.css';
@@ -30,16 +35,19 @@ import './registrations.css';
 import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
+import { useRegistrationDetailsQuery } from './hooks/useRegistrationDetailsQuery';
 import {
+  formatFullAddress,
   formatRegistrationTime,
   normalizeSearch,
 } from './utils/adminFormatters';
+import { AdminHeader } from './components/AdminHeader';
 import {
   CustomerNoticeModal,
   type CustomerNotificationItem,
 } from './components/CustomerNoticeModal';
 
-interface RegistrationDetails {
+export interface RegistrationDetails {
   id: string;
   branch_id: string;
   queue_date: string;
@@ -65,29 +73,49 @@ type RealtimeConnectionState =
   | 'disconnected'
   | 'offline';
 
-const PAGE_SIZE = 20;
+type RegistrationStatusTab = 'all' | 'waiting' | 'called';
+
+const PAGE_SIZE = 15;
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
 
 function formatBirthDate(value: string) {
-  const [year, month, day] = value.split('-');
-  return day && month && year ? `${day}/${month}/${year}` : value;
+  if (!value) return '—';
+  const parts = value.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return value;
+}
+
+function calculateAge(birthDateStr: string): number | null {
+  if (!birthDateStr) return null;
+  const currentYear = new Date().getFullYear();
+  if (birthDateStr.includes('-')) {
+    const year = Number.parseInt(birthDateStr.split('-')[0] ?? '', 10);
+    return Number.isNaN(year) ? null : currentYear - year;
+  }
+  const parts = birthDateStr.split('/');
+  const year = Number.parseInt(parts[parts.length - 1] ?? '', 10);
+  return Number.isNaN(year) ? null : currentYear - year;
 }
 
 function formatPhone(value: string) {
+  if (!value) return '—';
   return value.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3');
 }
 
 function getDisplayState(row: RegistrationDetails) {
   if (row.state === 'completed') {
-    return { key: 'completed', label: 'Hoàn tất' };
+    return { key: 'completed', label: 'Hoàn tất', cls: 'badge-called' };
   }
   if (row.state === 'cancelled') {
-    return { key: 'cancelled', label: 'Đã hủy' };
+    return { key: 'cancelled', label: 'Đã hủy', cls: 'badge-cancelled' };
   }
   if (row.first_called_at) {
-    return { key: 'called', label: 'Đã gọi' };
+    return { key: 'called', label: 'Đã gọi', cls: 'badge-called' };
   }
-  return { key: 'waiting', label: 'Chờ gọi' };
+  return { key: 'waiting', label: 'Chờ gọi', cls: 'badge-waiting' };
 }
 
 export function RegistrationsPage({
@@ -95,6 +123,7 @@ export function RegistrationsPage({
 }: {
   authorizedIsAdmin: boolean;
 }) {
+  const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { staffName, branchIds, identityError } = useStaffIdentity();
@@ -102,10 +131,10 @@ export function RegistrationsPage({
   const [branch, setBranch] = useState<BranchCode>('q1');
   const [date, setDate] = useState(getTodayInVietnam);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<RegistrationStatusTab>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [rows, setRows] = useState<RegistrationDetails[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(null);
+  const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
       navigator.onLine ? 'connecting' : 'offline',
@@ -113,178 +142,169 @@ export function RegistrationsPage({
   const [newRegistrationNotice, setNewRegistrationNotice] =
     useState<CustomerNotificationItem | null>(null);
 
-  const realtimeRefreshTimer = useRef<number | null>(null);
-  const realtimeRetryTimer = useRef<number | null>(null);
   const noticeTimer = useRef<number | null>(null);
+  const searchInputId = useId();
   const branchId = branchIds[branch];
+
+  const {
+    data: fetchedRows,
+    isLoading,
+    error: queryError,
+    refetch: refetchRegistrations,
+  } = useRegistrationDetailsQuery({
+    branch,
+    branchId,
+    date,
+  });
+
+  const rows = useMemo(() => fetchedRows ?? [], [fetchedRows]);
+  const error = queryError ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.' : null;
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Danh sách đăng ký | DYM Medical Center';
+    document.title = `Danh Sách Tiếp Nhận | ${BRANCH_NAMES[branch]} - DYM Medical Center`;
     return () => {
       document.title = previousTitle;
     };
+  }, [branch]);
+
+  useEffect(() => {
+    const handleOnline = () => setConnectionState('connecting');
+    const handleOffline = () => setConnectionState('offline');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
-  const availableBranches = useMemo(
-    () => Object.keys(branchIds) as BranchCode[],
-    [branchIds],
-  );
-
+  // Global search keyboard shortcut '/'
   useEffect(() => {
-    if (availableBranches.length > 0 && !branchIds[branch]) {
-      setBranch(availableBranches[0]);
-    }
-  }, [availableBranches, branchIds, branch]);
-
-  const loadRegistrations = useCallback(async (showLoading = true) => {
-    if (!branchId) return;
-
-    if (showLoading) setIsLoading(true);
-    setError(null);
-
-    const { data, error: queryError } = await supabase.rpc(
-      'get_registration_details',
-      {
-        p_branch_code: branch,
-        p_queue_date: date,
-      },
-    );
-
-    if (queryError) {
-      console.error('Không thể tải chi tiết đăng ký:', queryError);
-      setError('Không thể tải danh sách đăng ký. Vui lòng thử lại.');
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchedRows = (data ?? []) as RegistrationDetails[];
-    setRows(fetchedRows);
-    rememberRegistrationCount(branch, date, fetchedRows.length);
-    setIsLoading(false);
-  }, [branch, branchId, date]);
-
-  useEffect(() => {
-    if (branchId) {
-      void loadRegistrations();
-    }
-  }, [branchId, loadRegistrations]);
-
-  const scheduleRealtimeRefresh = useCallback(() => {
-    if (realtimeRefreshTimer.current !== null) {
-      window.clearTimeout(realtimeRefreshTimer.current);
-    }
-
-    realtimeRefreshTimer.current = window.setTimeout(() => {
-      realtimeRefreshTimer.current = null;
-      void loadRegistrations(false);
-    }, 200);
-  }, [loadRegistrations]);
-
-  useEffect(() => {
-    const handleOffline = () => setConnectionState('offline');
-    const handleOnline = () => {
-      setConnectionState('connecting');
-      void loadRegistrations(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA' &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        event.preventDefault();
+        const searchInput = document.getElementById(searchInputId);
+        searchInput?.focus();
+      }
     };
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('online', handleOnline);
-    return () => {
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [loadRegistrations]);
 
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchInputId]);
+
+  // Supabase Realtime subscription for incoming registrations
   useEffect(() => {
     if (!branchId) return;
-    let isCurrentChannel = true;
-    setConnectionState(navigator.onLine ? 'connecting' : 'offline');
 
     const channel = supabase
       .channel(`registrations-page:${branchId}:${date}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'registrations',
           filter: `branch_id=eq.${branchId}`,
         },
         (payload) => {
           if (
-            payload.eventType === 'INSERT' &&
             String(payload.new.queue_date ?? '') === date &&
-            payload.new.id &&
-            payload.new.queue_number &&
-            payload.new.full_name
+            typeof payload.new.queue_number === 'number'
           ) {
+            const nextItem: CustomerNotificationItem = {
+              id: String(payload.new.id ?? `${Date.now()}`),
+              queueNumber: formatQueueNumber(payload.new.queue_number),
+              fullName: String(payload.new.full_name ?? 'Khách hàng mới'),
+            };
+
+            setNewRegistrationNotice(nextItem);
             if (noticeTimer.current !== null) {
               window.clearTimeout(noticeTimer.current);
             }
-            setNewRegistrationNotice({
-              id: String(payload.new.id),
-              queueNumber: formatQueueNumber(Number(payload.new.queue_number)),
-              fullName: String(payload.new.full_name),
-            });
             noticeTimer.current = window.setTimeout(() => {
-              noticeTimer.current = null;
               setNewRegistrationNotice(null);
             }, NEW_REGISTRATION_NOTICE_MS);
           }
-          scheduleRealtimeRefresh();
+
+          void queryClient.invalidateQueries({
+            queryKey: ['registrationDetails', branch, date],
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'registrations',
+          filter: `branch_id=eq.${branchId}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({
+            queryKey: ['registrationDetails', branch, date],
+          });
         },
       )
       .subscribe((status) => {
-        if (!isCurrentChannel) return;
         if (status === 'SUBSCRIBED') {
           setConnectionState('connected');
-          if (realtimeRetryTimer.current !== null) {
-            window.clearTimeout(realtimeRetryTimer.current);
-            realtimeRetryTimer.current = null;
-          }
-          return;
-        }
-        if (
-          status === 'CHANNEL_ERROR' ||
-          status === 'TIMED_OUT' ||
-          status === 'CLOSED'
-        ) {
-          setConnectionState(navigator.onLine ? 'disconnected' : 'offline');
-          if (navigator.onLine && realtimeRetryTimer.current === null) {
-            realtimeRetryTimer.current = window.setTimeout(() => {
-              realtimeRetryTimer.current = null;
-              void loadRegistrations(false);
-            }, 3_000);
-          }
+        } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+          setConnectionState('disconnected');
         }
       });
 
     return () => {
-      isCurrentChannel = false;
-      if (realtimeRefreshTimer.current !== null) {
-        window.clearTimeout(realtimeRefreshTimer.current);
-        realtimeRefreshTimer.current = null;
-      }
-      if (realtimeRetryTimer.current !== null) {
-        window.clearTimeout(realtimeRetryTimer.current);
-        realtimeRetryTimer.current = null;
-      }
       void supabase.removeChannel(channel);
     };
-  }, [branchId, date, loadRegistrations, scheduleRealtimeRefresh]);
+  }, [branch, branchId, date, queryClient]);
 
-  useEffect(
-    () => () => {
-      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
-    },
-    [],
-  );
+  // Breakdown statistics
+  const tabCounts = useMemo(() => {
+    let waiting = 0;
+    let called = 0;
+    for (const row of rows) {
+      if (row.first_called_at || row.state === 'completed') {
+        called++;
+      } else {
+        waiting++;
+      }
+    }
+    return { all: rows.length, waiting, called };
+  }, [rows]);
 
+  const completionRate = useMemo(() => {
+    if (tabCounts.all === 0) return 0;
+    return Math.round((tabCounts.called / tabCounts.all) * 100);
+  }, [tabCounts]);
+
+  // Filter rows by search and status tab
   const filteredRows = useMemo(() => {
     const normalizedQuery = normalizeSearch(query);
-    if (!normalizedQuery) return rows;
 
     return rows.filter((row) => {
+      // Status tab match
+      if (statusFilter === 'waiting') {
+        if (row.first_called_at || row.state === 'completed' || row.state === 'cancelled') {
+          return false;
+        }
+      } else if (statusFilter === 'called') {
+        if (!row.first_called_at && row.state !== 'completed') {
+          return false;
+        }
+      }
+
+      // Query match
+      if (!normalizedQuery) return true;
+
       const searchableText = [
         formatQueueNumber(row.queue_number),
         row.full_name,
@@ -300,12 +320,9 @@ export function RegistrationsPage({
 
       return normalizeSearch(searchableText).includes(normalizedQuery);
     });
-  }, [query, rows]);
+  }, [query, rows, statusFilter]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredRows.length / PAGE_SIZE),
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const visiblePage = Math.min(currentPage, totalPages);
   const pageStartIndex = (visiblePage - 1) * PAGE_SIZE;
   const paginatedRows = useMemo(
@@ -313,18 +330,11 @@ export function RegistrationsPage({
     [filteredRows, pageStartIndex],
   );
   const firstVisibleRow = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
-  const lastVisibleRow = Math.min(
-    pageStartIndex + PAGE_SIZE,
-    filteredRows.length,
-  );
+  const lastVisibleRow = Math.min(pageStartIndex + PAGE_SIZE, filteredRows.length);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [branch, date, query]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+  }, [branch, date, query, statusFilter]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -332,8 +342,8 @@ export function RegistrationsPage({
     window.location.assign('/?page=login');
   };
 
-  const registrationCount =
-    getCachedRegistrationCount(branch, date) ?? rows.length;
+  const availableBranches = Object.keys(BRANCH_NAMES) as BranchCode[];
+  const registrationCount = getCachedRegistrationCount(branch, date) ?? rows.length;
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
@@ -348,93 +358,54 @@ export function RegistrationsPage({
           isCollapsed={isSidebarCollapsed}
           onCollapsedChange={setIsSidebarCollapsed}
           onThemeToggle={() =>
-            setThemeMode((current) =>
-              current === 'dark' ? 'light' : 'dark',
-            )
+            setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))
           }
           onLogout={() => void handleLogout()}
         />
 
-        <div className="dym-admin-workspace dym-records-workspace">
-          <header className="dym-records-header">
-            <div className="dym-records-title">
-              <div className="dym-records-title-copy">
-                <div className="dym-eyebrow-row">
-                  <span className="dym-eyebrow">Sổ đăng ký</span>
-                  <Badge label="Dữ liệu chi tiết" variant="info" />
-                </div>
-                <h1>Danh sách đăng ký</h1>
-                <p>
-                  Toàn bộ thông tin khách đã khai báo tại{' '}
-                  {BRANCH_NAMES[branch]}.
-                </p>
-              </div>
+        <div className="dym-admin-workspace">
+          {/* Unified Clinical Precision Header */}
+          <AdminHeader
+            title="Danh sách tiếp nhận"
+            branch={branch}
+            branchOptions={availableBranches.map((code) => ({
+              value: code,
+              label: BRANCH_NAMES[code],
+            }))}
+            onBranchChange={(nextBranch) => {
+              setBranch(nextBranch);
+              setQuery('');
+            }}
+            date={date}
+            onDateChange={(nextDate) => {
+              setDate(nextDate);
+              setQuery('');
+            }}
+            actions={
               <button
                 type="button"
-                className="dym-records-refresh"
+                className="dym-btn-action-secondary"
                 aria-busy={isLoading}
                 disabled={isLoading}
-                onClick={() => void loadRegistrations()}
+                onClick={() => void refetchRegistrations()}
+                title="Làm mới danh sách dữ liệu (F5)"
               >
-                <ArrowPathIcon aria-hidden="true" />
-                {isLoading ? 'Đang tải' : 'Làm mới'}
+                <ArrowPathIcon
+                  className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
               </button>
-            </div>
-
-            <div className="dym-records-filters" aria-label="Bộ lọc đăng ký">
-              <label className="dym-records-field">
-                <span>Chi nhánh</span>
-                <select
-                  value={branch}
-                  onChange={(event) => {
-                    setBranch(event.target.value as BranchCode);
-                    setQuery('');
-                  }}
-                >
-                  {availableBranches.map((value) => (
-                    <option key={value} value={value}>
-                      {BRANCH_NAMES[value]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="dym-records-field">
-                <span>Ngày đăng ký</span>
-                <span className="dym-records-date">
-                  <CalendarDaysIcon aria-hidden="true" />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(event) => {
-                      setDate(event.target.value);
-                      setQuery('');
-                    }}
-                  />
-                </span>
-              </label>
-
-              <label className="dym-records-field dym-records-search">
-                <span>Tìm kiếm</span>
-                <span>
-                  <MagnifyingGlassIcon aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Tên, SĐT, CCCD, công ty, địa chỉ..."
-                  />
-                </span>
-              </label>
-            </div>
-          </header>
+            }
+          />
 
           <CustomerNoticeModal
             notification={newRegistrationNotice}
             onClose={() => setNewRegistrationNotice(null)}
           />
 
-          <main className="dym-records-content">
+          <main className="dym-admin-content">
+            {/* Connection alert if offline or error */}
             {connectionState !== 'connected' && (
               <div
                 className="dym-connection-alert"
@@ -442,7 +413,7 @@ export function RegistrationsPage({
                 role="status"
                 aria-live="polite"
               >
-                <SignalSlashIcon aria-hidden="true" />
+                <SignalSlashIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <div>
                   <strong>
                     {connectionState === 'offline'
@@ -459,125 +430,327 @@ export function RegistrationsPage({
                 </div>
               </div>
             )}
-            <div className="dym-records-summary" aria-live="polite">
-              <span>
-                <strong>{filteredRows.length}</strong> đăng ký
-                {filteredRows.length > 0 && (
-                  <small>
-                    Hiển thị {firstVisibleRow}–{lastVisibleRow}
-                  </small>
-                )}
-              </span>
-              {query && (
-                <button type="button" onClick={() => setQuery('')}>
-                  Xóa tìm kiếm
-                </button>
-              )}
-            </div>
 
             {(error || identityError) && (
-              <div className="dym-records-error" role="alert">
-                <span>{error || identityError}</span>
-                <button type="button" onClick={() => void loadRegistrations()}>
-                  Thử lại
-                </button>
+              <div className="dym-data-error" role="alert">
+                {error || identityError}
               </div>
             )}
 
+            {/* Overview Summary Metrics Strip */}
             <section
-              className="dym-records-panel"
-              aria-label="Thông tin khách đăng ký"
+              className="dym-metrics-summary-grid"
+              aria-label="Thống kê danh sách tiếp nhận"
             >
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Tổng khách đăng ký</span>
+                  <UserGroupIcon className="dym-metric-summary-icon" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number">
+                    {tabCounts.all}
+                  </strong>
+                  <span className="dym-metric-summary-unit">bệnh nhân</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Toàn bộ hồ sơ trong ngày tại {BRANCH_NAMES[branch]}
+                </div>
+              </div>
+
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Đang chờ tiếp đón</span>
+                  <ClockIcon className="dym-metric-summary-icon text-amber-500" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number text-amber-600 dark:text-amber-400">
+                    {tabCounts.waiting}
+                  </strong>
+                  <span className="dym-metric-summary-unit">đang chờ</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Khách đang ngồi tại sảnh chưa gọi số
+                </div>
+              </div>
+
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Đã gọi / Hoàn tất</span>
+                  <CheckCircleIcon className="dym-metric-summary-icon text-emerald-500" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number text-emerald-600 dark:text-emerald-400">
+                    {tabCounts.called}
+                  </strong>
+                  <span className="dym-metric-summary-unit">lượt gọi</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Đã được bàn điều phối xử lý
+                </div>
+              </div>
+
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Tỷ lệ hoàn thành</span>
+                  <ClipboardDocumentListIcon className="dym-metric-summary-icon text-sky-500" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number text-sky-600 dark:text-sky-400">
+                    {completionRate}%
+                  </strong>
+                  <span className="dym-metric-summary-unit">tiến độ</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Tỷ lệ tiếp nhận đạt mục tiêu trong ngày
+                </div>
+              </div>
+            </section>
+
+            {/* Precision Table Section */}
+            <section
+              className="dym-registry-panel"
+              aria-labelledby="registry-table-title"
+            >
+              {/* Toolbar with Tabs and Search */}
+              <div className="dym-registry-toolbar">
+                <div className="dym-registry-title-block">
+                  <span className="dym-registry-kicker">HỒ SƠ KHÁM TIẾP NHẬN</span>
+                  <h2 id="registry-table-title" className="dym-registry-title">
+                    Danh Sách Chi Tiết Khách Hàng
+                  </h2>
+                  <p className="dym-registry-desc">
+                    Tra cứu thông tin hành chính, bảo hiểm y tế và tiến độ tiếp đón bệnh nhân tại phòng khám.
+                  </p>
+                </div>
+
+                {/* Filter Tabs & Search Controls */}
+                <div className="dym-registry-controls">
+                  {/* Filter Tabs */}
+                  <div
+                    className="dym-tab-group"
+                    role="tablist"
+                    aria-label="Lọc hồ sơ theo trạng thái"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'all'}
+                      className={`dym-tab-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('all')}
+                    >
+                      <span>Tất cả</span>
+                      <span className="dym-tab-badge">{tabCounts.all}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'waiting'}
+                      className={`dym-tab-btn is-waiting ${statusFilter === 'waiting' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('waiting')}
+                    >
+                      <span className="dym-tab-dot-waiting" />
+                      <span>Chờ gọi</span>
+                      <span className="dym-tab-badge">{tabCounts.waiting}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'called'}
+                      className={`dym-tab-btn is-called ${statusFilter === 'called' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('called')}
+                    >
+                      <span className="dym-tab-dot-called" />
+                      <span>Đã gọi</span>
+                      <span className="dym-tab-badge">{tabCounts.called}</span>
+                    </button>
+                  </div>
+
+                  {/* Search Field */}
+                  <div className="dym-search-wrapper">
+                    <label htmlFor={searchInputId} className="sr-only">
+                      Tìm kiếm hồ sơ bệnh nhân
+                    </label>
+                    <div className="dym-search-input-box">
+                      <MagnifyingGlassIcon className="dym-search-icon" aria-hidden="true" />
+                      <input
+                        id={searchInputId}
+                        type="search"
+                        className="dym-search-field"
+                        placeholder="Tìm tên, SĐT, CCCD, công ty..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                      {query ? (
+                        <button
+                          type="button"
+                          className="dym-search-clear-btn"
+                          onClick={() => setQuery('')}
+                          aria-label="Xóa từ khóa tìm kiếm"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <kbd className="dym-search-shortcut" title="Phím tắt: /">
+                          /
+                        </kbd>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Table Content */}
               {isLoading ? (
-                <div className="dym-records-empty" aria-live="polite">
+                <div className="dym-table-empty-box" aria-live="polite">
                   <div className="page-loader-dots" aria-hidden="true" />
-                  <strong>Đang tải danh sách đăng ký</strong>
-                  <span>Dữ liệu chi tiết đang được lấy an toàn từ Supabase.</span>
+                  <h3 className="dym-empty-title">Đang tải danh sách đăng ký</h3>
+                  <p className="dym-empty-desc">
+                    Hệ thống đang đồng bộ dữ liệu an toàn từ Supabase.
+                  </p>
                 </div>
               ) : filteredRows.length === 0 ? (
-                <div className="dym-records-empty">
-                  <UserGroupIcon aria-hidden="true" />
-                  <strong>Không có đăng ký phù hợp</strong>
-                  <span>Hãy đổi ngày, chi nhánh hoặc nội dung tìm kiếm.</span>
-                  <button
-                    type="button"
-                    className="dym-records-empty-action"
-                    onClick={() => {
-                      if (query) {
+                <div className="dym-table-empty-box">
+                  <div className="dym-empty-icon-wrap">
+                    <UserGroupIcon className="w-7 h-7 text-sky-600" aria-hidden="true" />
+                  </div>
+                  <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
+                  <p className="dym-empty-desc">
+                    Không có bệnh nhân nào phù hợp với bộ lọc hiện tại. Hãy thử đổi ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
+                  </p>
+                  {(query || statusFilter !== 'all') && (
+                    <button
+                      type="button"
+                      className="dym-btn-reset-filter"
+                      onClick={() => {
                         setQuery('');
-                      } else if (date !== getTodayInVietnam()) {
-                        setDate(getTodayInVietnam());
-                      } else {
-                        void loadRegistrations();
-                      }
-                    }}
-                  >
-                    {query
-                      ? 'Xóa tìm kiếm'
-                      : date !== getTodayInVietnam()
-                        ? 'Xem hôm nay'
-                        : 'Làm mới'}
-                  </button>
+                        setStatusFilter('all');
+                      }}
+                    >
+                      Đặt lại bộ lọc
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="dym-records-table-scroll">
-                  <table className="dym-records-table">
+                <div className="dym-table-scroller">
+                  <table className="dym-table-precision">
                     <thead>
                       <tr>
-                        <th scope="col">Số</th>
-                        <th scope="col">Đăng ký</th>
-                        <th scope="col">Họ và tên</th>
-                        <th scope="col">Ngày sinh</th>
-                        <th scope="col">Giới tính</th>
-                        <th scope="col">CCCD / Hộ chiếu</th>
-                        <th scope="col">Số điện thoại</th>
-                        <th scope="col">Tên công ty</th>
-                        <th scope="col">Tỉnh / Thành phố</th>
-                        <th scope="col">Phường / Xã</th>
-                        <th scope="col">Địa chỉ chi tiết</th>
-                        <th scope="col">Trạng thái</th>
+                        <th scope="col">Số Phiếu & Giờ</th>
+                        <th scope="col">Bệnh Nhân</th>
+                        <th scope="col">Liên Hệ & Định Danh</th>
+                        <th scope="col">Đơn Vị & Địa Chỉ</th>
+                        <th scope="col">Trạng Thái</th>
+                        <th scope="col" className="text-right">Hồ Sơ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedRows.map((row) => {
                         const displayState = getDisplayState(row);
+                        const age = calculateAge(row.birth_date);
 
                         return (
                           <tr key={row.id}>
-                            <td>
-                              <strong className="dym-records-queue">
-                                {formatQueueNumber(row.queue_number)}
-                              </strong>
+                            {/* Ticket & Time */}
+                            <td className="col-ticket">
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="dym-ticket-tag">
+                                  {formatQueueNumber(row.queue_number)}
+                                </span>
+                                <div className="dym-time-cell">
+                                  <span>{formatRegistrationTime(row.registered_at)}</span>
+                                </div>
+                              </div>
                             </td>
-                            <td>{formatRegistrationTime(row.registered_at)}</td>
+
+                            {/* Patient Info */}
                             <td>
-                              <strong className="dym-records-name">
-                                {row.full_name}
-                              </strong>
+                              <div className="dym-patient-block">
+                                <div className="flex items-center gap-2">
+                                  <strong className="dym-patient-name uppercase tracking-tight">
+                                    {row.full_name}
+                                  </strong>
+                                  <span
+                                    className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                      row.gender === 'Nữ'
+                                        ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                        : 'bg-sky-100 text-sky-700 border border-sky-200'
+                                    }`}
+                                  >
+                                    {row.gender}
+                                  </span>
+                                </div>
+                                <div className="dym-patient-meta">
+                                  {age !== null && <span>{age} tuổi</span>}
+                                  {row.birth_date && <span>({formatBirthDate(row.birth_date)})</span>}
+                                </div>
+                              </div>
                             </td>
-                            <td>{formatBirthDate(row.birth_date)}</td>
-                            <td>{row.gender}</td>
+
+                            {/* Contact & ID */}
                             <td>
-                              <span className="dym-records-mono">
-                                {row.identity_document}
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-semibold text-xs text-slate-900 tabular-nums">
+                                  {formatPhone(row.phone_number)}
+                                </span>
+                                <span className="text-xs text-slate-600 tabular-nums">
+                                  {row.identity_document || '—'}
+                                </span>
+                              </div>
                             </td>
+
+                            {/* Company & Location */}
                             <td>
-                              <span className="dym-records-mono">
-                                {formatPhone(row.phone_number)}
-                              </span>
+                              <div className="flex flex-col gap-0.5 max-w-[280px]">
+                                {row.company_name &&
+                                row.company_name !== '—' &&
+                                row.company_name !== 'Khách vãng lai' && (
+                                  <span
+                                    className="text-xs font-semibold text-slate-900 truncate"
+                                    title={row.company_name}
+                                  >
+                                    {row.company_name}
+                                  </span>
+                                )}
+                                <span
+                                  className="text-[11px] text-slate-700 leading-snug line-clamp-2"
+                                  title={formatFullAddress(row.address_detail, row.ward, row.province)}
+                                >
+                                  {formatFullAddress(row.address_detail, row.ward, row.province)}
+                                </span>
+                              </div>
                             </td>
-                            <td>{row.company_name || '—'}</td>
-                            <td>{row.province}</td>
-                            <td>{row.ward}</td>
-                            <td>{row.address_detail}</td>
+
+                            {/* Status */}
                             <td>
-                              <span
-                                className="dym-records-status"
-                                data-state={displayState.key}
-                              >
+                              <span className={`dym-status-badge ${displayState.cls}`}>
+                                <span className="dym-status-indicator-dot" />
                                 {displayState.label}
                               </span>
+                            </td>
+
+                            {/* Action Button */}
+                            <td className="text-right">
+                              <div className="dym-table-actions-group">
+                                <button
+                                  type="button"
+                                  className="dym-btn-table-action action-view"
+                                  onClick={() => setSelectedRow(row)}
+                                  title="Xem hồ sơ chi tiết"
+                                >
+                                  <EyeIcon className="w-3.5 h-3.5 text-sky-600" aria-hidden="true" />
+                                  <span>Chi tiết</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="dym-btn-table-action"
+                                  onClick={() => setPrintModalRow(row)}
+                                  title="In phiếu khám sức khỏe TT25"
+                                >
+                                  <PrinterIcon className="w-3.5 h-3.5 text-indigo-600" aria-hidden="true" />
+                                  <span>In TT25</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -587,62 +760,236 @@ export function RegistrationsPage({
                 </div>
               )}
 
+              {/* Pagination Bar */}
               {!isLoading && filteredRows.length > 0 && (
-                <nav
-                  className="dym-records-pagination"
-                  aria-label="Phân trang danh sách đăng ký"
-                >
-                  <span>
-                    {firstVisibleRow}–{lastVisibleRow} trong{' '}
-                    {filteredRows.length} đăng ký
+                <div className="dym-pagination-bar">
+                  <span className="dym-pagination-summary">
+                    Hiển thị <strong>{firstVisibleRow}</strong>–<strong>{lastVisibleRow}</strong> trong <strong>{filteredRows.length}</strong> đăng ký
                   </span>
-                  <div>
+                  <div className="dym-pagination-pager">
                     <button
                       type="button"
-                      aria-label="Trang trước"
+                      className="dym-page-btn"
                       disabled={visiblePage === 1}
-                      onClick={() =>
-                        setCurrentPage((page) => Math.max(1, page - 1))
-                      }
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      aria-label="Trang trước"
                     >
-                      <ChevronLeftIcon aria-hidden="true" />
+                      <ChevronLeftIcon className="w-3.5 h-3.5" />
                       <span>Trước</span>
                     </button>
-                    <span aria-current="page">
+                    <span className="dym-page-indicator">
                       Trang <strong>{visiblePage}</strong> / {totalPages}
                     </span>
                     <button
                       type="button"
-                      aria-label="Trang sau"
+                      className="dym-page-btn"
                       disabled={visiblePage === totalPages}
-                      onClick={() =>
-                        setCurrentPage((page) =>
-                          Math.min(totalPages, page + 1),
-                        )
-                      }
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      aria-label="Trang sau"
                     >
                       <span>Sau</span>
-                      <ChevronRightIcon aria-hidden="true" />
+                      <ChevronRightIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </nav>
+                </div>
               )}
             </section>
 
+            {/* Patient Detail Drawer */}
+            {selectedRow && (
+              <div
+                className="dym-clinical-drawer-backdrop"
+                onClick={() => setSelectedRow(null)}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="drawer-patient-name"
+              >
+                <div
+                  className="dym-clinical-drawer-panel"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Drawer Header */}
+                  <div className="dym-clinical-drawer-header">
+                    <div className="dym-clinical-drawer-title-wrap">
+                      <span className="dym-clinical-drawer-kicker">
+                        PHIẾU ĐĂNG KÝ TIẾP ĐÓN
+                      </span>
+                      <h2
+                        id="drawer-patient-name"
+                        className="dym-clinical-drawer-title flex items-center gap-2.5"
+                      >
+                        <span>{selectedRow.full_name}</span>
+                        <span className="dym-ticket-number text-xs">
+                          {formatQueueNumber(selectedRow.queue_number)}
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrintModalRow(selectedRow)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-95 text-white font-semibold text-xs rounded-lg shadow-sm transition-all cursor-pointer"
+                        title="In phiếu khám sức khỏe theo mẫu Thông tư 25"
+                      >
+                        <PrinterIcon className="w-4 h-4" />
+                        <span>In phiếu TT25</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="dym-clinical-drawer-close-btn"
+                        onClick={() => setSelectedRow(null)}
+                        aria-label="Đóng bảng chi tiết"
+                      >
+                        <XMarkIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Drawer Body */}
+                  <div className="dym-clinical-drawer-body">
+                    {/* Section 1: Thông tin cá nhân */}
+                    <div className="dym-detail-section">
+                      <div className="dym-detail-section-title">
+                        <IdentificationIcon className="w-4 h-4" />
+                        <span>Thông tin cá nhân</span>
+                      </div>
+                      <div className="dym-detail-grid">
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Họ và tên</span>
+                          <span className="dym-detail-value">{selectedRow.full_name}</span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Giới tính</span>
+                          <span className="dym-detail-value">{selectedRow.gender}</span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Ngày sinh</span>
+                          <span className="dym-detail-value">
+                            {formatBirthDate(selectedRow.birth_date)}
+                            {calculateAge(selectedRow.birth_date) !== null && (
+                              <span className="text-xs font-normal text-slate-500 ml-1">
+                                ({calculateAge(selectedRow.birth_date)} tuổi)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Số điện thoại</span>
+                          <span className="dym-detail-value">{formatPhone(selectedRow.phone_number)}</span>
+                        </div>
+                        <div className="dym-detail-item dym-detail-full-width">
+                          <span className="dym-detail-label">CCCD / Hộ chiếu</span>
+                          <span className="dym-detail-value tabular-nums">
+                            {selectedRow.identity_document || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Đơn vị & Địa chỉ */}
+                    <div className="dym-detail-section">
+                      <div className="dym-detail-section-title">
+                        <UserGroupIcon className="w-4 h-4" />
+                        <span>Đơn vị & Nơi cư trú</span>
+                      </div>
+                      <div className="dym-detail-grid">
+                        <div className="dym-detail-item dym-detail-full-width">
+                          <span className="dym-detail-label">Tên cơ quan / Công ty</span>
+                          <span className="dym-detail-value">{selectedRow.company_name || 'Khách cá nhân / Vãng lai'}</span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Tỉnh / Thành phố</span>
+                          <span className="dym-detail-value">{selectedRow.province || '—'}</span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Phường / Xã</span>
+                          <span className="dym-detail-value">{selectedRow.ward || '—'}</span>
+                        </div>
+                        <div className="dym-detail-item dym-detail-full-width">
+                          <span className="dym-detail-label">Địa chỉ chi tiết</span>
+                          <span className="dym-detail-value">{selectedRow.address_detail || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Quản lý lượt gọi */}
+                    <div className="dym-detail-section">
+                      <div className="dym-detail-section-title">
+                        <ClockIcon className="w-4 h-4" />
+                        <span>Nhật ký hàng đợi</span>
+                      </div>
+                      <div className="dym-detail-grid">
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Cơ sở tiếp nhận</span>
+                          <span className="dym-detail-value">{BRANCH_NAMES[branch]}</span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Thời gian lấy số</span>
+                          <span className="dym-detail-value tabular-nums">
+                            {formatRegistrationTime(selectedRow.registered_at)} ({selectedRow.queue_date})
+                          </span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Lần gọi đầu</span>
+                          <span className="dym-detail-value tabular-nums">
+                            {selectedRow.first_called_at
+                              ? formatRegistrationTime(selectedRow.first_called_at)
+                              : 'Chưa gọi'}
+                          </span>
+                        </div>
+                        <div className="dym-detail-item">
+                          <span className="dym-detail-label">Trạng thái</span>
+                          <span className="dym-detail-value">
+                            <span className={`dym-status-badge ${getDisplayState(selectedRow).cls}`}>
+                              <span className="dym-badge-dot" />
+                              {getDisplayState(selectedRow).label}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TT25 Print Preview Modal */}
+            {printModalRow && (
+              <TT25PrintModal
+                isOpen={Boolean(printModalRow)}
+                onClose={() => setPrintModalRow(null)}
+                data={{
+                  branch: branch,
+                  fullName: printModalRow.full_name,
+                  gender: (printModalRow.gender as 'Nam' | 'Nữ') || 'Nam',
+                  birthDate: printModalRow.birth_date,
+                  ethnicity: 'Kinh',
+                  bloodGroup: 'Chưa rõ',
+                  cccd: printModalRow.identity_document,
+                  insuranceNumber: '',
+                  province: printModalRow.province,
+                  ward: printModalRow.ward,
+                  addressDetail: printModalRow.address_detail,
+                  occupation: '',
+                  workplace: printModalRow.company_name || '',
+                  workplaceWard: '',
+                  phoneNumber: printModalRow.phone_number,
+                  checkupReason: 'Khám sức khỏe tổng quát',
+                  medicalHistory: {
+                    familyHistory: { hasDisease: false, diseaseDetails: '' },
+                    personalHistory: {},
+                    personalOtherDetails: '',
+                    currentTreatment: { isTreating: false, medications: '' },
+                    pregnancyHistory: { hasHistory: false, details: '' },
+                    commitmentAgreed: true,
+                  },
+                }}
+                registrationNumber={formatQueueNumber(printModalRow.queue_number)}
+              />
+            )}
+
             <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center</span>
-              <span className="dym-realtime-state" data-state={connectionState}>
-                {connectionState === 'connected' ? (
-                  <CheckCircleIcon aria-hidden="true" />
-                ) : (
-                  <SignalSlashIcon aria-hidden="true" />
-                )}
-                {connectionState === 'connected'
-                  ? 'Đã kết nối Supabase Realtime'
-                  : connectionState === 'offline'
-                    ? 'Không có kết nối Internet'
-                    : 'Đang kết nối lại Realtime'}
-              </span>
+              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
             </footer>
           </main>
         </div>

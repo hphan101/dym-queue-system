@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  CheckCircleIcon,
-  SignalSlashIcon,
-} from '@heroicons/react/24/outline';
+import { SignalSlashIcon } from '@heroicons/react/24/outline';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 import { BRANCH_NAMES } from '../../config/branches';
@@ -12,16 +9,15 @@ import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
 import { clearRememberedStaffName } from './adminIdentity';
-import {
-  getCachedRegistrationCount,
-  rememberRegistrationCount,
-} from './registrationCountCache';
+import { getCachedRegistrationCount } from './registrationCountCache';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 
 import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
+import { useDashboardQueueQuery } from './hooks/useDashboardQueueQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import { normalizeSearch } from './utils/adminFormatters';
 import { playNotificationChime } from './utils/audioNotification';
 
@@ -46,19 +42,6 @@ type RealtimeConnectionState =
   | 'disconnected'
   | 'offline';
 
-interface RegistrationRecord {
-  id: string;
-  queue_date: string;
-  queue_number: number;
-  full_name: string;
-  birth_date: string;
-  gender: string;
-  phone_number: string;
-  company_name: string | null;
-  registered_at: string;
-  first_called_at: string | null;
-}
-
 interface QueueActionResult {
   registration_id: string;
   queue_number: string;
@@ -75,21 +58,8 @@ interface UndoQueueResult {
 const DASHBOARD_PAGE_SIZE = 20;
 const CUSTOMER_NOTIFICATION_DURATION_MS = 8_000;
 
-function formatBirthDate(value: string) {
-  const [year, month, day] = value.split('-');
-  return year && month && day ? `${day}/${month}/${year}` : value;
-}
-
-function formatRegistrationTime(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value));
-}
-
 export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean }) {
+  const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { staffName, branchIds, identityError } = useStaffIdentity();
@@ -101,11 +71,10 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
   const [currentPage, setCurrentPage] = useState(1);
   const [currentQueue, setCurrentQueue] = useState('—');
   const [currentPatient, setCurrentPatient] = useState('Chưa gọi số');
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const [pendingQueueAction, setPendingQueueAction] =
     useState<PendingQueueAction>(null);
   const [pendingUndoId, setPendingUndoId] = useState<string | null>(null);
-  const [dataError, setDataError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState(
     'Chưa có số đang được gọi tại chi nhánh này.',
   );
@@ -118,17 +87,37 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
   const [isNotificationSoundEnabled, setIsNotificationSoundEnabled] =
     useState(false);
 
-  const realtimeRefreshTimer = useRef<number | null>(null);
-  const realtimeRetryTimer = useRef<number | null>(null);
   const notificationTimer = useRef<number | null>(null);
   const notificationSoundEnabledRef = useRef(false);
 
   const branchId = branchIds[branch];
   const isMutating = pendingQueueAction !== null || pendingUndoId !== null;
 
+  const {
+    data: dashboardData,
+    isLoading: isDataLoading,
+    error: queryError,
+    refetch: refetchDashboard,
+  } = useDashboardQueueQuery({
+    branch,
+    branchId,
+    date,
+  });
+
+  useEffect(() => {
+    if (dashboardData) {
+      setRows(dashboardData.rows);
+      setCurrentQueue(dashboardData.activeQueue);
+      setCurrentPatient(dashboardData.activePatient);
+      setAnnouncement(dashboardData.announcement);
+    }
+  }, [dashboardData]);
+
+  const dataError = actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
+
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Quản trị lượt khám | DYM Medical Center';
+    document.title = 'Tiếp nhận | DYM Medical Center';
     return () => {
       document.title = previousTitle;
     };
@@ -141,94 +130,6 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
       setBranch(availableCodes[0]);
     }
   }, [branchIds, branch]);
-
-  const loadDashboard = useCallback(async (showLoading = true) => {
-    if (!branchId) return;
-
-    if (showLoading) setIsDataLoading(true);
-    setDataError(null);
-
-    const [registrationsResult, displayResult] = await Promise.all([
-      supabase.rpc('get_dashboard_registrations', {
-        p_branch_code: branch,
-        p_queue_date: date,
-      }),
-      supabase
-        .from('branch_display_state')
-        .select('registration_id, queue_date, queue_number, called_at')
-        .eq('branch_id', branchId)
-        .maybeSingle(),
-    ]);
-
-    if (registrationsResult.error || displayResult.error) {
-      console.error('Không thể tải dữ liệu bàn điều phối:', {
-        registrations: registrationsResult.error?.message,
-        display: displayResult.error?.message,
-      });
-      setDataError('Không thể tải dữ liệu từ máy chủ.');
-      setIsDataLoading(false);
-      return;
-    }
-
-    const fetchedRows = (
-      (registrationsResult.data as RegistrationRecord[] | null) ?? []
-    ).map(
-      (record): RegistrationRow => ({
-        id: record.id,
-        queueNumber: formatQueueNumber(record.queue_number),
-        registeredAt: formatRegistrationTime(record.registered_at),
-        date: record.queue_date,
-        fullName: record.full_name,
-        birthDate: formatBirthDate(record.birth_date),
-        gender: record.gender,
-        phone: record.phone_number,
-        companyName: record.company_name?.trim() || '—',
-        branch,
-        status: record.first_called_at ? 'called' : 'waiting',
-      }),
-    );
-
-    setRows(fetchedRows);
-    rememberRegistrationCount(branch, date, fetchedRows.length);
-
-    const displayData = displayResult.data;
-    if (
-      displayData?.queue_number &&
-      displayData.queue_date === date &&
-      displayData.registration_id
-    ) {
-      const activeQueue = formatQueueNumber(displayData.queue_number);
-      const activePatient = fetchedRows.find(
-        (row) => row.id === displayData.registration_id,
-      );
-      setCurrentQueue(activeQueue);
-      setCurrentPatient(activePatient?.fullName ?? 'Khách đang được gọi');
-      setAnnouncement(
-        `Đang gọi số ${activeQueue}${activePatient ? ` — ${activePatient.fullName}` : ''}.`,
-      );
-    } else {
-      setCurrentQueue('—');
-      setCurrentPatient('Chưa gọi số');
-      setAnnouncement('Chưa có số đang được gọi tại chi nhánh này.');
-    }
-
-    setIsDataLoading(false);
-  }, [branch, branchId, date]);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
-
-  const scheduleRealtimeRefresh = useCallback(() => {
-    if (realtimeRefreshTimer.current !== null) {
-      window.clearTimeout(realtimeRefreshTimer.current);
-    }
-
-    realtimeRefreshTimer.current = window.setTimeout(() => {
-      realtimeRefreshTimer.current = null;
-      void loadDashboard(false);
-    }, 200);
-  }, [loadDashboard]);
 
   const showCustomerNotification = useCallback(
     (record: { id?: string; queue_number?: number; full_name?: string }) => {
@@ -270,7 +171,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     const handleOffline = () => setConnectionState('offline');
     const handleOnline = () => {
       setConnectionState('connecting');
-      void loadDashboard(false);
+      void refetchDashboard();
     };
 
     window.addEventListener('offline', handleOffline);
@@ -279,7 +180,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
     };
-  }, [loadDashboard]);
+  }, [refetchDashboard]);
 
   useEffect(() => {
     if (!branchId) return;
@@ -317,7 +218,9 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
           ) {
             showCustomerNotification(payload.new);
           }
-          scheduleRealtimeRefresh();
+          void queryClient.invalidateQueries({
+            queryKey: ['dashboardQueue', branch, date],
+          });
         },
       )
       .on(
@@ -328,17 +231,17 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
           table: 'branch_display_state',
           filter: `branch_id=eq.${branchId}`,
         },
-        scheduleRealtimeRefresh,
+        () => {
+          void queryClient.invalidateQueries({
+            queryKey: ['dashboardQueue', branch, date],
+          });
+        },
       )
       .subscribe((status) => {
         if (!isCurrentChannel) return;
 
         if (status === 'SUBSCRIBED') {
           setConnectionState('connected');
-          if (realtimeRetryTimer.current !== null) {
-            window.clearTimeout(realtimeRetryTimer.current);
-            realtimeRetryTimer.current = null;
-          }
           return;
         }
 
@@ -348,29 +251,20 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
           status === 'CLOSED'
         ) {
           setConnectionState(navigator.onLine ? 'disconnected' : 'offline');
-          if (navigator.onLine && realtimeRetryTimer.current === null) {
-            realtimeRetryTimer.current = window.setTimeout(() => {
-              realtimeRetryTimer.current = null;
-              void loadDashboard(false);
-            }, 3_000);
+          if (navigator.onLine) {
+            void refetchDashboard();
           }
         }
       });
 
     return () => {
       isCurrentChannel = false;
-      if (realtimeRefreshTimer.current !== null) {
-        window.clearTimeout(realtimeRefreshTimer.current);
-      }
-      if (realtimeRetryTimer.current !== null) {
-        window.clearTimeout(realtimeRetryTimer.current);
-      }
       if (notificationTimer.current !== null) {
         window.clearTimeout(notificationTimer.current);
       }
       void channel.unsubscribe();
     };
-  }, [branchId, date, loadDashboard, scheduleRealtimeRefresh, showCustomerNotification]);
+  }, [branch, branchId, date, queryClient, refetchDashboard, showCustomerNotification]);
 
   const rowsForDay = useMemo(
     () => rows.filter((row) => row.branch === branch && row.date === date),
@@ -439,7 +333,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (isMutating) return;
 
     setPendingQueueAction('next');
-    setDataError(null);
+    setActionError(null);
     const { data, error } = await supabase.rpc('call_next_queue', {
       p_branch_code: branch,
     });
@@ -449,7 +343,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
       | undefined;
 
     if (error) {
-      setDataError('Không thể gọi số tiếp theo.');
+      setActionError('Không thể gọi số tiếp theo.');
     } else if (!result) {
       setAnnouncement('Không còn khách trong hàng chờ để gọi.');
     } else {
@@ -469,6 +363,9 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
             : row,
         ),
       );
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
     }
     setPendingQueueAction(null);
   };
@@ -477,7 +374,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (isMutating) return;
 
     setPendingQueueAction('recall');
-    setDataError(null);
+    setActionError(null);
     const { data, error } = await supabase.rpc('recall_current_queue', {
       p_branch_code: branch,
     });
@@ -486,13 +383,16 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
       | undefined;
 
     if (error) {
-      setDataError('Không thể gọi lại số hiện tại.');
+      setActionError('Không thể gọi lại số hiện tại.');
     } else if (!result) {
       setAnnouncement('Chưa có số để gọi lại.');
     } else {
       const nextQueueNumber = formatQueueNumber(result.queue_number);
       setCurrentQueue(nextQueueNumber);
       setAnnouncement(`Đã gọi lại số ${nextQueueNumber} — ${currentPatient}.`);
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
     }
     setPendingQueueAction(null);
   };
@@ -501,7 +401,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (isMutating || row.status !== 'called') return;
 
     setPendingUndoId(row.id);
-    setDataError(null);
+    setActionError(null);
 
     const { data, error } = await supabase.rpc(
       'return_called_queue_to_waiting',
@@ -517,11 +417,13 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (error) {
       if (error.message.includes('ALREADY_WAITING')) {
         setAnnouncement(`Số ${row.queueNumber} đã ở trạng thái Chờ gọi.`);
-        void loadDashboard(false);
+        void queryClient.invalidateQueries({
+          queryKey: ['dashboardQueue', branch, date],
+        });
       } else if (error.message.includes('ONLY_TODAY_ALLOWED')) {
-        setDataError('Chỉ có thể hoàn tác lượt gọi trong ngày hiện tại.');
+        setActionError('Chỉ có thể hoàn tác lượt gọi trong ngày hiện tại.');
       } else {
-        setDataError(`Không thể đưa số ${row.queueNumber} về Chờ gọi.`);
+        setActionError(`Không thể đưa số ${row.queueNumber} về Chờ gọi.`);
       }
     } else if (result) {
       setRows((currentRows) =>
@@ -539,10 +441,60 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
       } else {
         setAnnouncement(`Đã đưa số ${row.queueNumber} về Chờ gọi.`);
       }
+
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
     }
 
     setPendingUndoId(null);
   };
+
+  const callNextRef = useRef(callNext);
+  const recallCurrentRef = useRef(recallCurrent);
+  useEffect(() => {
+    callNextRef.current = callNext;
+    recallCurrentRef.current = recallCurrent;
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const activeTag = (event.target as HTMLElement)?.tagName?.toLowerCase();
+      const isInput =
+        activeTag === 'input' ||
+        activeTag === 'textarea' ||
+        activeTag === 'select' ||
+        (event.target as HTMLElement)?.isContentEditable;
+
+      // Focus search on '/'
+      if (event.key === '/' && !isInput) {
+        event.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('.dym-search-field');
+        searchInput?.focus();
+        return;
+      }
+
+      // Space for Call Next
+      if (event.code === 'Space' && !isInput) {
+        event.preventDefault();
+        if (!isMutating && counts.waiting > 0) {
+          void callNextRef.current();
+        }
+        return;
+      }
+
+      // Alt + R for Recall
+      if (event.altKey && (event.key === 'r' || event.key === 'R')) {
+        event.preventDefault();
+        if (!isMutating && currentQueue !== '—') {
+          void recallCurrentRef.current();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [counts.waiting, currentQueue, isMutating]);
 
   const handleBranchChange = (nextBranch: BranchCode) => {
     setBranch(nextBranch);
@@ -616,7 +568,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
                 role="status"
                 aria-live="polite"
               >
-                <SignalSlashIcon aria-hidden="true" />
+                <SignalSlashIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <div>
                   <strong>
                     {connectionState === 'offline'
@@ -673,19 +625,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
             />
 
             <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center</span>
-              <span className="dym-realtime-state" data-state={connectionState}>
-                {connectionState === 'connected' ? (
-                  <CheckCircleIcon aria-hidden="true" />
-                ) : (
-                  <SignalSlashIcon aria-hidden="true" />
-                )}
-                {connectionState === 'connected'
-                  ? 'Đã kết nối Supabase Realtime'
-                  : connectionState === 'offline'
-                    ? 'Không có kết nối Internet'
-                    : 'Đang kết nối lại Realtime'}
-              </span>
+              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
             </footer>
           </main>
         </div>

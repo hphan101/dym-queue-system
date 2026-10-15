@@ -278,9 +278,9 @@ export function AdminSidebar({
         <SideNavSection title="Vận hành" className="dym-nav-section">
           {isCollapsed ? (
             <>
-              <SidebarTooltip label="Bàn điều phối">
+              <SidebarTooltip label="Tiếp nhận">
                 <SideNavItem
-                  label="Bàn điều phối"
+                  label="Tiếp nhận"
                   icon={HomeIcon}
                   isSelected={activePage === 'dashboard'}
                   href="/?page=admin"
@@ -289,9 +289,9 @@ export function AdminSidebar({
                   }
                 />
               </SidebarTooltip>
-              <SidebarTooltip label="Danh sách đăng ký">
+              <SidebarTooltip label="Danh sách tiếp nhận">
                 <SideNavItem
-                  label="Danh sách đăng ký"
+                  label="Danh sách tiếp nhận"
                   icon={ClipboardDocumentListIcon}
                   isSelected={activePage === 'registrations'}
                   href="/?page=registrations"
@@ -311,7 +311,7 @@ export function AdminSidebar({
           ) : (
             <>
               <SideNavItem
-                label="Bàn điều phối"
+                label="Tiếp nhận"
                 icon={HomeIcon}
                 isSelected={activePage === 'dashboard'}
                 href="/?page=admin"
@@ -320,7 +320,7 @@ export function AdminSidebar({
                 }
               />
               <SideNavItem
-                label="Danh sách đăng ký"
+                label="Danh sách tiếp nhận"
                 icon={ClipboardDocumentListIcon}
                 isSelected={activePage === 'registrations'}
                 href="/?page=registrations"

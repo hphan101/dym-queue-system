@@ -5,10 +5,11 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { RegistrationForm } from './features/registration/RegistrationForm';
+import { TT25RegistrationForm } from './features/registration/TT25RegistrationForm';
 import { SuccessView } from './features/registration/SuccessView';
 import type {
   RegistrationData,
+  TT25RegistrationData,
   RegistrationResponse,
 } from './features/registration/types';
 import { BRANCH_NAMES, isBranchCode } from './config/branches';
@@ -16,10 +17,12 @@ import type { BranchCode } from './types/domain';
 import { AlertCircle, Phone, Mail, MapPin, Clock } from 'lucide-react';
 import dymLogo from './assets/dym-logo.png';
 import dymLogoDark from './assets/dym-logo-dark.png';
-import { translations } from './features/registration/translations';
+import { translations, type SupportedLanguage } from './locales';
 import { APP_NAVIGATION_EVENT } from './lib/navigation';
 import { formatQueueNumber } from './lib/queueNumber';
 
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const LoginPage = lazy(() => import('./features/auth/LoginPage'));
@@ -46,9 +49,17 @@ function getBranchFromUrl(): BranchCode | null {
 
 function RegistrationApp() {
   const branch = getBranchFromUrl();
-  const [lang, setLang] = useState<'vi' | 'en'>(() => {
-    return (localStorage.getItem('dym_registration_lang') as 'vi' | 'en') || 'vi';
+  const [lang, setLang] = useState<SupportedLanguage>(() => {
+    const saved = localStorage.getItem('dym_registration_lang');
+    return saved === 'en' ? saved : 'vi';
   });
+
+  useEffect(() => {
+    if (lang === 'ja') {
+      setLang('vi');
+      localStorage.setItem('dym_registration_lang', 'vi');
+    }
+  }, [lang]);
 
   const [step, setStep] = useState<'form' | 'success'>(() => {
     const savedStep = localStorage.getItem('dym_registration_step');
@@ -58,7 +69,7 @@ function RegistrationApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [registeredData, setRegisteredData] = useState<RegistrationData | null>(null);
+  const [registeredData, setRegisteredData] = useState<RegistrationData | TT25RegistrationData | null>(null);
   const [queueNumber, setQueueNumber] = useState<string>(() => {
     const storedQueueNumber = localStorage.getItem('dym_registration_queue');
     return storedQueueNumber ? formatQueueNumber(storedQueueNumber) : '';
@@ -71,12 +82,12 @@ function RegistrationApp() {
     localStorage.removeItem('dym_registration_data');
   }, []);
 
-  const handleLangChange = (newLang: 'vi' | 'en') => {
+  const handleLangChange = (newLang: SupportedLanguage) => {
     setLang(newLang);
     localStorage.setItem('dym_registration_lang', newLang);
   };
 
-  const handleFormSubmit = async (formData: RegistrationData) => {
+  const handleFormSubmit = async (formData: RegistrationData | TT25RegistrationData) => {
     setIsLoading(true);
     setShowPageLoader(false);
     setError(null);
@@ -99,6 +110,16 @@ function RegistrationApp() {
       15_000,
     );
 
+    const payload = {
+      ...formData,
+      companyName:
+        'companyName' in formData && formData.companyName
+          ? formData.companyName
+          : 'workplace' in formData
+            ? formData.workplace
+            : '',
+    };
+
     try {
       const response = await fetch(registrationApiUrl, {
         method: 'POST',
@@ -107,7 +128,7 @@ function RegistrationApp() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json() as RegistrationResponse;
@@ -123,25 +144,16 @@ function RegistrationApp() {
         localStorage.setItem('dym_registration_queue', formattedQueueNumber);
         localStorage.setItem('dym_last_registration_time', Date.now().toString());
       } else {
-        throw new Error(
-          result.error ||
-          (lang === 'vi'
-            ? 'Có lỗi xảy ra khi lưu thông tin.'
-            : 'An error occurred while saving information.'),
-        );
+        throw new Error(result.error || translations[lang].saveError);
       }
     } catch (err: unknown) {
       console.error('Lỗi khi gửi đăng ký:', err);
       setError(
         err instanceof DOMException && err.name === 'AbortError'
-          ? lang === 'vi'
-            ? 'Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.'
-            : 'The request took too long. Please try again.'
+          ? translations[lang].requestTimeout
           : err instanceof Error
             ? err.message
-            : lang === 'vi'
-              ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.'
-              : 'Unable to connect to the server. Please check your network connection.',
+            : translations[lang].networkError,
       );
     } finally {
       window.clearTimeout(requestTimeout);
@@ -173,7 +185,7 @@ function RegistrationApp() {
         </div>
       )}
 
-      <main className="flex-grow max-w-md md:max-w-lg w-full mx-auto px-4 py-6 flex flex-col justify-center">
+      <main className="flex-grow max-w-md md:max-w-xl lg:max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-center transition-all duration-300">
         <div className="flex justify-end mb-3">
           <div className="inline-flex rounded-lg border border-slate-200/60 bg-white/90 p-0.5 shadow-sm text-[11px] backdrop-blur-sm">
             <button
@@ -196,20 +208,36 @@ function RegistrationApp() {
             >
               English
             </button>
+            {/* Tam thoi an ngon ngu tieng Nhat theo yeu cau */}
+            {/* <button
+              onClick={() => handleLangChange('ja')}
+              className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                lang === 'ja'
+                  ? 'bg-dym-blue-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              日本語
+            </button> */}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-8 medical-card">
           {step === 'form' && (
             <div className="mb-6 text-center">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-dym-blue-50 text-dym-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+                Thông tư 25/2026/TT-BYT (Mẫu 03)
+              </span>
               <h2 className="text-xl font-extrabold text-slate-800">
-                {translations[lang].title}
+                {lang === 'vi' ? 'Hồ Sơ Khám Sức Khỏe' : translations[lang].title}
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                {translations[lang].subtitle}
+                {lang === 'vi'
+                  ? 'Vui lòng hoàn tất 12 mục hành chính và tiền sử y tế để in phiếu khám'
+                  : translations[lang].subtitle}
               </p>
               {branch && (
-                <p className="mt-2 inline-flex rounded-full bg-dym-blue-50 px-3 py-1 text-xs font-semibold text-dym-blue-700">
+                <p className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
                   {BRANCH_NAMES[branch]}
                 </p>
               )}
@@ -228,17 +256,14 @@ function RegistrationApp() {
 
           {step === 'form' ? (
             branch ? (
-              <RegistrationForm
+              <TT25RegistrationForm
                 onSubmit={handleFormSubmit}
                 isLoading={isLoading}
-                lang={lang}
                 branch={branch}
               />
             ) : (
               <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-center text-sm text-red-700">
-                {lang === 'vi'
-                  ? 'Liên kết đăng ký không xác định chi nhánh. Vui lòng quét lại mã QR tại cơ sở DYM.'
-                  : 'This registration link does not identify a branch. Please scan the QR code at the DYM location.'}
+                {translations[lang].noBranchError}
               </div>
             )
           ) : (
@@ -378,31 +403,33 @@ function App() {
     pathname === '/display' || requestedPage === 'display';
 
   return (
-    <ErrorBoundary>
-      {isQueueDisplayPage ? (
-        <Suspense fallback={<RouteLoader label="Đang tải màn hình chờ DYM" />}>
-          <QueueDisplayPage />
-        </Suspense>
-      ) : isAdminPage || isRegistrationsPage || isStaffPage ? (
-        <Suspense fallback={<RouteLoader label="Đang tải trang quản trị DYM" />}>
-          <AdminApplication
-            destination={
-              isStaffPage
-                ? 'staff'
-                : isRegistrationsPage
-                  ? 'registrations'
-                  : 'dashboard'
-            }
-          />
-        </Suspense>
-      ) : isLoginPage ? (
-        <Suspense fallback={<RouteLoader label="Đang tải cổng nhân viên DYM" />}>
-          <LoginPage />
-        </Suspense>
-      ) : (
-        <RegistrationApp />
-      )}
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        {isQueueDisplayPage ? (
+          <Suspense fallback={<RouteLoader label="Đang tải màn hình chờ DYM" />}>
+            <QueueDisplayPage />
+          </Suspense>
+        ) : isAdminPage || isRegistrationsPage || isStaffPage ? (
+          <Suspense fallback={<RouteLoader label="Đang tải trang quản trị DYM" />}>
+            <AdminApplication
+              destination={
+                isStaffPage
+                  ? 'staff'
+                  : isRegistrationsPage
+                    ? 'registrations'
+                    : 'dashboard'
+              }
+            />
+          </Suspense>
+        ) : isLoginPage ? (
+          <Suspense fallback={<RouteLoader label="Đang tải cổng nhân viên DYM" />}>
+            <LoginPage />
+          </Suspense>
+        ) : (
+          <RegistrationApp />
+        )}
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 }
 

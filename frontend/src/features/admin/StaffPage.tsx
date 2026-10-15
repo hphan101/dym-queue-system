@@ -1,19 +1,21 @@
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
+  CheckCircleIcon,
   ExclamationTriangleIcon,
+  KeyIcon,
   LockClosedIcon,
   LockOpenIcon,
-  KeyIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
   PlusIcon,
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { Badge } from '@astryxdesign/core/Badge';
+import { Avatar } from '@astryxdesign/core/Avatar';
 import { Theme } from '@astryxdesign/core/theme';
-import { useEffect, useMemo, useState } from 'react';
 import '@astryxdesign/core/astryx.css';
+
 import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
 import { supabase } from '../../lib/supabaseClient';
@@ -35,8 +37,10 @@ import './staff.css';
 import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { normalizeSearch } from './utils/adminFormatters';
+import { AdminHeader } from './components/AdminHeader';
 
 type StaffRole = 'admin' | 'receptionist';
+type StaffStatusTab = 'all' | 'active' | 'locked';
 
 interface StaffBranch {
   code: BranchCode;
@@ -103,17 +107,27 @@ function formatDateTime(value: string | null) {
 function apiErrorMessage(code?: string) {
   switch (code) {
     case 'ACCOUNT_EXISTS':
-      return 'Tài khoản này đã được sử dụng.';
+      return 'Tài khoản đăng nhập này đã tồn tại trên hệ thống.';
     case 'SELF_ADMIN_PROTECTION':
       return 'Bạn không thể tự khóa hoặc tự hạ quyền quản trị của chính mình.';
     case 'INVALID_DATA':
-      return 'Thông tin nhân viên chưa hợp lệ. Mật khẩu cần ít nhất 6 ký tự.';
+      return 'Thông tin không hợp lệ. Vui lòng kiểm tra lại họ tên, tài khoản và mật khẩu.';
     case 'ADMIN_REQUIRED':
       return 'Chỉ quản trị viên mới được quản lý nhân viên.';
     case 'STAFF_NOT_FOUND':
       return 'Không tìm thấy tài khoản nhân viên.';
+    case 'CREATE_FAILED':
+      return 'Không thể tạo tài khoản trên hệ thống xác thực. Vui lòng kiểm tra lại mật khẩu (tối thiểu 6 ký tự).';
+    case 'ORIGIN_NOT_ALLOWED':
+      return 'Địa chỉ mạng này chưa được cấp quyền CORS. Vui lòng kiểm tra cấu hình mạng.';
+    case 'AUTH_REQUIRED':
+      return 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang hoặc đăng nhập lại.';
+    case 'SERVER_ERROR':
+      return 'Lỗi máy chủ khi xử lý dữ liệu. Vui lòng thử lại sau.';
     default:
-      return 'Không thể thực hiện thao tác. Vui lòng thử lại.';
+      return code && code !== 'REQUEST_FAILED'
+        ? `Thao tác không thành công (${code}). Vui lòng thử lại.`
+        : 'Không thể thực hiện thao tác. Vui lòng thử lại.';
   }
 }
 
@@ -137,14 +151,22 @@ async function requestStaffApi(
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const result = (await response.json()) as StaffApiResponse;
-  if (!response.ok || !result.success) {
-    throw new Error(result.code ?? 'REQUEST_FAILED');
+
+  let result: StaffApiResponse | null = null;
+  try {
+    result = (await response.json()) as StaffApiResponse;
+  } catch {
+    // Non-JSON response
+  }
+
+  if (!response.ok || !result?.success) {
+    const fallbackCode = response.status === 403 ? 'ORIGIN_NOT_ALLOWED' : 'REQUEST_FAILED';
+    throw new Error(result?.code ?? fallbackCode);
   }
   return result;
 }
 
-function StaffPage() {
+export function StaffPage() {
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const [staffName, setStaffName] = useState(getInitialStaffName);
@@ -152,6 +174,7 @@ function StaffPage() {
     () => cachedStaffAccounts ?? [],
   );
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StaffStatusTab>('all');
   const [isLoading, setIsLoading] = useState(cachedStaffAccounts === null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
@@ -168,6 +191,8 @@ function StaffPage() {
   const [passwordResetError, setPasswordResetError] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [registrationScope] = useState(getInitialRegistrationScope);
+
+  const searchInputId = useId();
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -215,20 +240,58 @@ function StaffPage() {
     void loadStaff(cachedStaffAccounts === null);
   }, []);
 
+  // Global search shortcut '/'
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA' &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        event.preventDefault();
+        const searchInput = document.getElementById(searchInputId);
+        searchInput?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchInputId]);
+
+  const activeCount = useMemo(
+    () => staff.filter((item) => item.isActive).length,
+    [staff],
+  );
+
+  const tabCounts = useMemo(() => {
+    const active = activeCount;
+    const locked = staff.length - active;
+    return { all: staff.length, active, locked };
+  }, [activeCount, staff.length]);
+
   const filteredStaff = useMemo(() => {
     const normalizedQuery = normalizeSearch(query);
-    if (!normalizedQuery) return staff;
-    return staff.filter((account) =>
-      normalizeSearch(
-        [
-          account.displayName,
-          account.loginName,
-          account.role === 'admin' ? 'quản trị' : 'lễ tân',
-          ...account.branches.map((branch) => branch.name),
-        ].join(' '),
-      ).includes(normalizedQuery),
-    );
-  }, [query, staff]);
+
+    return staff.filter((account) => {
+      // Tab filter
+      if (statusFilter === 'active' && !account.isActive) return false;
+      if (statusFilter === 'locked' && account.isActive) return false;
+
+      // Query filter
+      if (!normalizedQuery) return true;
+
+      const searchable = [
+        account.displayName,
+        account.loginName,
+        account.role === 'admin' ? 'quản trị' : 'lễ tân',
+        ...account.branches.map((b) => b.name),
+      ].join(' ');
+
+      return normalizeSearch(searchable).includes(normalizedQuery);
+    });
+  }, [query, staff, statusFilter]);
 
   const openCreateForm = () => {
     setForm(EMPTY_FORM);
@@ -298,7 +361,7 @@ function StaffPage() {
         setSuccess(`Đã tạo tài khoản cho ${form.displayName.trim()}.`);
       }
       setIsFormOpen(false);
-      await loadStaff();
+      await loadStaff(false);
     } catch (requestError) {
       const code = requestError instanceof Error ? requestError.message : undefined;
       setFormError(apiErrorMessage(code));
@@ -308,8 +371,6 @@ function StaffPage() {
   };
 
   const setAccountActive = async (account: StaffAccount) => {
-    const nextActive = !account.isActive;
-
     setPendingAccountId(account.userId);
     setError(null);
     setSuccess(null);
@@ -317,24 +378,12 @@ function StaffPage() {
       await requestStaffApi('POST', {
         action: 'set-active',
         userId: account.userId,
-        isActive: nextActive,
+        isActive: !account.isActive,
       });
-      setStaff((accounts) =>
-        {
-          const nextAccounts = accounts.map((current) =>
-          current.userId === account.userId
-            ? { ...current, isActive: nextActive }
-            : current,
-          );
-          cachedStaffAccounts = nextAccounts;
-          return nextAccounts;
-        },
-      );
       setSuccess(
-        nextActive
-          ? `Đã mở khóa ${account.displayName}.`
-          : `Đã khóa ${account.displayName}.`,
+        `Đã ${account.isActive ? 'khóa' : 'mở khóa'} tài khoản ${account.displayName}.`,
       );
+      await loadStaff(false);
     } catch (requestError) {
       const code = requestError instanceof Error ? requestError.message : undefined;
       setError(apiErrorMessage(code));
@@ -344,19 +393,18 @@ function StaffPage() {
   };
 
   const requestAccountActiveChange = (account: StaffAccount) => {
-    if (!account.isActive) {
-      void setAccountActive(account);
+    if (account.isActive) {
+      setAccountPendingConfirmation(account);
       return;
     }
-
-    setAccountPendingConfirmation(account);
+    void setAccountActive(account);
   };
 
   const openPasswordReset = (account: StaffAccount) => {
+    setPasswordResetAccount(account);
     setNewPassword('');
     setConfirmedPassword('');
     setPasswordResetError(null);
-    setPasswordResetAccount(account);
   };
 
   const resetPassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -364,11 +412,11 @@ function StaffPage() {
     if (!passwordResetAccount) return;
 
     if (newPassword.length < 6) {
-      setPasswordResetError('Mật khẩu mới cần có ít nhất 6 ký tự.');
+      setPasswordResetError('Mật khẩu mới cần ít nhất 6 ký tự.');
       return;
     }
     if (newPassword !== confirmedPassword) {
-      setPasswordResetError('Xác nhận mật khẩu chưa khớp.');
+      setPasswordResetError('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -380,7 +428,7 @@ function StaffPage() {
         userId: passwordResetAccount.userId,
         password: newPassword,
       });
-      setSuccess(`Đã đặt lại mật khẩu cho ${passwordResetAccount.displayName}.`);
+      setSuccess(`Đã đổi mật khẩu cho ${passwordResetAccount.displayName}.`);
       setPasswordResetAccount(null);
     } catch (requestError) {
       const code = requestError instanceof Error ? requestError.message : undefined;
@@ -390,28 +438,17 @@ function StaffPage() {
     }
   };
 
-  useEffect(() => {
-    if (!accountPendingConfirmation) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !pendingAccountId) {
-        setAccountPendingConfirmation(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [accountPendingConfirmation, pendingAccountId]);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     clearRememberedStaffName();
     window.location.assign('/?page=login');
   };
 
-  const activeCount = staff.filter((account) => account.isActive).length;
   const registrationCount =
-    getCachedRegistrationCount(registrationScope.branch, registrationScope.date) ?? 0;
+    getCachedRegistrationCount(
+      registrationScope.branch,
+      registrationScope.date,
+    ) ?? 0;
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
@@ -421,7 +458,7 @@ function StaffPage() {
           branch={registrationScope.branch}
           registrationCount={registrationCount}
           staffName={staffName}
-          isAdmin
+          isAdmin={true}
           themeMode={themeMode}
           isCollapsed={isSidebarCollapsed}
           onCollapsedChange={setIsSidebarCollapsed}
@@ -432,159 +469,349 @@ function StaffPage() {
         />
 
         <div className="dym-admin-workspace">
-          <header className="dym-command-bar dym-staff-command-bar">
-            <div className="dym-command-copy">
-              <div className="dym-eyebrow-row">
-                <span className="dym-eyebrow">Hệ thống</span>
-                <Badge label="Chỉ quản trị viên" variant="info" />
-              </div>
-              <h1>Quản lý nhân viên</h1>
-              <p>Tạo tài khoản, khóa truy cập và phân quyền theo chi nhánh.</p>
-            </div>
-            <button type="button" className="dym-staff-primary" onClick={openCreateForm}>
-              <PlusIcon aria-hidden="true" />
-              Thêm nhân viên
-            </button>
-          </header>
+          {/* Unified Clinical Precision Header */}
+          <AdminHeader
+            title="Quản lý nhân viên"
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="dym-btn-action-primary"
+                  onClick={openCreateForm}
+                  title="Thêm tài khoản nhân viên mới"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  <span>Thêm nhân viên</span>
+                </button>
+                <button
+                  type="button"
+                  className="dym-btn-action-secondary"
+                  disabled={isLoading}
+                  onClick={() => void loadStaff()}
+                  title="Làm mới danh sách nhân viên (F5)"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+                  <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+                </button>
+              </>
+            }
+          />
 
-          <main className="dym-admin-content dym-staff-content">
-            {error && <div className="dym-data-error" role="alert">{error}</div>}
+          <main className="dym-admin-content">
+            {error && (
+              <div className="dym-data-error" role="alert">
+                {error}
+              </div>
+            )}
             {success && (
               <div className="dym-staff-success" role="status">
                 {success}
               </div>
             )}
 
-            <section className="dym-staff-summary" aria-label="Tổng quan nhân viên">
-              <div>
-                <span>Tổng tài khoản</span>
-                <strong>{staff.length}</strong>
+            {/* Overview Summary Metrics Grid */}
+            <section
+              className="dym-metrics-summary-grid"
+              aria-label="Tổng quan nhân viên"
+            >
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Tổng tài khoản</span>
+                  <UserGroupIcon className="dym-metric-summary-icon" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number">
+                    {staff.length}
+                  </strong>
+                  <span className="dym-metric-summary-unit">nhân sự</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Tổng số tài khoản đã đăng ký trên hệ thống
+                </div>
               </div>
-              <div>
-                <span>Đang hoạt động</span>
-                <strong>{activeCount}</strong>
+
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Đang hoạt động</span>
+                  <CheckCircleIcon className="dym-metric-summary-icon text-emerald-500" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number text-emerald-600 dark:text-emerald-400">
+                    {activeCount}
+                  </strong>
+                  <span className="dym-metric-summary-unit">tài khoản</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Có quyền truy cập và điều phối tại quầy
+                </div>
               </div>
-              <div>
-                <span>Đã khóa</span>
-                <strong>{staff.length - activeCount}</strong>
+
+              <div className="dym-metric-summary-card">
+                <div className="dym-metric-summary-header">
+                  <span className="dym-metric-summary-label">Đã khóa / Tạm dừng</span>
+                  <LockClosedIcon className="dym-metric-summary-icon text-amber-500" aria-hidden="true" />
+                </div>
+                <div className="dym-metric-summary-value-row">
+                  <strong className="dym-metric-summary-number text-amber-600 dark:text-amber-400">
+                    {staff.length - activeCount}
+                  </strong>
+                  <span className="dym-metric-summary-unit">tạm dừng</span>
+                </div>
+                <div className="dym-metric-summary-footnote">
+                  Tài khoản vô hiệu hóa không thể đăng nhập
+                </div>
               </div>
             </section>
 
-            <section className="dym-staff-panel" aria-labelledby="staff-list-title">
-              <div className="dym-staff-toolbar">
-                <div>
-                  <span className="dym-eyebrow">Danh sách tài khoản</span>
-                  <h2 id="staff-list-title">Nhân viên DYM</h2>
+            {/* Precision Table Panel */}
+            <section
+              className="dym-registry-panel"
+              aria-labelledby="staff-list-title"
+            >
+              {/* Toolbar */}
+              <div className="dym-registry-toolbar">
+                <div className="dym-registry-title-block">
+                  <span className="dym-registry-kicker">DANH MỤC TÀI KHOẢN</span>
+                  <h2 id="staff-list-title" className="dym-registry-title">
+                    Nhân Viên Phòng Khám DYM
+                  </h2>
+                  <p className="dym-registry-desc">
+                    Quản lý tài khoản nhân viên, thiết lập vai trò tiếp nhận và phân công cơ sở hoạt động.
+                  </p>
                 </div>
-                <label className="dym-staff-search">
-                  <MagnifyingGlassIcon aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Tìm tên, tài khoản hoặc chi nhánh"
-                    aria-label="Tìm nhân viên"
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="dym-staff-refresh"
-                  aria-label="Làm mới danh sách nhân viên"
-                  aria-busy={isLoading}
-                  disabled={isLoading}
-                  onClick={() => void loadStaff()}
-                >
-                  <ArrowPathIcon aria-hidden="true" />
-                  {isLoading ? 'Đang tải' : 'Làm mới'}
-                </button>
+
+                {/* Filter Tabs & Search Controls */}
+                <div className="dym-registry-controls">
+                  {/* Status Tabs */}
+                  <div
+                    className="dym-tab-group"
+                    role="tablist"
+                    aria-label="Lọc theo trạng thái tài khoản"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'all'}
+                      className={`dym-tab-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('all')}
+                    >
+                      <span>Tất cả</span>
+                      <span className="dym-tab-badge">{tabCounts.all}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'active'}
+                      className={`dym-tab-btn is-called ${statusFilter === 'active' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('active')}
+                    >
+                      <span className="dym-tab-dot-called" />
+                      <span>Hoạt động</span>
+                      <span className="dym-tab-badge">{tabCounts.active}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === 'locked'}
+                      className={`dym-tab-btn is-waiting ${statusFilter === 'locked' ? 'is-active' : ''}`}
+                      onClick={() => setStatusFilter('locked')}
+                    >
+                      <span className="dym-tab-dot-waiting" />
+                      <span>Đã khóa</span>
+                      <span className="dym-tab-badge">{tabCounts.locked}</span>
+                    </button>
+                  </div>
+
+                  {/* Search Field */}
+                  <div className="dym-search-wrapper">
+                    <label htmlFor={searchInputId} className="sr-only">
+                      Tìm kiếm nhân viên
+                    </label>
+                    <div className="dym-search-input-box">
+                      <MagnifyingGlassIcon className="dym-search-icon" aria-hidden="true" />
+                      <input
+                        id={searchInputId}
+                        type="search"
+                        className="dym-search-field"
+                        placeholder="Tìm tên, tài khoản, chi nhánh..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                      {query ? (
+                        <button
+                          type="button"
+                          className="dym-search-clear-btn"
+                          onClick={() => setQuery('')}
+                          aria-label="Xóa từ khóa tìm kiếm"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <kbd className="dym-search-shortcut" title="Phím tắt: /">
+                          /
+                        </kbd>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              {/* Data Table */}
               {isLoading ? (
-                <div className="dym-staff-empty" aria-live="polite">
+                <div className="dym-table-empty-box" aria-live="polite">
                   <div className="page-loader-dots" aria-hidden="true" />
-                  <strong>Đang tải danh sách nhân viên</strong>
+                  <h3 className="dym-empty-title">Đang tải danh sách nhân viên</h3>
+                  <p className="dym-empty-desc">
+                    Hệ thống đang đồng bộ dữ liệu bảo mật từ Supabase.
+                  </p>
                 </div>
               ) : filteredStaff.length === 0 ? (
-                <div className="dym-staff-empty">
-                  <UserGroupIcon aria-hidden="true" />
-                  <strong>Không có nhân viên phù hợp</strong>
-                  <span>Hãy đổi nội dung tìm kiếm hoặc thêm tài khoản mới.</span>
+                <div className="dym-table-empty-box">
+                  <div className="dym-empty-icon-wrap">
+                    <UserGroupIcon className="w-7 h-7 text-sky-600" aria-hidden="true" />
+                  </div>
+                  <h3 className="dym-empty-title">Không tìm thấy nhân viên</h3>
+                  <p className="dym-empty-desc">
+                    Không có tài khoản nào phù hợp với bộ lọc hiện tại. Hãy đổi từ khóa hoặc thêm nhân viên mới.
+                  </p>
+                  {(query || statusFilter !== 'all') && (
+                    <button
+                      type="button"
+                      className="dym-btn-reset-filter"
+                      onClick={() => {
+                        setQuery('');
+                        setStatusFilter('all');
+                      }}
+                    >
+                      Đặt lại bộ lọc
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="dym-staff-table-wrap">
-                  <table className="dym-staff-table">
+                <div className="dym-table-scroller">
+                  <table className="dym-table-precision">
                     <thead>
                       <tr>
-                        <th scope="col">Nhân viên</th>
-                        <th scope="col">Vai trò</th>
-                        <th scope="col">Chi nhánh</th>
-                        <th scope="col">Đăng nhập gần nhất</th>
-                        <th scope="col">Trạng thái</th>
-                        <th scope="col"><span className="sr-only">Thao tác</span></th>
+                        <th scope="col">Nhân Viên</th>
+                        <th scope="col">Vai Trò</th>
+                        <th scope="col">Cơ Sở Tiếp Nhận</th>
+                        <th scope="col">Đăng Nhập Gần Nhất</th>
+                        <th scope="col">Trạng Thái</th>
+                        <th scope="col" className="text-right">Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStaff.map((account) => (
                         <tr key={account.userId}>
+                          {/* Staff Avatar + Name + Login */}
                           <td>
-                            <strong>{account.displayName}</strong>
-                            <span>@{account.loginName || 'chưa có tài khoản'}</span>
+                            <div className="flex items-center gap-3">
+                              <Avatar name={account.displayName} size="md" tooltip={false} />
+                              <div className="dym-patient-info">
+                                <span className="dym-patient-name">
+                                  {account.displayName}
+                                </span>
+                                <span className="dym-patient-meta font-mono">
+                                  @{account.loginName || 'chưa_cài_tên'}
+                                </span>
+                              </div>
+                            </div>
                           </td>
+
+                          {/* Role */}
                           <td>
-                            {account.role === 'admin' ? 'Quản trị viên' : 'Lễ tân'}
+                            <span
+                              className={`dym-role-badge ${
+                                account.role === 'admin'
+                                  ? 'role-admin'
+                                  : 'role-receptionist'
+                              }`}
+                            >
+                              {account.role === 'admin' ? 'Quản trị viên' : 'Lễ tân'}
+                            </span>
                           </td>
+
+                          {/* Branches */}
                           <td>
-                            <div className="dym-staff-branches">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               {account.role === 'admin' && account.branches.length === 0 ? (
-                                <span>Tất cả chi nhánh</span>
+                                <span className="dym-branch-chip">Tất cả cơ sở</span>
+                              ) : account.branches.length === 0 ? (
+                                <span className="text-xs text-slate-400 italic">Chưa gán</span>
                               ) : (
-                                account.branches.map((branch) => (
-                                  <span key={branch.code}>{branch.code.toUpperCase()}</span>
+                                account.branches.map((b) => (
+                                  <span key={b.code} className="dym-branch-chip">
+                                    {b.code.toUpperCase()}
+                                  </span>
                                 ))
                               )}
                             </div>
                           </td>
-                          <td className="dym-staff-secondary">
-                            {formatDateTime(account.lastSignInAt)}
-                          </td>
+
+                          {/* Last Sign In */}
                           <td>
-                            <span className="dym-staff-status" data-active={account.isActive}>
+                            <span className="dym-patient-meta font-mono text-xs">
+                              {formatDateTime(account.lastSignInAt)}
+                            </span>
+                          </td>
+
+                          {/* Status */}
+                          <td>
+                            <span
+                              className={`dym-status-led-badge ${
+                                account.isActive ? 'is-active' : 'is-locked'
+                              }`}
+                            >
+                              <span className="dym-status-led-dot" />
                               {account.isActive ? 'Hoạt động' : 'Đã khóa'}
                             </span>
                           </td>
-                          <td>
-                            <div className="dym-staff-actions">
+
+                          {/* Actions */}
+                          <td className="text-right">
+                            <div className="dym-table-actions-group">
                               <button
                                 type="button"
+                                className="dym-btn-table-action action-edit"
                                 onClick={() => openEditForm(account)}
+                                title="Chỉnh sửa thông tin tài khoản"
                               >
-                                <PencilSquareIcon aria-hidden="true" />
-                                Sửa
+                                <PencilSquareIcon className="w-3.5 h-3.5 text-sky-600" aria-hidden="true" />
+                                <span>Sửa</span>
                               </button>
+
                               <button
                                 type="button"
+                                className="dym-btn-table-action action-key"
                                 disabled={isResettingPassword}
                                 onClick={() => openPasswordReset(account)}
+                                title="Đặt lại mật khẩu cho tài khoản này"
                               >
-                                <KeyIcon aria-hidden="true" />
-                                Đặt lại MK
+                                <KeyIcon className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                                <span>Mật khẩu</span>
                               </button>
+
                               <button
                                 type="button"
-                                data-danger={account.isActive}
+                                className={`dym-btn-table-action ${
+                                  account.isActive ? 'action-lock' : 'action-unlock'
+                                }`}
                                 disabled={pendingAccountId === account.userId}
                                 onClick={() => requestAccountActiveChange(account)}
+                                title={account.isActive ? 'Khóa tài khoản này' : 'Mở khóa kích hoạt lại tài khoản'}
                               >
                                 {account.isActive ? (
-                                  <LockClosedIcon aria-hidden="true" />
+                                  <LockClosedIcon className="w-3.5 h-3.5 text-rose-600" aria-hidden="true" />
                                 ) : (
-                                  <LockOpenIcon aria-hidden="true" />
+                                  <LockOpenIcon className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
                                 )}
-                                {pendingAccountId === account.userId
-                                  ? 'Đang xử lý'
-                                  : account.isActive
-                                    ? 'Khóa'
-                                    : 'Mở khóa'}
+                                <span>
+                                  {pendingAccountId === account.userId
+                                    ? 'Đang lưu...'
+                                    : account.isActive
+                                      ? 'Khóa'
+                                      : 'Mở khóa'}
+                                </span>
                               </button>
                             </div>
                           </td>
@@ -597,12 +824,12 @@ function StaffPage() {
             </section>
 
             <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center</span>
-              <span>Dữ liệu tài khoản chỉ hiển thị cho quản trị viên.</span>
+              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
             </footer>
           </main>
         </div>
 
+        {/* Modal 1: Create / Edit Staff Form */}
         {isFormOpen && (
           <div className="dym-staff-dialog-backdrop" role="presentation">
             <section
@@ -613,14 +840,14 @@ function StaffPage() {
             >
               <header>
                 <div>
-                  <span className="dym-eyebrow">Tài khoản nhân viên</span>
+                  <span className="dym-eyebrow">Tài khoản nhân sự</span>
                   <h2 id="staff-form-title">
-                    {form.userId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên'}
+                    {form.userId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
                   </h2>
                 </div>
                 <button
                   type="button"
-                  aria-label="Đóng"
+                  aria-label="Đóng hộp thoại"
                   disabled={isSaving}
                   onClick={() => setIsFormOpen(false)}
                 >
@@ -629,18 +856,26 @@ function StaffPage() {
               </header>
 
               <form onSubmit={(event) => void saveStaff(event)}>
-                {formError && <div className="dym-staff-form-error" role="alert">{formError}</div>}
+                {formError && (
+                  <div className="dym-staff-form-error" role="alert">
+                    {formError}
+                  </div>
+                )}
 
                 <label>
-                  <span>Họ và tên</span>
+                  <span>Họ và tên nhân viên</span>
                   <input
                     type="text"
                     value={form.displayName}
                     maxLength={100}
                     required
                     autoFocus
+                    placeholder="vd: Nguyễn Văn A"
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, displayName: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
                     }
                   />
                 </label>
@@ -656,12 +891,15 @@ function StaffPage() {
                       autoComplete="username"
                       placeholder="vd: letan.q1"
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, loginName: event.target.value }))
+                        setForm((current) => ({
+                          ...current,
+                          loginName: event.target.value,
+                        }))
                       }
                     />
                   </label>
                   <label>
-                    <span>Vai trò</span>
+                    <span>Vai trò hệ thống</span>
                     <select
                       value={form.role}
                       onChange={(event) =>
@@ -671,7 +909,7 @@ function StaffPage() {
                         }))
                       }
                     >
-                      <option value="receptionist">Lễ tân</option>
+                      <option value="receptionist">Nhân viên lễ tân</option>
                       <option value="admin">Quản trị viên</option>
                     </select>
                   </label>
@@ -687,16 +925,20 @@ function StaffPage() {
                       maxLength={72}
                       required
                       autoComplete="new-password"
+                      placeholder="Tối thiểu 6 ký tự"
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, password: event.target.value }))
+                        setForm((current) => ({
+                          ...current,
+                          password: event.target.value,
+                        }))
                       }
                     />
-                    <small>Tối thiểu 6 ký tự. Gửi mật khẩu cho nhân viên qua kênh riêng.</small>
+                    <small>Gửi mật khẩu cho nhân viên qua kênh an toàn.</small>
                   </label>
                 )}
 
                 <fieldset>
-                  <legend>Chi nhánh được truy cập</legend>
+                  <legend>Cơ sở phòng khám được cấp quyền</legend>
                   <div className="dym-staff-branch-options">
                     {BRANCH_CODES.map((branchCode) => (
                       <label key={branchCode}>
@@ -713,21 +955,29 @@ function StaffPage() {
                     ))}
                   </div>
                   {form.role === 'admin' && (
-                    <small>Quản trị viên luôn có quyền truy cập tất cả chi nhánh.</small>
+                    <small>Quản trị viên mặc định được truy cập toàn bộ các chi nhánh.</small>
                   )}
                 </fieldset>
 
                 <footer>
                   <button
                     type="button"
-                    className="dym-staff-secondary-button"
+                    className="dym-btn-action-secondary"
                     disabled={isSaving}
                     onClick={() => setIsFormOpen(false)}
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="dym-staff-primary" disabled={isSaving}>
-                    {isSaving ? 'Đang lưu…' : form.userId ? 'Lưu thay đổi' : 'Tạo tài khoản'}
+                  <button
+                    type="submit"
+                    className="dym-btn-action-primary"
+                    disabled={isSaving}
+                  >
+                    {isSaving
+                      ? 'Đang lưu…'
+                      : form.userId
+                        ? 'Lưu thay đổi'
+                        : 'Tạo tài khoản'}
                   </button>
                 </footer>
               </form>
@@ -735,6 +985,7 @@ function StaffPage() {
           </div>
         )}
 
+        {/* Modal 2: Confirm Account Lock */}
         {accountPendingConfirmation && (
           <div className="dym-staff-dialog-backdrop" role="presentation">
             <section
@@ -751,14 +1002,14 @@ function StaffPage() {
                 <span className="dym-eyebrow">Xác nhận thao tác</span>
                 <h2 id="staff-lock-confirmation-title">Khóa tài khoản?</h2>
                 <p id="staff-lock-confirmation-description">
-                  Khóa tài khoản <strong>{accountPendingConfirmation.displayName}</strong>.
-                  Nhân viên sẽ không thể đăng nhập cho đến khi bạn mở khóa lại.
+                  Bạn có chắc chắn muốn khóa tài khoản <strong>{accountPendingConfirmation.displayName}</strong>?
+                  Nhân viên này sẽ bị ngắt kết nối ngay lập tức và không thể đăng nhập cho đến khi được mở khóa lại.
                 </p>
               </div>
               <footer>
                 <button
                   type="button"
-                  className="dym-staff-secondary-button"
+                  className="dym-btn-action-secondary"
                   disabled={Boolean(pendingAccountId)}
                   autoFocus
                   onClick={() => setAccountPendingConfirmation(null)}
@@ -767,7 +1018,7 @@ function StaffPage() {
                 </button>
                 <button
                   type="button"
-                  className="dym-staff-confirm-danger"
+                  className="dym-btn-action-primary !bg-red-600 hover:!bg-red-700"
                   disabled={Boolean(pendingAccountId)}
                   onClick={() => {
                     const account = accountPendingConfirmation;
@@ -775,14 +1026,15 @@ function StaffPage() {
                     void setAccountActive(account);
                   }}
                 >
-                  <LockClosedIcon aria-hidden="true" />
-                  {pendingAccountId ? 'Đang khóa' : 'Khóa tài khoản'}
+                  <LockClosedIcon className="w-4 h-4 mr-1 inline-block" />
+                  {pendingAccountId ? 'Đang khóa' : 'Xác nhận khóa'}
                 </button>
               </footer>
             </section>
           </div>
         )}
 
+        {/* Modal 3: Password Reset */}
         {passwordResetAccount && (
           <div className="dym-staff-dialog-backdrop" role="presentation">
             <section
@@ -807,10 +1059,12 @@ function StaffPage() {
               </header>
               <form onSubmit={(event) => void resetPassword(event)}>
                 <p className="dym-staff-password-note">
-                  Đặt mật khẩu mới cho <strong>{passwordResetAccount.displayName}</strong>. Mật khẩu cũ sẽ không còn dùng được.
+                  Đặt mật khẩu mới cho nhân viên <strong>{passwordResetAccount.displayName}</strong> (@{passwordResetAccount.loginName}). Mật khẩu cũ sẽ mất hiệu lực ngay lập tức.
                 </p>
                 {passwordResetError && (
-                  <div className="dym-staff-form-error" role="alert">{passwordResetError}</div>
+                  <div className="dym-staff-form-error" role="alert">
+                    {passwordResetError}
+                  </div>
                 )}
                 <label>
                   <span>Mật khẩu mới</span>
@@ -822,9 +1076,10 @@ function StaffPage() {
                     required
                     autoFocus
                     autoComplete="new-password"
+                    placeholder="Tối thiểu 6 ký tự"
                     onChange={(event) => setNewPassword(event.target.value)}
                   />
-                  <small>Tối thiểu 6 ký tự. Gửi mật khẩu cho nhân viên qua kênh riêng.</small>
+                  <small>Tối thiểu 6 ký tự. Gửi mật khẩu qua kênh an toàn.</small>
                 </label>
                 <label>
                   <span>Xác nhận mật khẩu mới</span>
@@ -835,19 +1090,24 @@ function StaffPage() {
                     maxLength={72}
                     required
                     autoComplete="new-password"
+                    placeholder="Nhập lại mật khẩu mới"
                     onChange={(event) => setConfirmedPassword(event.target.value)}
                   />
                 </label>
                 <footer>
                   <button
                     type="button"
-                    className="dym-staff-secondary-button"
+                    className="dym-btn-action-secondary"
                     disabled={isResettingPassword}
                     onClick={() => setPasswordResetAccount(null)}
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="dym-staff-primary" disabled={isResettingPassword}>
+                  <button
+                    type="submit"
+                    className="dym-btn-action-primary"
+                    disabled={isResettingPassword}
+                  >
                     {isResettingPassword ? 'Đang lưu…' : 'Lưu mật khẩu mới'}
                   </button>
                 </footer>
