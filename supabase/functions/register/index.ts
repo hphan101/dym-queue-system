@@ -27,7 +27,7 @@ function getSupabaseSecretKey(): string | null {
 
 const MAX_REQUEST_BYTES = 16_384;
 const COOLDOWN_SECONDS = 600;
-const IP_RATE_LIMIT_REQUESTS = 180;
+const IP_RATE_LIMIT_REQUESTS = 1000;
 const IP_RATE_LIMIT_WINDOW_SECONDS = 600;
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
 const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;

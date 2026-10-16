@@ -2,7 +2,6 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon,
   KeyIcon,
   LockClosedIcon,
   LockOpenIcon,
@@ -16,7 +15,6 @@ import { Avatar } from '@astryxdesign/core/Avatar';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 
-import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
@@ -38,34 +36,14 @@ import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { normalizeSearch } from './utils/adminFormatters';
 import { AdminHeader } from './components/AdminHeader';
-
-type StaffRole = 'admin' | 'receptionist';
-type StaffStatusTab = 'all' | 'active' | 'locked';
-
-interface StaffBranch {
-  code: BranchCode;
-  name: string;
-}
-
-interface StaffAccount {
-  userId: string;
-  loginName: string;
-  displayName: string;
-  role: StaffRole;
-  isActive: boolean;
-  branches: StaffBranch[];
-  createdAt: string;
-  lastSignInAt: string | null;
-}
-
-interface StaffFormState {
-  userId: string | null;
-  displayName: string;
-  loginName: string;
-  password: string;
-  role: StaffRole;
-  branchCodes: BranchCode[];
-}
+import type {
+  StaffAccount,
+  StaffFormState,
+  StaffStatusTab,
+} from './types';
+import { StaffFormModal } from './components/StaffFormModal';
+import { StaffLockConfirmModal } from './components/StaffLockConfirmModal';
+import { StaffPasswordResetModal } from './components/StaffPasswordResetModal';
 
 interface StaffApiResponse {
   success: boolean;
@@ -73,7 +51,6 @@ interface StaffApiResponse {
   staff?: StaffAccount[];
 }
 
-const BRANCH_CODES = Object.keys(BRANCH_NAMES) as BranchCode[];
 const EMPTY_FORM: StaffFormState = {
   userId: null,
   displayName: '',
@@ -830,291 +807,40 @@ export function StaffPage() {
         </div>
 
         {/* Modal 1: Create / Edit Staff Form */}
-        {isFormOpen && (
-          <div className="dym-staff-dialog-backdrop" role="presentation">
-            <section
-              className="dym-staff-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="staff-form-title"
-            >
-              <header>
-                <div>
-                  <span className="dym-eyebrow">Tài khoản nhân sự</span>
-                  <h2 id="staff-form-title">
-                    {form.userId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Đóng hộp thoại"
-                  disabled={isSaving}
-                  onClick={() => setIsFormOpen(false)}
-                >
-                  <XMarkIcon aria-hidden="true" />
-                </button>
-              </header>
-
-              <form onSubmit={(event) => void saveStaff(event)}>
-                {formError && (
-                  <div className="dym-staff-form-error" role="alert">
-                    {formError}
-                  </div>
-                )}
-
-                <label>
-                  <span>Họ và tên nhân viên</span>
-                  <input
-                    type="text"
-                    value={form.displayName}
-                    maxLength={100}
-                    required
-                    autoFocus
-                    placeholder="vd: Nguyễn Văn A"
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        displayName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-
-                <div className="dym-staff-form-grid">
-                  <label>
-                    <span>Tài khoản đăng nhập</span>
-                    <input
-                      type="text"
-                      value={form.loginName}
-                      maxLength={32}
-                      required
-                      autoComplete="username"
-                      placeholder="vd: letan.q1"
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          loginName: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Vai trò hệ thống</span>
-                    <select
-                      value={form.role}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          role: event.target.value as StaffRole,
-                        }))
-                      }
-                    >
-                      <option value="receptionist">Nhân viên lễ tân</option>
-                      <option value="admin">Quản trị viên</option>
-                    </select>
-                  </label>
-                </div>
-
-                {!form.userId && (
-                  <label>
-                    <span>Mật khẩu tạm thời</span>
-                    <input
-                      type="password"
-                      value={form.password}
-                      minLength={6}
-                      maxLength={72}
-                      required
-                      autoComplete="new-password"
-                      placeholder="Tối thiểu 6 ký tự"
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          password: event.target.value,
-                        }))
-                      }
-                    />
-                    <small>Gửi mật khẩu cho nhân viên qua kênh an toàn.</small>
-                  </label>
-                )}
-
-                <fieldset>
-                  <legend>Cơ sở phòng khám được cấp quyền</legend>
-                  <div className="dym-staff-branch-options">
-                    {BRANCH_CODES.map((branchCode) => (
-                      <label key={branchCode}>
-                        <input
-                          type="checkbox"
-                          checked={form.branchCodes.includes(branchCode)}
-                          onChange={() => toggleBranch(branchCode)}
-                        />
-                        <span>
-                          <strong>{branchCode.toUpperCase()}</strong>
-                          {BRANCH_NAMES[branchCode]}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  {form.role === 'admin' && (
-                    <small>Quản trị viên mặc định được truy cập toàn bộ các chi nhánh.</small>
-                  )}
-                </fieldset>
-
-                <footer>
-                  <button
-                    type="button"
-                    className="dym-btn-action-secondary"
-                    disabled={isSaving}
-                    onClick={() => setIsFormOpen(false)}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="dym-btn-action-primary"
-                    disabled={isSaving}
-                  >
-                    {isSaving
-                      ? 'Đang lưu…'
-                      : form.userId
-                        ? 'Lưu thay đổi'
-                        : 'Tạo tài khoản'}
-                  </button>
-                </footer>
-              </form>
-            </section>
-          </div>
-        )}
+        <StaffFormModal
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          form={form}
+          setForm={setForm}
+          isSaving={isSaving}
+          formError={formError}
+          onSave={saveStaff}
+          toggleBranch={toggleBranch}
+        />
 
         {/* Modal 2: Confirm Account Lock */}
-        {accountPendingConfirmation && (
-          <div className="dym-staff-dialog-backdrop" role="presentation">
-            <section
-              className="dym-staff-dialog dym-staff-confirm-dialog"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="staff-lock-confirmation-title"
-              aria-describedby="staff-lock-confirmation-description"
-            >
-              <div className="dym-staff-confirm-icon" aria-hidden="true">
-                <ExclamationTriangleIcon />
-              </div>
-              <div>
-                <span className="dym-eyebrow">Xác nhận thao tác</span>
-                <h2 id="staff-lock-confirmation-title">Khóa tài khoản?</h2>
-                <p id="staff-lock-confirmation-description">
-                  Bạn có chắc chắn muốn khóa tài khoản <strong>{accountPendingConfirmation.displayName}</strong>?
-                  Nhân viên này sẽ bị ngắt kết nối ngay lập tức và không thể đăng nhập cho đến khi được mở khóa lại.
-                </p>
-              </div>
-              <footer>
-                <button
-                  type="button"
-                  className="dym-btn-action-secondary"
-                  disabled={Boolean(pendingAccountId)}
-                  autoFocus
-                  onClick={() => setAccountPendingConfirmation(null)}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  className="dym-btn-action-primary !bg-red-600 hover:!bg-red-700"
-                  disabled={Boolean(pendingAccountId)}
-                  onClick={() => {
-                    const account = accountPendingConfirmation;
-                    setAccountPendingConfirmation(null);
-                    void setAccountActive(account);
-                  }}
-                >
-                  <LockClosedIcon className="w-4 h-4 mr-1 inline-block" />
-                  {pendingAccountId ? 'Đang khóa' : 'Xác nhận khóa'}
-                </button>
-              </footer>
-            </section>
-          </div>
-        )}
+        <StaffLockConfirmModal
+          account={accountPendingConfirmation}
+          onClose={() => setAccountPendingConfirmation(null)}
+          onConfirm={(account) => {
+            setAccountPendingConfirmation(null);
+            void setAccountActive(account);
+          }}
+          isPending={Boolean(pendingAccountId)}
+        />
 
         {/* Modal 3: Password Reset */}
-        {passwordResetAccount && (
-          <div className="dym-staff-dialog-backdrop" role="presentation">
-            <section
-              className="dym-staff-dialog dym-staff-password-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="staff-password-reset-title"
-            >
-              <header>
-                <div>
-                  <span className="dym-eyebrow">Bảo mật tài khoản</span>
-                  <h2 id="staff-password-reset-title">Đặt lại mật khẩu</h2>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Đóng"
-                  disabled={isResettingPassword}
-                  onClick={() => setPasswordResetAccount(null)}
-                >
-                  <XMarkIcon aria-hidden="true" />
-                </button>
-              </header>
-              <form onSubmit={(event) => void resetPassword(event)}>
-                <p className="dym-staff-password-note">
-                  Đặt mật khẩu mới cho nhân viên <strong>{passwordResetAccount.displayName}</strong> (@{passwordResetAccount.loginName}). Mật khẩu cũ sẽ mất hiệu lực ngay lập tức.
-                </p>
-                {passwordResetError && (
-                  <div className="dym-staff-form-error" role="alert">
-                    {passwordResetError}
-                  </div>
-                )}
-                <label>
-                  <span>Mật khẩu mới</span>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    minLength={6}
-                    maxLength={72}
-                    required
-                    autoFocus
-                    autoComplete="new-password"
-                    placeholder="Tối thiểu 6 ký tự"
-                    onChange={(event) => setNewPassword(event.target.value)}
-                  />
-                  <small>Tối thiểu 6 ký tự. Gửi mật khẩu qua kênh an toàn.</small>
-                </label>
-                <label>
-                  <span>Xác nhận mật khẩu mới</span>
-                  <input
-                    type="password"
-                    value={confirmedPassword}
-                    minLength={6}
-                    maxLength={72}
-                    required
-                    autoComplete="new-password"
-                    placeholder="Nhập lại mật khẩu mới"
-                    onChange={(event) => setConfirmedPassword(event.target.value)}
-                  />
-                </label>
-                <footer>
-                  <button
-                    type="button"
-                    className="dym-btn-action-secondary"
-                    disabled={isResettingPassword}
-                    onClick={() => setPasswordResetAccount(null)}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="dym-btn-action-primary"
-                    disabled={isResettingPassword}
-                  >
-                    {isResettingPassword ? 'Đang lưu…' : 'Lưu mật khẩu mới'}
-                  </button>
-                </footer>
-              </form>
-            </section>
-          </div>
-        )}
+        <StaffPasswordResetModal
+          account={passwordResetAccount}
+          onClose={() => setPasswordResetAccount(null)}
+          newPassword={newPassword}
+          setNewPassword={setNewPassword}
+          confirmedPassword={confirmedPassword}
+          setConfirmedPassword={setConfirmedPassword}
+          passwordResetError={passwordResetError}
+          isResetting={isResettingPassword}
+          onReset={resetPassword}
+        />
       </div>
     </Theme>
   );

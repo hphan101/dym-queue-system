@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useId, useMemo, useState } from 'react';
 import {
   ArrowUturnLeftIcon,
   ChevronLeftIcon,
@@ -10,10 +10,12 @@ import {
 } from '@heroicons/react/24/outline';
 import type { BranchCode } from '../../../types/domain';
 import { STATUS_META, type QueueStatus } from '../constants/queueConstants';
-import { TT25PrintModal } from '../../registration/TT25PrintModal';
+import { calculateAge, formatPhone } from '../utils/adminFormatters';
 import { supabase } from '../../../lib/supabaseClient';
 import type { RegistrationDetails } from '../hooks/useRegistrationDetailsQuery';
 import type { TT25RegistrationData } from '../../registration/tt25Types';
+
+const TT25PrintModal = lazy(() => import('../../registration/TT25PrintModal'));
 
 export interface RegistrationRow {
   id: string;
@@ -49,25 +51,6 @@ interface QueueTableProps {
 }
 
 type TableStatusFilter = 'all' | 'waiting' | 'called';
-
-function calculateAge(birthDateStr: string): number | null {
-  if (!birthDateStr) return null;
-  const parts = birthDateStr.split('/');
-  if (parts.length !== 3) return null;
-  const birthYear = parseInt(parts[2], 10);
-  if (isNaN(birthYear) || birthYear < 1900) return null;
-  const currentYear = new Date().getFullYear();
-  return currentYear - birthYear;
-}
-
-function formatPhoneDisplay(phoneStr: string): string {
-  if (!phoneStr) return '—';
-  const clean = phoneStr.replace(/\D/g, '');
-  if (clean.length === 10) {
-    return `${clean.slice(0, 4)} ${clean.slice(4, 7)} ${clean.slice(7)}`;
-  }
-  return phoneStr;
-}
 
 export function QueueTable({
   filteredRows,
@@ -381,7 +364,7 @@ export function QueueTable({
                       {/* Contact Phone */}
                       <td className="col-contact">
                         <span className="dym-phone-text">
-                          {formatPhoneDisplay(row.phone)}
+                          {formatPhone(row.phone)}
                         </span>
                       </td>
 
@@ -491,11 +474,13 @@ export function QueueTable({
 
       {/* TT25 Print Preview Modal */}
       {printModalData && (
-        <TT25PrintModal
-          isOpen={Boolean(printModalData)}
-          onClose={() => setPrintModalData(null)}
-          data={printModalData}
-        />
+        <Suspense fallback={null}>
+          <TT25PrintModal
+            isOpen={Boolean(printModalData)}
+            onClose={() => setPrintModalData(null)}
+            data={printModalData}
+          />
+        </Suspense>
       )}
     </section>
   );

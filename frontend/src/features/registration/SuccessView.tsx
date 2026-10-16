@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Calendar, User, Phone, CreditCard, Building, Home, Heart, RefreshCw, Printer } from 'lucide-react';
 import type { RegistrationData, TT25RegistrationData } from './types';
-import { TT25PrintModal } from './TT25PrintModal';
 import { translations, type SupportedLanguage } from './translations';
+
+const TT25PrintModal = React.lazy(() => import('./TT25PrintModal'));
 
 const REGISTRATION_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -18,19 +19,45 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
   const [cooldownRemaining, setCooldownRemaining] = React.useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
+  const handleClosePrintModal = React.useCallback(() => {
+    setIsPrintModalOpen(false);
+  }, []);
+
+  const tt25PrintData = React.useMemo<TT25RegistrationData | null>(() => {
+    if (!data) return null;
+    if ('medicalHistory' in data) return data as TT25RegistrationData;
+    return {
+      ...(data as RegistrationData),
+      ethnicity: 'Kinh',
+      bloodGroup: 'Chưa rõ',
+      insuranceNumber: '',
+      occupation: '',
+      workplace: data.companyName || '',
+      workplaceWard: '',
+      checkupReason: 'Khám sức khỏe tổng quát',
+      medicalHistory: {
+        familyHistory: { hasDisease: false, diseaseDetails: '' },
+        personalHistory: {},
+        personalOtherDetails: '',
+        currentTreatment: { isTreating: false, medications: '' },
+        pregnancyHistory: { hasHistory: false, details: '' },
+        commitmentAgreed: true,
+      },
+    };
+  }, [data]);
+
   React.useEffect(() => {
     const checkCooldown = () => {
       const lastTime = localStorage.getItem("dym_last_registration_time");
       if (lastTime) {
         const timePassed = Date.now() - parseInt(lastTime, 10);
         if (timePassed < REGISTRATION_COOLDOWN_MS) {
-          setCooldownRemaining(
-            Math.ceil((REGISTRATION_COOLDOWN_MS - timePassed) / 1000),
-          );
+          const remaining = Math.ceil((REGISTRATION_COOLDOWN_MS - timePassed) / 1000);
+          setCooldownRemaining((prev) => (prev !== remaining ? remaining : prev));
           return;
         }
       }
-      setCooldownRemaining(0);
+      setCooldownRemaining((prev) => (prev !== 0 ? 0 : prev));
     };
 
     checkCooldown();
@@ -174,30 +201,15 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
         </button>
       </div>
 
-      {data && (
-        <TT25PrintModal
-          isOpen={isPrintModalOpen}
-          onClose={() => setIsPrintModalOpen(false)}
-          data={'medicalHistory' in data ? (data as TT25RegistrationData) : {
-            ...(data as RegistrationData),
-            ethnicity: 'Kinh',
-            bloodGroup: 'Chưa rõ',
-            insuranceNumber: '',
-            occupation: '',
-            workplace: data.companyName || '',
-            workplaceWard: '',
-            checkupReason: 'Khám sức khỏe tổng quát',
-            medicalHistory: {
-              familyHistory: { hasDisease: false, diseaseDetails: '' },
-              personalHistory: {},
-              personalOtherDetails: '',
-              currentTreatment: { isTreating: false, medications: '' },
-              pregnancyHistory: { hasHistory: false, details: '' },
-              commitmentAgreed: true,
-            },
-          }}
-          registrationNumber={_queueNumber}
-        />
+      {tt25PrintData && (
+        <React.Suspense fallback={null}>
+          <TT25PrintModal
+            isOpen={isPrintModalOpen}
+            onClose={handleClosePrintModal}
+            data={tt25PrintData}
+            registrationNumber={_queueNumber}
+          />
+        </React.Suspense>
       )}
     </div>
   );

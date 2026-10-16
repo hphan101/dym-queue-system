@@ -107,4 +107,60 @@ export function formatFullAddress(
   return parts.length > 0 ? parts.join(', ') : '—';
 }
 
+export function calculateAge(birthDateStr?: string | null): number | null {
+  if (!birthDateStr) return null;
+  const trimmed = birthDateStr.trim();
+  if (!trimmed || trimmed === '—') return null;
+
+  const currentYear = new Date().getFullYear();
+  let birthYear: number | null = null;
+
+  if (trimmed.includes('-')) {
+    const year = Number.parseInt(trimmed.split('-')[0] ?? '', 10);
+    birthYear = Number.isNaN(year) ? null : year;
+  } else if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    const year = Number.parseInt(parts[parts.length - 1] ?? '', 10);
+    birthYear = Number.isNaN(year) ? null : year;
+  }
+
+  if (birthYear === null || birthYear < 1900 || birthYear > currentYear) return null;
+  return currentYear - birthYear;
+}
+
+export function formatPhone(value?: string | null): string {
+  if (!value) return '—';
+  const clean = value.replace(/\D/g, '');
+  if (clean.length === 10) {
+    return `${clean.slice(0, 4)} ${clean.slice(4, 7)} ${clean.slice(7)}`;
+  }
+  return clean || value;
+}
+
+export function formatBirthDate(value?: string | null): string {
+  if (!value) return '—';
+  const parts = value.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return value;
+}
+
+export function getRegistrationDisplayState(
+  state: 'active' | 'completed' | 'cancelled',
+  firstCalledAt: string | null,
+) {
+  if (state === 'completed') {
+    return { key: 'completed', label: 'Hoàn tất', cls: 'badge-called' };
+  }
+  if (state === 'cancelled') {
+    return { key: 'cancelled', label: 'Đã hủy', cls: 'badge-cancelled' };
+  }
+  if (firstCalledAt) {
+    return { key: 'called', label: 'Đã gọi', cls: 'badge-called' };
+  }
+  return { key: 'waiting', label: 'Chờ gọi', cls: 'badge-waiting' };
+}
+
 

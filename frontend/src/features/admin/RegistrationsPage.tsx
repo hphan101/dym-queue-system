@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
   CheckCircleIcon,
@@ -6,10 +6,7 @@ import {
   ChevronRightIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
-  EyeIcon,
-  IdentificationIcon,
   MagnifyingGlassIcon,
-  PrinterIcon,
   SignalSlashIcon,
   UserGroupIcon,
   XMarkIcon,
@@ -18,8 +15,9 @@ import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { TT25PrintModal } from '../registration/TT25PrintModal';
 import type { TT25RegistrationData } from '../registration/tt25Types';
+
+const TT25PrintModal = lazy(() => import('../registration/TT25PrintModal'));
 
 import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
@@ -37,36 +35,17 @@ import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useRegistrationDetailsQuery } from './hooks/useRegistrationDetailsQuery';
-import {
-  formatFullAddress,
-  formatRegistrationTime,
-  normalizeSearch,
-} from './utils/adminFormatters';
+import { normalizeSearch } from './utils/adminFormatters';
 import { AdminHeader } from './components/AdminHeader';
 import {
   CustomerNoticeModal,
   type CustomerNotificationItem,
 } from './components/CustomerNoticeModal';
+import { RegistrationDetailModal } from './components/RegistrationDetailModal';
+import { RegistrationsTable } from './components/RegistrationsTable';
+import type { RegistrationDetails, RegistrationStatusTab } from './types';
 
-export interface RegistrationDetails {
-  id: string;
-  branch_id: string;
-  queue_date: string;
-  queue_number: number;
-  registered_at: string;
-  full_name: string;
-  birth_date: string;
-  gender: string;
-  phone_number: string;
-  identity_document: string;
-  company_name: string;
-  province: string;
-  ward: string;
-  address_detail: string;
-  state: 'active' | 'completed' | 'cancelled';
-  first_called_at: string | null;
-  last_called_at: string | null;
-}
+export type { RegistrationDetails };
 
 type RealtimeConnectionState =
   | 'connecting'
@@ -74,50 +53,8 @@ type RealtimeConnectionState =
   | 'disconnected'
   | 'offline';
 
-type RegistrationStatusTab = 'all' | 'waiting' | 'called';
-
 const PAGE_SIZE = 15;
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
-
-function formatBirthDate(value: string) {
-  if (!value) return '—';
-  const parts = value.split('-');
-  if (parts.length === 3) {
-    const [year, month, day] = parts;
-    return `${day}/${month}/${year}`;
-  }
-  return value;
-}
-
-function calculateAge(birthDateStr: string): number | null {
-  if (!birthDateStr) return null;
-  const currentYear = new Date().getFullYear();
-  if (birthDateStr.includes('-')) {
-    const year = Number.parseInt(birthDateStr.split('-')[0] ?? '', 10);
-    return Number.isNaN(year) ? null : currentYear - year;
-  }
-  const parts = birthDateStr.split('/');
-  const year = Number.parseInt(parts[parts.length - 1] ?? '', 10);
-  return Number.isNaN(year) ? null : currentYear - year;
-}
-
-function formatPhone(value: string) {
-  if (!value) return '—';
-  return value.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3');
-}
-
-function getDisplayState(row: RegistrationDetails) {
-  if (row.state === 'completed') {
-    return { key: 'completed', label: 'Hoàn tất', cls: 'badge-called' };
-  }
-  if (row.state === 'cancelled') {
-    return { key: 'cancelled', label: 'Đã hủy', cls: 'badge-cancelled' };
-  }
-  if (row.first_called_at) {
-    return { key: 'called', label: 'Đã gọi', cls: 'badge-called' };
-  }
-  return { key: 'waiting', label: 'Chờ gọi', cls: 'badge-waiting' };
-}
 
 export function RegistrationsPage({
   authorizedIsAdmin,
@@ -662,132 +599,11 @@ export function RegistrationsPage({
                   )}
                 </div>
               ) : (
-                <div className="dym-table-scroller">
-                  <table className="dym-table-precision">
-                    <thead>
-                      <tr>
-                        <th scope="col">Số Phiếu & Giờ</th>
-                        <th scope="col">Bệnh Nhân</th>
-                        <th scope="col">Liên Hệ & Định Danh</th>
-                        <th scope="col">Đơn Vị & Địa Chỉ</th>
-                        <th scope="col">Trạng Thái</th>
-                        <th scope="col" className="text-right">Hồ Sơ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedRows.map((row) => {
-                        const displayState = getDisplayState(row);
-                        const age = calculateAge(row.birth_date);
-
-                        return (
-                          <tr key={row.id}>
-                            {/* Ticket & Time */}
-                            <td className="col-ticket">
-                              <div className="flex flex-col gap-1 items-start">
-                                <span className="dym-ticket-tag">
-                                  {formatQueueNumber(row.queue_number)}
-                                </span>
-                                <div className="dym-time-cell">
-                                  <span>{formatRegistrationTime(row.registered_at)}</span>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Patient Info */}
-                            <td>
-                              <div className="dym-patient-block">
-                                <div className="flex items-center gap-2">
-                                  <strong className="dym-patient-name uppercase tracking-tight">
-                                    {row.full_name}
-                                  </strong>
-                                  <span
-                                    className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                                      row.gender === 'Nữ'
-                                        ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                                        : 'bg-sky-100 text-sky-700 border border-sky-200'
-                                    }`}
-                                  >
-                                    {row.gender}
-                                  </span>
-                                </div>
-                                <div className="dym-patient-meta">
-                                  {age !== null && <span>{age} tuổi</span>}
-                                  {row.birth_date && <span>({formatBirthDate(row.birth_date)})</span>}
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Contact & ID */}
-                            <td>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-semibold text-xs text-slate-900 tabular-nums">
-                                  {formatPhone(row.phone_number)}
-                                </span>
-                                <span className="text-xs text-slate-600 tabular-nums">
-                                  {row.identity_document || '—'}
-                                </span>
-                              </div>
-                            </td>
-
-                            {/* Company & Location */}
-                            <td>
-                              <div className="flex flex-col gap-0.5 max-w-[280px]">
-                                {row.company_name &&
-                                row.company_name !== '—' &&
-                                row.company_name !== 'Khách vãng lai' && (
-                                  <span
-                                    className="text-xs font-semibold text-slate-900 truncate"
-                                    title={row.company_name}
-                                  >
-                                    {row.company_name}
-                                  </span>
-                                )}
-                                <span
-                                  className="text-[11px] text-slate-700 leading-snug line-clamp-2"
-                                  title={formatFullAddress(row.address_detail, row.ward, row.province)}
-                                >
-                                  {formatFullAddress(row.address_detail, row.ward, row.province)}
-                                </span>
-                              </div>
-                            </td>
-
-                            {/* Status */}
-                            <td>
-                              <span className={`dym-status-badge ${displayState.cls}`}>
-                                <span className="dym-status-indicator-dot" />
-                                {displayState.label}
-                              </span>
-                            </td>
-
-                            {/* Action Button */}
-                            <td className="text-right">
-                              <div className="dym-table-actions-group">
-                                <button
-                                  type="button"
-                                  className="dym-btn-table-action action-view"
-                                  onClick={() => setSelectedRow(row)}
-                                  title="Xem hồ sơ chi tiết"
-                                >
-                                  <EyeIcon className="w-3.5 h-3.5 text-sky-600" aria-hidden="true" />
-                                  <span>Chi tiết</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="dym-btn-table-action"
-                                  onClick={() => setPrintModalRow(row)}
-                                  title="In phiếu khám sức khỏe TT25"
-                                >
-                                  <PrinterIcon className="w-3.5 h-3.5 text-indigo-600" aria-hidden="true" />
-                                  <span>In TT25</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <RegistrationsTable
+                  rows={paginatedRows}
+                  onSelectRow={(row) => setSelectedRow(row)}
+                  onPrintRow={(row) => setPrintModalRow(row)}
+                />
               )}
 
               {/* Pagination Bar */}
@@ -826,171 +642,23 @@ export function RegistrationsPage({
             </section>
 
             {/* Patient Detail Drawer */}
-            {selectedRow && (
-              <div
-                className="dym-clinical-drawer-backdrop"
-                onClick={() => setSelectedRow(null)}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="drawer-patient-name"
-              >
-                <div
-                  className="dym-clinical-drawer-panel"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Drawer Header */}
-                  <div className="dym-clinical-drawer-header">
-                    <div className="dym-clinical-drawer-title-wrap">
-                      <span className="dym-clinical-drawer-kicker">
-                        PHIẾU ĐĂNG KÝ TIẾP ĐÓN
-                      </span>
-                      <h2
-                        id="drawer-patient-name"
-                        className="dym-clinical-drawer-title flex items-center gap-2.5"
-                      >
-                        <span>{selectedRow.full_name}</span>
-                        <span className="dym-ticket-number text-xs">
-                          {formatQueueNumber(selectedRow.queue_number)}
-                        </span>
-                      </h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPrintModalRow(selectedRow)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-95 text-white font-semibold text-xs rounded-lg shadow-sm transition-all cursor-pointer"
-                        title="In phiếu khám sức khỏe theo mẫu Thông tư 25"
-                      >
-                        <PrinterIcon className="w-4 h-4" />
-                        <span>In phiếu TT25</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="dym-clinical-drawer-close-btn"
-                        onClick={() => setSelectedRow(null)}
-                        aria-label="Đóng bảng chi tiết"
-                      >
-                        <XMarkIcon className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Drawer Body */}
-                  <div className="dym-clinical-drawer-body">
-                    {/* Section 1: Thông tin cá nhân */}
-                    <div className="dym-detail-section">
-                      <div className="dym-detail-section-title">
-                        <IdentificationIcon className="w-4 h-4" />
-                        <span>Thông tin cá nhân</span>
-                      </div>
-                      <div className="dym-detail-grid">
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Họ và tên</span>
-                          <span className="dym-detail-value">{selectedRow.full_name}</span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Giới tính</span>
-                          <span className="dym-detail-value">{selectedRow.gender}</span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Ngày sinh</span>
-                          <span className="dym-detail-value">
-                            {formatBirthDate(selectedRow.birth_date)}
-                            {calculateAge(selectedRow.birth_date) !== null && (
-                              <span className="text-xs font-normal text-slate-500 ml-1">
-                                ({calculateAge(selectedRow.birth_date)} tuổi)
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Số điện thoại</span>
-                          <span className="dym-detail-value">{formatPhone(selectedRow.phone_number)}</span>
-                        </div>
-                        <div className="dym-detail-item dym-detail-full-width">
-                          <span className="dym-detail-label">CCCD / Hộ chiếu</span>
-                          <span className="dym-detail-value tabular-nums">
-                            {selectedRow.identity_document || '—'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 2: Đơn vị & Địa chỉ */}
-                    <div className="dym-detail-section">
-                      <div className="dym-detail-section-title">
-                        <UserGroupIcon className="w-4 h-4" />
-                        <span>Đơn vị & Nơi cư trú</span>
-                      </div>
-                      <div className="dym-detail-grid">
-                        <div className="dym-detail-item dym-detail-full-width">
-                          <span className="dym-detail-label">Tên cơ quan / Công ty</span>
-                          <span className="dym-detail-value">{selectedRow.company_name || 'Khách cá nhân / Vãng lai'}</span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Tỉnh / Thành phố</span>
-                          <span className="dym-detail-value">{selectedRow.province || '—'}</span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Phường / Xã</span>
-                          <span className="dym-detail-value">{selectedRow.ward || '—'}</span>
-                        </div>
-                        <div className="dym-detail-item dym-detail-full-width">
-                          <span className="dym-detail-label">Địa chỉ chi tiết</span>
-                          <span className="dym-detail-value">{selectedRow.address_detail || '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 3: Quản lý lượt gọi */}
-                    <div className="dym-detail-section">
-                      <div className="dym-detail-section-title">
-                        <ClockIcon className="w-4 h-4" />
-                        <span>Nhật ký hàng đợi</span>
-                      </div>
-                      <div className="dym-detail-grid">
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Cơ sở tiếp nhận</span>
-                          <span className="dym-detail-value">{BRANCH_NAMES[branch]}</span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Thời gian lấy số</span>
-                          <span className="dym-detail-value tabular-nums">
-                            {formatRegistrationTime(selectedRow.registered_at)} ({selectedRow.queue_date})
-                          </span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Lần gọi đầu</span>
-                          <span className="dym-detail-value tabular-nums">
-                            {selectedRow.first_called_at
-                              ? formatRegistrationTime(selectedRow.first_called_at)
-                              : 'Chưa gọi'}
-                          </span>
-                        </div>
-                        <div className="dym-detail-item">
-                          <span className="dym-detail-label">Trạng thái</span>
-                          <span className="dym-detail-value">
-                            <span className={`dym-status-badge ${getDisplayState(selectedRow).cls}`}>
-                              <span className="dym-badge-dot" />
-                              {getDisplayState(selectedRow).label}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <RegistrationDetailModal
+              selectedRow={selectedRow}
+              branch={branch}
+              onClose={() => setSelectedRow(null)}
+              onPrint={(row) => setPrintModalRow(row)}
+            />
 
             {/* TT25 Print Preview Modal */}
             {printModalRow && printModalData && (
-              <TT25PrintModal
-                isOpen={Boolean(printModalRow)}
-                onClose={() => setPrintModalRow(null)}
-                data={printModalData}
-                registrationNumber={formatQueueNumber(printModalRow.queue_number)}
-              />
+              <Suspense fallback={null}>
+                <TT25PrintModal
+                  isOpen={Boolean(printModalRow)}
+                  onClose={() => setPrintModalRow(null)}
+                  data={printModalData}
+                  registrationNumber={formatQueueNumber(printModalRow.queue_number)}
+                />
+              </Suspense>
             )}
 
             <footer className="dym-admin-footer">

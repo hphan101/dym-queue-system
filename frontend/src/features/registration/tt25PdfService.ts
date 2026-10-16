@@ -220,15 +220,15 @@ export async function generateTT25OriginalPdf(
   }
 
   // 8. Nơi ở hiện tại & Xã phường
-  drawCleanText(page1, data.addressDetail || '', 145, 475.5, 10, false);
+  drawCleanText(page1, data.addressDetail || '', 151, 475.5, 10, false);
   const wardProvince = [data.ward, data.province].filter(Boolean).join(', ');
   drawCleanText(page1, wardProvince, 135, 460.8, 10, false);
 
   // 9. Nghề nghiệp
-  drawCleanText(page1, data.occupation || '', 145, 445.2, 10, false);
+  drawCleanText(page1, data.occupation || '', 149, 445.2, 10, false);
 
   // 10. Nơi làm việc, học tập & Xã phường
-  drawCleanText(page1, data.workplace || '', 175, 431.7, 10, false);
+  drawCleanText(page1, data.workplace || '', 184, 431.7, 10, false);
   drawCleanText(page1, data.workplaceWard || '', 135, 417.0, 10, false);
 
   // 11. Điện thoại di động

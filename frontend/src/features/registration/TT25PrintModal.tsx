@@ -25,9 +25,13 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   const [viewMode, setViewMode] = useState<'pdf' | 'web'>('pdf');
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const pdfUrlRef = useRef<string | null>(null);
+  const hasLoadedRef = useRef<boolean>(false);
 
   const dataRef = useRef(data);
   dataRef.current = data;
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const loadPdf = useCallback(() => {
     setIsLoading(true);
@@ -41,6 +45,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         pdfUrlRef.current = url;
         setPdfUrl(url);
         setIsLoading(false);
+        hasLoadedRef.current = true;
       })
       .catch((err) => {
         console.error('Failed to generate TT25 PDF:', err);
@@ -50,7 +55,17 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   }, [registrationNumber]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasLoadedRef.current = false;
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+      setPdfUrl(null);
+      setIsLoading(true);
+      setError(null);
+      return;
+    }
 
     // Lock body scroll
     const originalOverflow = document.body.style.overflow;
@@ -58,18 +73,21 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    loadPdf();
+    // Only load once per open session to prevent infinite reload loops
+    if (!hasLoadedRef.current) {
+      loadPdf();
+    }
 
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, loadPdf]);
+  }, [isOpen, loadPdf]);
 
   useEffect(() => {
     return () => {
@@ -83,15 +101,35 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    if (viewMode === 'pdf' && iframeRef.current?.contentWindow) {
-      try {
-        iframeRef.current.contentWindow.focus();
-        iframeRef.current.contentWindow.print();
-        return;
-      } catch (e) {
-        console.warn('Iframe print failed, falling back to window.print():', e);
+    const isMobile =
+      typeof window !== 'undefined' &&
+      (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && window.innerWidth < 1024));
+
+    if (viewMode === 'pdf') {
+      if (isMobile) {
+        // Mobile browsers (iOS Safari, Android Chrome) cannot print iframe PDF blobs directly and may crash or reload the page.
+        // Opening the PDF blob URL in a new tab allows the device's native PDF viewer to print/AirPrint cleanly.
+        if (pdfUrl) {
+          const newTab = window.open(pdfUrl, '_blank');
+          if (!newTab) {
+            handleDownload();
+          }
+          return;
+        }
+      }
+
+      if (iframeRef.current?.contentWindow) {
+        try {
+          iframeRef.current.contentWindow.focus();
+          iframeRef.current.contentWindow.print();
+          return;
+        } catch (e) {
+          console.warn('Iframe print failed, falling back to window.print():', e);
+        }
       }
     }
+
     window.print();
   };
 
@@ -171,17 +209,17 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-md transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded-lg shadow-md transition-all cursor-pointer shrink-0"
             title="In phiếu khám trực tiếp ra máy in"
           >
             <Printer className="w-4 h-4" />
-            In phiếu khám (2 trang A4)
+            <span>In phiếu khám<span className="hidden sm:inline"> (2 trang A4)</span></span>
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer shrink-0"
             title="Đóng cửa sổ (Esc)"
           >
             <X className="w-5 h-5" />
@@ -191,7 +229,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
       {/* Main Viewport */}
       {viewMode === 'pdf' ? (
-        <div className="tt25-viewport !p-0 flex-1 relative flex items-center justify-center bg-[#525659]">
+        <div className="tt25-viewport !p-0 flex-1 relative flex flex-col items-center justify-center bg-[#525659]">
           {isLoading && (
             <div className="flex flex-col items-center gap-3 text-slate-300 p-8">
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
@@ -222,18 +260,33 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
           )}
 
           {!isLoading && !error && pdfUrl && (
-            <object
-              data={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
-              type="application/pdf"
-              className="w-full h-full border-0"
-            >
-              <iframe
-                ref={iframeRef}
-                src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
-                title="Phiếu khám sức khỏe Mẫu 03 TT25"
-                className="w-full h-full border-0"
-              />
-            </object>
+            <div className="w-full h-full flex flex-col items-center">
+              {/* Mobile quick-action banner */}
+              <div className="sm:hidden w-full p-2.5 bg-slate-900/95 border-b border-slate-700 flex items-center justify-between text-xs text-slate-200 shrink-0">
+                <span className="truncate pr-2 font-medium">Phiếu TT25 (2 trang A4)</span>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="shrink-0 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold rounded text-xs flex items-center gap-1 shadow-sm cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Mở in / AirPrint
+                </button>
+              </div>
+
+              <object
+                data={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                type="application/pdf"
+                className="w-full flex-1 border-0"
+              >
+                <iframe
+                  ref={iframeRef}
+                  src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                  title="Phiếu khám sức khỏe Mẫu 03 TT25"
+                  className="w-full h-full border-0"
+                />
+              </object>
+            </div>
           )}
         </div>
       ) : (
@@ -246,3 +299,5 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
   return createPortal(modalContent, document.body);
 };
+
+export default TT25PrintModal;

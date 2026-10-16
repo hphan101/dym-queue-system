@@ -28,6 +28,7 @@ import {
   CHECKUP_REASONS,
 } from './tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
+import { BirthDateInput } from './BirthDateInput';
 
 interface Province {
   name: string;
@@ -207,17 +208,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     }
 
     if (!birthDate) {
-      newErrors.birthDate = 'Vui lòng chọn ngày sinh';
+      newErrors.birthDate = 'Vui lòng nhập ngày sinh (định dạng ngày/tháng/năm)';
     } else {
       const birth = new Date(birthDate);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const m = today.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-      if (age < 18) {
-        newErrors.birthDate = 'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên';
+      if (isNaN(birth.getTime()) || birth.getFullYear() < 1900) {
+        newErrors.birthDate = 'Ngày sinh không hợp lệ';
+      } else {
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          newErrors.birthDate = 'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên';
+        }
       }
     }
 
@@ -388,8 +393,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           </div>
 
           {/* Giới tính & Ngày sinh */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
                 <Heart className="w-3.5 h-3.5 text-slate-400" />
                 2. Giới tính <span className="text-red-500">*</span>
@@ -412,21 +417,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 3. Ngày sinh <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <BirthDateInput
                 value={birthDate}
-                onChange={(e) => {
-                  setBirthDate(e.target.value);
+                onChange={(val) => {
+                  setBirthDate(val);
                   if (errors.birthDate) setErrors((prev) => ({ ...prev, birthDate: '' }));
                 }}
-                className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
-                  errors.birthDate ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
-                }`}
+                error={errors.birthDate}
+                onErrorClear={() => {
+                  if (errors.birthDate) setErrors((prev) => ({ ...prev, birthDate: '' }));
+                }}
               />
               {errors.birthDate && <p className="text-xs text-red-500 mt-1">{errors.birthDate}</p>}
             </div>
