@@ -1,50 +1,21 @@
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import {
+  CONTROL_CHARACTERS,
   isOriginAllowed,
+  isRecord,
+  isSafeText,
   jsonResponse,
+  LOGIN_NAME_PATTERN,
   responseHeaders,
 } from "../_shared/http.ts";
-import { createAdminClient } from "../_shared/supabase.ts";
-
-function getSupabaseSecretKey(): string | null {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (serviceRoleKey) return serviceRoleKey;
-
-  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
-  if (secretKeys) {
-    try {
-      const parsed = JSON.parse(secretKeys) as Record<string, unknown>;
-      const defaultKey = parsed.default;
-      if (typeof defaultKey === "string" && defaultKey.length > 0) {
-        return defaultKey;
-      }
-    } catch {
-      console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
-    }
-  }
-  return null;
-}
-
-function getSupabasePublishableKey(): string | null {
-  const publishableKeys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
-  if (publishableKeys) {
-    try {
-      const parsed = JSON.parse(publishableKeys) as Record<string, unknown>;
-      const defaultKey = parsed.default;
-      if (typeof defaultKey === "string" && defaultKey.length > 0) {
-        return defaultKey;
-      }
-    } catch {
-      console.error(JSON.stringify({ code: "INVALID_SUPABASE_PUBLISHABLE_KEYS" }));
-    }
-  }
-  return Deno.env.get("SUPABASE_ANON_KEY") ?? null;
-}
+import {
+  createAdminClient,
+  getSupabasePublishableKey,
+  getSupabaseSecretKey,
+} from "../_shared/supabase.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
 const MAX_STAFF_ACCOUNTS = 200;
-const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
-const LOGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const USER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_BRANCH_CODES = new Set(["q1", "q7", "hn"]);
 const ALLOWED_ROLES = new Set(["admin", "receptionist"]);
@@ -82,14 +53,6 @@ interface ResetPasswordInput {
 }
 
 type StaffRequest = CreateStaffInput | UpdateStaffInput | SetActiveInput | ResetPasswordInput;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isSafeText(value: string, min: number, max: number) {
-  return value.length >= min && value.length <= max && !CONTROL_CHARACTERS.test(value);
-}
 
 function parseStaffInput(value: Record<string, unknown>): StaffInput | null {
   const displayName = typeof value.displayName === "string"
@@ -349,7 +312,6 @@ async function listStaff(serviceClient: SupabaseClient, databaseClient: Supabase
 
 async function handleCreateStaff(
   serviceClient: SupabaseClient,
-  _userClient: SupabaseClient,
   actor: User,
   payload: CreateStaffInput,
   origin: string | null,
@@ -414,7 +376,6 @@ async function handleCreateStaff(
 
 async function handleUpdateStaff(
   serviceClient: SupabaseClient,
-  _userClient: SupabaseClient,
   actor: User,
   payload: UpdateStaffInput,
   origin: string | null,
@@ -478,9 +439,19 @@ async function handleUpdateStaff(
     throw error;
   }
 
+  const currentEmail = targetAuthData.user.email?.toLowerCase() ?? "";
+  const shouldSyncInternalEmail =
+    !currentEmail || currentEmail.endsWith("@accounts.dym.internal");
+
   const { error: authMetadataError } = await serviceClient.auth.admin.updateUserById(
     payload.userId,
     {
+      ...(shouldSyncInternalEmail
+        ? {
+            email: `${payload.loginName}@accounts.dym.internal`,
+            email_confirm: true,
+          }
+        : {}),
       user_metadata: {
         ...targetAuthData.user.user_metadata,
         display_name: payload.displayName,
@@ -502,7 +473,6 @@ async function handleUpdateStaff(
 
 async function handleSetActive(
   serviceClient: SupabaseClient,
-  _userClient: SupabaseClient,
   actor: User,
   payload: SetActiveInput,
   origin: string | null,
@@ -550,7 +520,6 @@ async function handleSetActive(
 
 async function handleResetPassword(
   serviceClient: SupabaseClient,
-  _userClient: SupabaseClient,
   actor: User,
   payload: ResetPasswordInput,
   origin: string | null,
@@ -657,13 +626,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     switch (payload.action) {
       case "create":
-        return await handleCreateStaff(serviceClient, userClient, actor, payload, origin);
+        return await handleCreateStaff(serviceClient, actor, payload, origin);
       case "update":
-        return await handleUpdateStaff(serviceClient, userClient, actor, payload, origin);
+        return await handleUpdateStaff(serviceClient, actor, payload, origin);
       case "set-active":
-        return await handleSetActive(serviceClient, userClient, actor, payload, origin);
+        return await handleSetActive(serviceClient, actor, payload, origin);
       case "reset-password":
-        return await handleResetPassword(serviceClient, userClient, actor, payload, origin);
+        return await handleResetPassword(serviceClient, actor, payload, origin);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -673,7 +642,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       message: errorMessage,
     }));
     return jsonResponse(
-      { success: false, code: "SERVER_ERROR", message: errorMessage, requestId },
+      { success: false, code: "SERVER_ERROR", requestId },
       500,
       origin,
     );

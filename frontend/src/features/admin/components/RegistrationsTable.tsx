@@ -1,6 +1,6 @@
 import React from 'react';
-import { EyeIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { formatQueueNumber } from '../../../lib/queueNumber';
+import { usePrintStatus } from '../hooks/usePrintStatus';
 import type { RegistrationDetails } from '../types';
 import {
   calculateAge,
@@ -10,18 +10,25 @@ import {
   formatRegistrationTime,
   getRegistrationDisplayState,
 } from '../utils/adminFormatters';
+import { HighlightText } from './HighlightText';
 
 export interface RegistrationsTableProps {
   rows: RegistrationDetails[];
+  searchQuery?: string;
   onSelectRow: (row: RegistrationDetails) => void;
   onPrintRow: (row: RegistrationDetails) => void;
+  onPrintConsentRow?: (row: RegistrationDetails) => void;
 }
 
 export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
   rows,
+  searchQuery,
   onSelectRow,
   onPrintRow,
+  onPrintConsentRow,
 }) => {
+  const { getStatus, togglePrintStatus } = usePrintStatus();
+
   return (
     <div className="dym-table-scroller">
       <table className="dym-table-precision">
@@ -32,6 +39,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
             <th scope="col">Liên Hệ & Định Danh</th>
             <th scope="col">Đơn Vị & Địa Chỉ</th>
             <th scope="col">Trạng Thái</th>
+            <th scope="col">Trạng Thái In</th>
             <th scope="col" className="text-right">Hồ Sơ</th>
           </tr>
         </thead>
@@ -42,6 +50,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
               row.first_called_at,
             );
             const age = calculateAge(row.birth_date);
+            const printStatus = getStatus(row.id);
 
             return (
               <tr key={row.id}>
@@ -49,7 +58,10 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 <td className="col-ticket">
                   <div className="flex flex-col gap-1 items-start">
                     <span className="dym-ticket-tag">
-                      {formatQueueNumber(row.queue_number)}
+                      <HighlightText
+                        text={formatQueueNumber(row.queue_number)}
+                        query={searchQuery}
+                      />
                     </span>
                     <div className="dym-time-cell">
                       <span>{formatRegistrationTime(row.registered_at)}</span>
@@ -62,10 +74,13 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                   <div className="dym-patient-block">
                     <div className="flex items-center gap-2">
                       <strong className="dym-patient-name uppercase tracking-tight">
-                        {row.full_name}
+                        <HighlightText
+                          text={row.full_name}
+                          query={searchQuery}
+                        />
                       </strong>
                       <span
-                        className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                        className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
                           row.gender === 'Nữ'
                             ? 'bg-rose-100 text-rose-700 border border-rose-200'
                             : 'bg-sky-100 text-sky-700 border border-sky-200'
@@ -77,7 +92,14 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                     <div className="dym-patient-meta">
                       {age !== null && <span>{age} tuổi</span>}
                       {row.birth_date && (
-                        <span>({formatBirthDate(row.birth_date)})</span>
+                        <span>
+                          (
+                          <HighlightText
+                            text={formatBirthDate(row.birth_date)}
+                            query={searchQuery}
+                          />
+                          )
+                        </span>
                       )}
                     </div>
                   </div>
@@ -86,11 +108,21 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 {/* Contact & ID */}
                 <td>
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-semibold text-xs text-slate-900 tabular-nums">
-                      {formatPhone(row.phone_number)}
+                    <span className="dym-contact-phone">
+                      <HighlightText
+                        text={formatPhone(row.phone_number)}
+                        query={searchQuery}
+                      />
                     </span>
-                    <span className="text-xs text-slate-600 tabular-nums">
-                      {row.identity_document || '—'}
+                    <span className="dym-contact-id">
+                      {row.identity_document ? (
+                        <HighlightText
+                          text={row.identity_document}
+                          query={searchQuery}
+                        />
+                      ) : (
+                        '—'
+                      )}
                     </span>
                   </div>
                 </td>
@@ -102,25 +134,31 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       row.company_name !== '—' &&
                       row.company_name !== 'Khách vãng lai' && (
                         <span
-                          className="text-xs font-semibold text-slate-900 truncate"
+                          className="dym-company-name truncate"
                           title={row.company_name}
                         >
-                          {row.company_name}
+                          <HighlightText
+                            text={row.company_name}
+                            query={searchQuery}
+                          />
                         </span>
                       )}
                     <span
-                      className="text-[11px] text-slate-700 leading-snug line-clamp-2"
+                      className="dym-address-line line-clamp-2"
                       title={formatFullAddress(
                         row.address_detail,
                         row.ward,
                         row.province,
                       )}
                     >
-                      {formatFullAddress(
-                        row.address_detail,
-                        row.ward,
-                        row.province,
-                      )}
+                      <HighlightText
+                        text={formatFullAddress(
+                          row.address_detail,
+                          row.ward,
+                          row.province,
+                        )}
+                        query={searchQuery}
+                      />
                     </span>
                   </div>
                 </td>
@@ -133,6 +171,19 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                   </span>
                 </td>
 
+                {/* Print Status */}
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => togglePrintStatus(row.id)}
+                    title={printStatus.title}
+                    className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
+                  >
+                    <span className="dym-status-indicator-dot" />
+                    {printStatus.label}
+                  </button>
+                </td>
+
                 {/* Action Button */}
                 <td className="text-right">
                   <div className="dym-table-actions-group">
@@ -142,22 +193,24 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       onClick={() => onSelectRow(row)}
                       title="Xem hồ sơ chi tiết"
                     >
-                      <EyeIcon
-                        className="w-3.5 h-3.5 text-sky-600"
-                        aria-hidden="true"
-                      />
                       <span>Chi tiết</span>
                     </button>
+                    {onPrintConsentRow && (
+                      <button
+                        type="button"
+                        className="dym-btn-table-action"
+                        onClick={() => onPrintConsentRow(row)}
+                        title="In phiếu Đồng thuận khám sức khỏe"
+                      >
+                        <span>In Đồng thuận</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="dym-btn-table-action"
                       onClick={() => onPrintRow(row)}
                       title="In phiếu khám sức khỏe TT25"
                     >
-                      <PrinterIcon
-                        className="w-3.5 h-3.5 text-indigo-600"
-                        aria-hidden="true"
-                      />
                       <span>In TT25</span>
                     </button>
                   </div>

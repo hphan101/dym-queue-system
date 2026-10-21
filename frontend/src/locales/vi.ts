@@ -12,32 +12,6 @@ export const vi: TranslationDictionary = {
   cccd: 'Số CCCD / Hộ chiếu',
   address: 'Địa chỉ',
   companyName: 'Tên công ty',
-  province: 'Tỉnh / Thành phố',
-  ward: 'Phường / Xã',
-  addressDetail: 'Địa chỉ chi tiết (Số nhà, đường...)',
-  selectProvince: 'Chọn Tỉnh / Thành phố',
-  selectWard: 'Chọn Phường / Xã',
-  btnSubmit: 'Xác nhận Đăng ký',
-  btnSubmitting: 'Đang xử lý...',
-  placeholderCompany: 'Nhập tên công ty',
-  placeholderCccd: 'Nhập số CCCD hoặc hộ chiếu',
-  placeholderAddressDetail: 'Số nhà, tên đường...',
-
-  // Validation
-  errFullNameRequired: 'Họ và tên không được để trống',
-  errFullNameMin: 'Họ và tên phải từ 2 ký tự trở lên',
-  errPhoneRequired: 'Số điện thoại không được để trống',
-  errPhoneInvalid: 'Số điện thoại không hợp lệ (gồm 10 chữ số)',
-  errBirthRequired: 'Ngày sinh không được để trống',
-  errBirthPast: 'Ngày sinh phải ở trong quá khứ',
-  errGenderRequired: 'Vui lòng chọn giới tính',
-  errCccdRequired: 'Số CCCD/Hộ chiếu không được để trống',
-  errCccdInvalid: 'Số CCCD hoặc Hộ chiếu không hợp lệ',
-  errProvinceRequired: 'Vui lòng chọn Tỉnh/Thành phố',
-  errWardRequired: 'Vui lòng chọn Phường/Xã',
-  errAddressDetailRequired: 'Địa chỉ chi tiết không được để trống',
-  loadingLocations: 'Đang tải danh sách địa chỉ…',
-  locationLoadError: 'Không thể tải danh sách địa chỉ. Vui lòng chạm lại để thử lại.',
 
   // Success
   successTitle: 'Đăng ký thành công!',
@@ -55,4 +29,3 @@ export const vi: TranslationDictionary = {
   networkError: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.',
   noBranchError: 'Liên kết đăng ký không xác định chi nhánh. Vui lòng quét lại mã QR tại cơ sở DYM.',
 };
-

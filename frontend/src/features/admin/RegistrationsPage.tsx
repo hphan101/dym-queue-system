@@ -15,12 +15,18 @@ import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 import { useQueryClient } from '@tanstack/react-query';
 
-import type { TT25RegistrationData } from '../registration/tt25Types';
+import {
+  type TT25RegistrationData,
+  createDefaultTT25Data,
+  getDefaultTargetPaymentByReason,
+} from '../registration/tt25Types';
 
 const TT25PrintModal = lazy(() => import('../registration/TT25PrintModal'));
+const ConsentPrintModal = lazy(
+  () => import('../registration/ConsentPrintModal'),
+);
 
 import { BRANCH_NAMES } from '../../config/branches';
-import { getTodayInVietnam } from '../../lib/date';
 import { formatQueueNumber } from '../../lib/queueNumber';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
@@ -35,6 +41,9 @@ import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useRegistrationDetailsQuery } from './hooks/useRegistrationDetailsQuery';
+import { useAdminScope } from './hooks/useAdminScope';
+import { markRegistrationPrinted } from './hooks/usePrintStatus';
+import { useRegistrationOverrides } from './hooks/useRegistrationOverrides';
 import { normalizeSearch } from './utils/adminFormatters';
 import { AdminHeader } from './components/AdminHeader';
 import {
@@ -55,24 +64,39 @@ type RealtimeConnectionState =
 
 const PAGE_SIZE = 15;
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
+const REALTIME_REGISTRATION_COLUMNS = [
+  'id',
+  'branch_id',
+  'queue_date',
+  'queue_number',
+  'full_name',
+  'phone_number',
+  'state',
+  'registered_at',
+  'first_called_at',
+  'last_called_at',
+  'updated_at',
+];
 
 export function RegistrationsPage({
   authorizedIsAdmin,
+  isActiveTab = true,
 }: {
   authorizedIsAdmin: boolean;
+  isActiveTab?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { staffName, branchIds, identityError } = useStaffIdentity();
+  const { branch, setBranch, date, setDate } = useAdminScope();
 
-  const [branch, setBranch] = useState<BranchCode>('q1');
-  const [date, setDate] = useState(getTodayInVietnam);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RegistrationStatusTab>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(null);
   const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
+  const [consentModalRow, setConsentModalRow] = useState<RegistrationDetails | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
       navigator.onLine ? 'connected' : 'offline',
@@ -81,6 +105,8 @@ export function RegistrationsPage({
     useState<CustomerNotificationItem | null>(null);
 
   const noticeTimer = useRef<number | null>(null);
+  const isActiveTabRef = useRef(isActiveTab);
+  isActiveTabRef.current = isActiveTab;
   const searchInputId = useId();
   const branchId = branchIds[branch];
 
@@ -95,46 +121,63 @@ export function RegistrationsPage({
     date,
   });
 
-  const rows = useMemo(() => fetchedRows ?? [], [fetchedRows]);
+  const { applyToDetails, applyToDetailsList } = useRegistrationOverrides();
+  const rows = useMemo(
+    () => applyToDetailsList(fetchedRows ?? []),
+    [applyToDetailsList, fetchedRows],
+  );
   const error = queryError ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.' : null;
 
   const printModalData = useMemo<TT25RegistrationData | null>(() => {
-    if (!printModalRow) return null;
-    return {
+    const rawTarget = printModalRow || consentModalRow;
+    if (!rawTarget) return null;
+    const targetRow = applyToDetails(rawTarget);
+    const extras = targetRow.tt25_data ?? {};
+    const defaultReason = targetRow.company_name?.trim()
+      ? 'Khám sức khỏe định kỳ theo công ty'
+      : 'Khám sức khỏe cá nhân tự nguyện';
+    const resolvedReason =
+      extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
+        ? extras.checkupReason
+        : defaultReason;
+
+    const wpWard = extras.workplaceWard || '';
+    const wpProv = extras.workplaceProvince || '';
+    const resolvedWorkplaceWard =
+      wpProv && !wpWard.includes(wpProv)
+        ? [wpWard, wpProv].filter(Boolean).join(', ')
+        : wpWard;
+
+    return createDefaultTT25Data({
       branch,
-      fullName: printModalRow.full_name,
-      gender: (printModalRow.gender as 'Nam' | 'Nữ') || 'Nam',
-      birthDate: printModalRow.birth_date,
-      ethnicity: 'Kinh',
-      bloodGroup: 'Chưa rõ',
-      cccd: printModalRow.identity_document,
-      insuranceNumber: '',
-      province: printModalRow.province,
-      ward: printModalRow.ward,
-      addressDetail: printModalRow.address_detail,
-      occupation: '',
-      workplace: printModalRow.company_name || '',
-      workplaceWard: '',
-      phoneNumber: printModalRow.phone_number,
-      checkupReason: 'Khám sức khỏe tổng quát',
-      medicalHistory: {
-        familyHistory: { hasDisease: false, diseaseDetails: '' },
-        personalHistory: {},
-        personalOtherDetails: '',
-        currentTreatment: { isTreating: false, medications: '' },
-        pregnancyHistory: { hasHistory: false, details: '' },
-        commitmentAgreed: true,
-      },
-    };
-  }, [branch, printModalRow]);
+      fullName: targetRow.full_name,
+      gender: (targetRow.gender as 'Nam' | 'Nữ') || 'Nam',
+      birthDate: targetRow.birth_date,
+      ethnicity: extras.ethnicity || 'Kinh',
+      bloodGroup: extras.bloodGroup || 'Chưa rõ',
+      cccd: targetRow.identity_document,
+      insuranceNumber: extras.insuranceNumber || '',
+      province: targetRow.province,
+      ward: targetRow.ward,
+      addressDetail: targetRow.address_detail,
+      occupation: extras.occupation || '',
+      workplace: targetRow.company_name || '',
+      workplaceWard: resolvedWorkplaceWard,
+      phoneNumber: targetRow.phone_number,
+      checkupReason: resolvedReason,
+      medicalHistory: extras.medicalHistory,
+      targetPayment:
+        extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
+      consentAgreed: extras.consentAgreed ?? true,
+      queueNumber: formatQueueNumber(targetRow.queue_number),
+      checkupDate: targetRow.queue_date,
+    });
+  }, [applyToDetails, branch, printModalRow, consentModalRow]);
 
   useEffect(() => {
-    const previousTitle = document.title;
+    if (!isActiveTab) return;
     document.title = `Danh Sách Tiếp Nhận | ${BRANCH_NAMES[branch]} - DYM Medical Center`;
-    return () => {
-      document.title = previousTitle;
-    };
-  }, [branch]);
+  }, [branch, isActiveTab]);
 
   useEffect(() => {
     const handleOnline = () => setConnectionState('connecting');
@@ -151,6 +194,8 @@ export function RegistrationsPage({
 
   // Global search keyboard shortcut '/'
   useEffect(() => {
+    if (!isActiveTab) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === '/' &&
@@ -167,7 +212,7 @@ export function RegistrationsPage({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchInputId]);
+  }, [isActiveTab, searchInputId]);
 
   // Supabase Realtime subscription for incoming registrations
   useEffect(() => {
@@ -182,9 +227,11 @@ export function RegistrationsPage({
           schema: 'public',
           table: 'registrations',
           filter: `branch_id=eq.${branchId}`,
+          select: REALTIME_REGISTRATION_COLUMNS,
         },
         (payload) => {
           if (
+            isActiveTabRef.current &&
             String(payload.new.queue_date ?? '') === date &&
             typeof payload.new.queue_number === 'number'
           ) {
@@ -215,6 +262,7 @@ export function RegistrationsPage({
           schema: 'public',
           table: 'registrations',
           filter: `branch_id=eq.${branchId}`,
+          select: REALTIME_REGISTRATION_COLUMNS,
         },
         () => {
           void queryClient.invalidateQueries({
@@ -319,6 +367,7 @@ export function RegistrationsPage({
         <AdminSidebar
           activePage="registrations"
           branch={branch}
+          date={date}
           registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={authorizedIsAdmin}
@@ -601,8 +650,16 @@ export function RegistrationsPage({
               ) : (
                 <RegistrationsTable
                   rows={paginatedRows}
+                  searchQuery={query}
                   onSelectRow={(row) => setSelectedRow(row)}
-                  onPrintRow={(row) => setPrintModalRow(row)}
+                  onPrintRow={(row) => {
+                    markRegistrationPrinted(row.id, 'tt25');
+                    setPrintModalRow(row);
+                  }}
+                  onPrintConsentRow={(row) => {
+                    markRegistrationPrinted(row.id, 'consent');
+                    setConsentModalRow(row);
+                  }}
                 />
               )}
 
@@ -646,7 +703,20 @@ export function RegistrationsPage({
               selectedRow={selectedRow}
               branch={branch}
               onClose={() => setSelectedRow(null)}
-              onPrint={(row) => setPrintModalRow(row)}
+              onUpdated={(updated) => {
+                setSelectedRow(updated);
+                void queryClient.invalidateQueries({
+                  queryKey: ['registrationDetails', branch, date],
+                });
+              }}
+              onPrint={(row) => {
+                markRegistrationPrinted(row.id, 'tt25');
+                setPrintModalRow(row);
+              }}
+              onPrintConsent={(row) => {
+                markRegistrationPrinted(row.id, 'consent');
+                setConsentModalRow(row);
+              }}
             />
 
             {/* TT25 Print Preview Modal */}
@@ -656,14 +726,22 @@ export function RegistrationsPage({
                   isOpen={Boolean(printModalRow)}
                   onClose={() => setPrintModalRow(null)}
                   data={printModalData}
-                  registrationNumber={formatQueueNumber(printModalRow.queue_number)}
+                  onPrinted={() => markRegistrationPrinted(printModalRow.id, 'tt25')}
                 />
               </Suspense>
             )}
 
-            <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
-            </footer>
+            {/* Consent Print Preview Modal */}
+            {consentModalRow && printModalData && (
+              <Suspense fallback={null}>
+                <ConsentPrintModal
+                  isOpen={Boolean(consentModalRow)}
+                  onClose={() => setConsentModalRow(null)}
+                  data={printModalData}
+                  onPrinted={() => markRegistrationPrinted(consentModalRow.id, 'consent')}
+                />
+              </Suspense>
+            )}
           </main>
         </div>
       </div>

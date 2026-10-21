@@ -17,6 +17,7 @@ import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useDashboardQueueQuery } from './hooks/useDashboardQueueQuery';
+import { useAdminScope } from './hooks/useAdminScope';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeSearch } from './utils/adminFormatters';
 import { playNotificationChime } from './utils/audioNotification';
@@ -58,15 +59,20 @@ interface UndoQueueResult {
 const DASHBOARD_PAGE_SIZE = 20;
 const CUSTOMER_NOTIFICATION_DURATION_MS = 8_000;
 
-export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean }) {
+export function AdminPage({
+  authorizedIsAdmin,
+  isActiveTab = true,
+}: {
+  authorizedIsAdmin: boolean;
+  isActiveTab?: boolean;
+}) {
   const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { staffName, branchIds, identityError } = useStaffIdentity();
+  const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [rows, setRows] = useState<RegistrationRow[]>([]);
-  const [branch, setBranch] = useState<BranchCode>('q1');
-  const [date, setDate] = useState(getTodayInVietnam);
   const [query, setQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [currentQueue, setCurrentQueue] = useState('—');
@@ -89,6 +95,8 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
 
   const notificationTimer = useRef<number | null>(null);
   const notificationSoundEnabledRef = useRef(false);
+  const isActiveTabRef = useRef(isActiveTab);
+  isActiveTabRef.current = isActiveTab;
 
   const branchId = branchIds[branch];
   const isMutating = pendingQueueAction !== null || pendingUndoId !== null;
@@ -116,12 +124,9 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
   const dataError = actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
 
   useEffect(() => {
-    const previousTitle = document.title;
+    if (!isActiveTab) return;
     document.title = 'Tiếp nhận | DYM Medical Center';
-    return () => {
-      document.title = previousTitle;
-    };
-  }, []);
+  }, [isActiveTab]);
 
   // Sync branch selection if initial branch is not in allowed list
   useEffect(() => {
@@ -129,7 +134,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
     if (availableCodes.length > 0 && !branchIds[branch]) {
       setBranch(availableCodes[0]);
     }
-  }, [branchIds, branch]);
+  }, [branchIds, branch, setBranch]);
 
   const showCustomerNotification = useCallback(
     (record: { id?: string; queue_number?: number; full_name?: string }) => {
@@ -215,6 +220,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
         },
         (payload) => {
           if (
+            isActiveTabRef.current &&
             payload.eventType === 'INSERT' &&
             String(payload.new.queue_date ?? '') === date
           ) {
@@ -460,6 +466,8 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
   });
 
   useEffect(() => {
+    if (!isActiveTab) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeTag = (event.target as HTMLElement)?.tagName?.toLowerCase();
       const isInput =
@@ -496,7 +504,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [counts.waiting, currentQueue, isMutating]);
+  }, [isActiveTab, counts.waiting, currentQueue, isMutating]);
 
   const handleBranchChange = (nextBranch: BranchCode) => {
     setBranch(nextBranch);
@@ -532,6 +540,7 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
         <AdminSidebar
           activePage="dashboard"
           branch={branch}
+          date={date}
           registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={authorizedIsAdmin}
@@ -624,10 +633,6 @@ export function AdminPage({ authorizedIsAdmin }: { authorizedIsAdmin: boolean })
               onPageChange={setCurrentPage}
               onReturnToWaiting={(row) => void returnToWaiting(row)}
             />
-
-            <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
-            </footer>
           </main>
         </div>
       </div>

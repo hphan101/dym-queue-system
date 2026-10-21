@@ -1,54 +1,41 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  getClientIp,
   isOriginAllowed,
+  isRecord,
   jsonResponse,
+  LOGIN_NAME_PATTERN,
   responseHeaders,
 } from "../_shared/http.ts";
-import { createAdminClient } from "../_shared/supabase.ts";
+import {
+  createAdminClient,
+  getSupabasePublishableKey,
+  getSupabaseSecretKey,
+} from "../_shared/supabase.ts";
 
 const MAX_REQUEST_BYTES = 4_096;
 const MAX_ACCOUNTS = 1_000;
-const LOGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const RATE_WINDOW_MS = 10 * 60 * 1_000;
 const RATE_MAX_ATTEMPTS = 20;
 const attempts = new Map<string, { count: number; expiresAt: number }>();
 
-function getSupabaseSecretKey(): string | null {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (serviceRoleKey) return serviceRoleKey;
-
-  const keys = Deno.env.get("SUPABASE_SECRET_KEYS");
-  if (keys) {
-    try {
-      const key = (JSON.parse(keys) as Record<string, unknown>).default;
-      if (typeof key === "string" && key) return key;
-    } catch {
-      console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
+function cleanupExpiredAttempts(now: number) {
+  if (attempts.size < 500) return;
+  for (const [k, v] of attempts.entries()) {
+    if (v.expiresAt <= now) {
+      attempts.delete(k);
     }
   }
-  return null;
-}
-
-function getSupabasePublishableKey(): string | null {
-  const keys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
-  if (keys) {
-    try {
-      const key = (JSON.parse(keys) as Record<string, unknown>).default;
-      if (typeof key === "string" && key) return key;
-    } catch {
-      console.error(JSON.stringify({ code: "INVALID_SUPABASE_PUBLISHABLE_KEYS" }));
-    }
-  }
-  return Deno.env.get("SUPABASE_ANON_KEY") ?? null;
 }
 
 function requestKey(request: Request, loginName: string) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return `${forwarded ?? "unknown"}:${loginName}`;
+  const clientIp = getClientIp(request) ?? "unknown";
+  return `${clientIp}:${loginName}`;
 }
 
 function mayAttempt(key: string): boolean {
   const now = Date.now();
+  cleanupExpiredAttempts(now);
   const entry = attempts.get(key);
   if (!entry || entry.expiresAt <= now) {
     attempts.set(key, { count: 1, expiresAt: now + RATE_WINDOW_MS });
@@ -57,10 +44,6 @@ function mayAttempt(key: string): boolean {
   if (entry.count >= RATE_MAX_ATTEMPTS) return false;
   entry.count += 1;
   return true;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {

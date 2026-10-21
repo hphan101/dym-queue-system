@@ -2,26 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
 import { rememberRegistrationCount } from '../registrationCountCache';
+import type { RegistrationDetails } from '../types';
 
-export interface RegistrationDetails {
-  id: string;
-  branch_id: string;
-  queue_date: string;
-  queue_number: number;
-  registered_at: string;
-  full_name: string;
-  birth_date: string;
-  gender: string;
-  phone_number: string;
-  identity_document: string;
-  company_name: string;
-  province: string;
-  ward: string;
-  address_detail: string;
-  state: 'active' | 'completed' | 'cancelled';
-  first_called_at: string | null;
-  last_called_at: string | null;
-}
+export type { RegistrationDetails } from '../types';
 
 export function useRegistrationDetailsQuery({
   branch,

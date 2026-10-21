@@ -1,50 +1,33 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Calendar, User, Phone, CreditCard, Building, Home, Heart, RefreshCw, Printer } from 'lucide-react';
-import type { RegistrationData, TT25RegistrationData } from './types';
-import { translations, type SupportedLanguage } from './translations';
+import { CheckCircle2, Calendar, User, Phone, CreditCard, Building, Home, Heart, RefreshCw, Eye, FileCheck2 } from 'lucide-react';
+import type { TT25RegistrationData } from './types';
+import { translations, type SupportedLanguage } from '../../locales';
 
 const TT25PrintModal = React.lazy(() => import('./TT25PrintModal'));
+const ConsentPrintModal = React.lazy(() => import('./ConsentPrintModal'));
 
 const REGISTRATION_COOLDOWN_MS = 10 * 60 * 1000;
 
 interface SuccessViewProps {
   queueNumber: string;
-  data: RegistrationData | TT25RegistrationData | null;
+  data: TT25RegistrationData | null;
   onReset: () => void;
   lang: SupportedLanguage;
 }
 
 export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNumber, data, onReset, lang }) => {
   const t = translations[lang];
-  const [cooldownRemaining, setCooldownRemaining] = React.useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
 
   const handleClosePrintModal = React.useCallback(() => {
     setIsPrintModalOpen(false);
   }, []);
 
-  const tt25PrintData = React.useMemo<TT25RegistrationData | null>(() => {
-    if (!data) return null;
-    if ('medicalHistory' in data) return data as TT25RegistrationData;
-    return {
-      ...(data as RegistrationData),
-      ethnicity: 'Kinh',
-      bloodGroup: 'Chưa rõ',
-      insuranceNumber: '',
-      occupation: '',
-      workplace: data.companyName || '',
-      workplaceWard: '',
-      checkupReason: 'Khám sức khỏe tổng quát',
-      medicalHistory: {
-        familyHistory: { hasDisease: false, diseaseDetails: '' },
-        personalHistory: {},
-        personalOtherDetails: '',
-        currentTreatment: { isTreating: false, medications: '' },
-        pregnancyHistory: { hasHistory: false, details: '' },
-        commitmentAgreed: true,
-      },
-    };
-  }, [data]);
+  const handleCloseConsentModal = React.useCallback(() => {
+    setIsConsentModalOpen(false);
+  }, []);
 
   React.useEffect(() => {
     const checkCooldown = () => {
@@ -75,10 +58,6 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
     ? [data.addressDetail, data.ward, data.province].filter(Boolean).join(', ')
     : '';
 
-  const companyOrWorkplace = data
-    ? ('workplace' in data ? data.workplace : data.companyName)
-    : '';
-
   return (
     <div className="text-center space-y-6 animate-fade-in">
       <div className="flex flex-col items-center justify-center space-y-2">
@@ -101,14 +80,14 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
           {t.queueLabel}
         </p>
         <div className="text-5xl font-extrabold text-dym-blue-800 tracking-tight my-2">
-          {queueNumber}
+          {_queueNumber}
         </div>
         <p className="text-xs text-slate-500 mt-2">
           {t.successNote}
         </p>
       </div> */}
 
-      {data && <div className="text-left bg-white border border-slate-100 rounded-xl p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
+      {data && <div className="text-left bg-white border border-slate-200 rounded-md p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
         <h3 className="font-bold text-slate-700 border-b border-slate-100 pb-2 flex items-center gap-1.5">
           {t.summaryTitle}
         </h3>
@@ -127,7 +106,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
             <p className="text-xs text-slate-400">{t.birthDate}</p>
             <p className="font-medium text-slate-700">
               {new Date(data.birthDate).toLocaleDateString(
-                lang === 'vi' ? 'vi-VN' : lang === 'ja' ? 'ja-JP' : 'en-US',
+                lang === 'vi' ? 'vi-VN' : 'en-US',
               )}
             </p>
           </div>
@@ -167,27 +146,40 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
           </div>
         </div>
 
-        {companyOrWorkplace && (
+        {data.workplace && (
           <div className="flex items-start gap-2.5">
             <Building className="w-4 h-4 text-slate-400 mt-0.5" />
             <div>
               <p className="text-xs text-slate-400">{t.companyName}</p>
-              <p className="font-semibold text-dym-blue-700">{companyOrWorkplace}</p>
+              <p className="font-semibold text-dym-blue-700">{data.workplace}</p>
             </div>
           </div>
         )}
       </div>}
 
-      <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+      <div className="pt-2 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3">
         {data && (
-          <button
-            type="button"
-            onClick={() => setIsPrintModalOpen(true)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            Xem & In phiếu khám TT25 (2 trang A4)
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setIsConsentModalOpen(true)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded shadow-sm transition-all cursor-pointer"
+            >
+              <FileCheck2 className="w-4 h-4" />
+              {lang === 'en' ? 'View Consent Form' : 'Xem Phiếu Đồng Thuận'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPrintModalOpen(true)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded shadow-sm transition-all cursor-pointer"
+            >
+              <Eye className="w-4 h-4" />
+              {lang === 'en'
+                ? 'View Checkup Form TT25'
+                : 'Xem phiếu khám TT25'}
+            </button>
+          </>
         )}
 
         <button
@@ -201,13 +193,19 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
         </button>
       </div>
 
-      {tt25PrintData && (
+      {data && (
         <React.Suspense fallback={null}>
           <TT25PrintModal
             isOpen={isPrintModalOpen}
             onClose={handleClosePrintModal}
-            data={tt25PrintData}
-            registrationNumber={_queueNumber}
+            data={data}
+            allowPrint={false}
+          />
+          <ConsentPrintModal
+            isOpen={isConsentModalOpen}
+            onClose={handleCloseConsentModal}
+            data={data}
+            allowPrint={false}
           />
         </React.Suspense>
       )}

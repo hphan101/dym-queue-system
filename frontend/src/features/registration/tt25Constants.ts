@@ -10,27 +10,19 @@ export const ETHNIC_GROUPS = [
 
 export const BLOOD_GROUPS = [
   'Chưa rõ',
-  'A',
-  'B',
-  'AB',
-  'O',
   'A (Rh+)',
-  'A (Rh-)',
   'B (Rh+)',
-  'B (Rh-)',
-  'AB (Rh+)',
-  'AB (Rh-)',
   'O (Rh+)',
+  'AB (Rh+)',
+  'A (Rh-)',
+  'B (Rh-)',
   'O (Rh-)',
+  'AB (Rh-)',
 ];
 
 export const CHECKUP_REASONS = [
-  'Khám sức khỏe đi làm / tuyển dụng',
-  'Khám sức khỏe định kỳ doanh nghiệp',
-  'Khám sức khỏe đi học / nhập học',
-  'Khám sức khỏe tổng quát cá nhân',
-  'Khám sức khỏe lái xe',
-  'Khám sức khỏe đi xuất khẩu lao động / du học',
-  'Khác'
+  'Khám sức khỏe định kì theo công ty',
+  'Khám sức khỏe đi học/đi làm',
+  'Khám sức khỏe cá nhân tự nguyện',
 ];
 

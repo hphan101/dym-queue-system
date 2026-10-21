@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type SetStateAction } from 'react';
 import type { AdminThemeMode } from '../AdminSidebar';
 
 export const THEME_STORAGE_KEY = 'dym-admin-theme';
@@ -12,21 +12,40 @@ export function getInitialThemeMode(): AdminThemeMode {
   }
 }
 
+let sharedThemeMode: AdminThemeMode = getInitialThemeMode();
+const themeListeners = new Set<(mode: AdminThemeMode) => void>();
+
+function updateSharedThemeMode(action: SetStateAction<AdminThemeMode>) {
+  const nextMode =
+    typeof action === 'function' ? action(sharedThemeMode) : action;
+  if (nextMode === sharedThemeMode) return;
+  sharedThemeMode = nextMode;
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextMode);
+  } catch {
+    // Theme preference remains active for current session
+  }
+  themeListeners.forEach((listener) => listener(nextMode));
+}
+
 export function useAdminTheme() {
-  const [themeMode, setThemeMode] = useState<AdminThemeMode>(getInitialThemeMode);
+  const [themeMode, setLocalThemeMode] = useState<AdminThemeMode>(sharedThemeMode);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-    } catch {
-      // Theme preference remains active for current session
-    }
-  }, [themeMode]);
+    setLocalThemeMode(sharedThemeMode);
+    themeListeners.add(setLocalThemeMode);
+    return () => {
+      themeListeners.delete(setLocalThemeMode);
+    };
+  }, []);
 
-  const toggleTheme = () => {
-    setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'));
-  };
+  const setThemeMode = useCallback((action: SetStateAction<AdminThemeMode>) => {
+    updateSharedThemeMode(action);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    updateSharedThemeMode((current) => (current === 'dark' ? 'light' : 'dark'));
+  }, []);
 
   return { themeMode, setThemeMode, toggleTheme };
 }
-

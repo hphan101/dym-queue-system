@@ -2,7 +2,7 @@ import { defineTheme } from '@astryxdesign/core/theme';
 
 export const dymAdminTheme = defineTheme({
   name: 'dym-admin',
-  radius: { base: 4, multiplier: 1 },
+  radius: { base: 3, multiplier: 1 },
   motion: { fast: 120, medium: 220, slow: 420, ratio: 0.75 },
   tokens: {
     '--color-accent': [

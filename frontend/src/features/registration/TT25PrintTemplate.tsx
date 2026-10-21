@@ -3,12 +3,10 @@ import type { TT25RegistrationData } from './tt25Types';
 
 interface TT25PrintTemplateProps {
   data: TT25RegistrationData;
-  registrationNumber?: string;
 }
 
 export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
   data,
-  registrationNumber: _registrationNumber,
 }) => {
   // Format Date dd/mm/yyyy
   const formatDate = (isoDate: string) => {
@@ -49,17 +47,11 @@ export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
         {/* Top Header Layout */}
         <div className="tt25-header-grid">
           <div className="tt25-header-left">
-            <p className="tt25-top-doc-title">
-              MẪU 3. MẪU GIẤY KHÁM SỨC KHỎE VÀ KHÁM SỨC KHỎE ĐỊNH KỲ DÙNG CHO NGƯỜI TỪ ĐỦ 18 TUỔI TRỞ LÊN
-            </p>
-            <p className="text-[10px] my-0.5">------</p>
             <p className="text-[11px] leading-tight text-slate-800">
-              …………………<br />
-              ………………….
+              CODE: DYM.PRO.09.FOR.14.02
             </p>
-            <p className="text-[10px] my-0.5">-------</p>
             <p className="text-[10.5px]">
-              Số: ……./SKSK-.........
+              Số: {data.cccd ? `${data.cccd.toUpperCase()}/` : '/'}{currentDay}{currentMonth}{currentYear}/GKSK - DYM
             </p>
           </div>
 
@@ -89,7 +81,7 @@ export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
 
           <div className="tt25-line">
             <span className="tt25-label font-medium mr-1.5">1. Họ và tên (viết chữ in hoa):</span>
-            <span className="tt25-value font-bold uppercase">{data.fullName}</span>
+            <span className="tt25-value font-bold uppercase">{data.fullName?.toUpperCase()}</span>
           </div>
 
           <div className="tt25-line-group">
@@ -172,14 +164,39 @@ export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
             <span className="tt25-value">{data.workplaceWard || ''}</span>
           </div>
 
-          <div className="tt25-line-group">
-            <div className="tt25-line flex-1">
-              <span className="tt25-label font-medium mr-1.5">11. Điện thoại di động:</span>
-              <span className="tt25-value font-bold">{data.phoneNumber}</span>
+          <div className="tt25-line">
+            <span className="tt25-label font-medium mr-1.5">11. Điện thoại di động:</span>
+            <span className="tt25-value font-bold">{data.phoneNumber}</span>
+          </div>
+
+          <div className="tt25-line">
+            <span className="tt25-label font-medium mr-1.5">12. Lý do khám sức khỏe:</span>
+            <span className="tt25-value" />
+          </div>
+          <div className="pl-4 space-y-0.5 text-[10.5px] mt-0.5">
+            <div>
+              <span className="tt25-box mr-1.5">
+                {data.checkupReason?.toLowerCase().includes('công ty') ? '✓' : ''}
+              </span>
+              Khám sức khỏe định kỳ theo công ty
             </div>
-            <div className="tt25-line flex-1">
-              <span className="tt25-label font-medium mr-1.5">12. Lý do khám sức khỏe:</span>
-              <span className="tt25-value">{data.checkupReason || 'Khám sức khỏe tổng quát'}</span>
+            <div>
+              <span className="tt25-box mr-1.5">
+                {data.checkupReason?.toLowerCase().includes('đi học') ||
+                data.checkupReason?.toLowerCase().includes('đi làm')
+                  ? '✓'
+                  : ''}
+              </span>
+              Khám sức khỏe đi học/ đi làm
+            </div>
+            <div>
+              <span className="tt25-box mr-1.5">
+                {data.checkupReason?.toLowerCase().includes('tự nguyện') ||
+                data.checkupReason?.toLowerCase().includes('cá nhân')
+                  ? '✓'
+                  : ''}
+              </span>
+              Khám sức khỏe các nhân tự nguyện
             </div>
           </div>
         </div>
@@ -275,6 +292,21 @@ export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
         {/* Chú thích chân trang 1 */}
         <div className="tt25-footnote">
           ¹ Đối với người sử dụng ngân sách nhà nước chỉ chấp nhận số định danh cá nhân hoặc căn cước công dân
+        </div>
+
+        {/* Footer Trang 1 */}
+        <div className="mt-auto pt-2 flex items-center justify-between text-[11px] text-black">
+          <span>
+            {[(data.fullName || '').trim().toUpperCase(), formatDate(data.birthDate)]
+              .filter(Boolean)
+              .join(' – ')}
+          </span>
+          <span>
+            {data.cccd ? `${data.cccd.toUpperCase()}/` : ''}
+            {currentDay}
+            {currentMonth}
+            {currentYear}/GKSK - DYM
+          </span>
         </div>
       </div>
 
@@ -432,52 +464,121 @@ export const TT25PrintTemplate: React.FC<TT25PrintTemplateProps> = ({
           </div>
         </div>
 
-        {/* ================= PHẦN DÀNH CHO CƠ SỞ Y TẾ ================= */}
-        <div className="border-t border-black pt-1.5 text-[10px]">
+        {/* ================= THÔNG TIN ĐỐI TƯỢNG - CHI TRẢ ================= */}
+        <div className="border-t border-black pt-1.5 text-[10.5px]">
           <h2 className="font-bold text-center uppercase tracking-wide text-[11px] mb-1">
             THÔNG TIN ĐỐI TƯỢNG - CHI TRẢ
           </h2>
-          <div className="tt25-line mb-1">
-            <span className="tt25-label">Đối tượng (ghi số từ 1 đến 17 theo mã đối tượng tại phụ lục):</span>
-            <span className="tt25-value"></span>
+          <div className="mb-1">
+            <span className="font-bold">Đối tượng</span>{' '}
+            <span>(ghi số từ 1 đến 17 theo mã đối tượng tại phụ lục):</span>
           </div>
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+          <div className="space-y-0.5 pl-1 mb-1.5">
             <div>
-              <p className="font-semibold mb-0.5">Nguồn chi trả:</p>
-              <div className="space-y-0.5 pl-2">
-                <p>□ Ngân sách nhà nước hỗ trợ</p>
-                <p className="pl-4">□ Khám theo hợp đồng &nbsp;&nbsp;&nbsp;&nbsp; □ Khám phi địa giới</p>
-                <p>□ Người sử dụng lao động chi trả</p>
-                <p>□ Người dân tự chi trả</p>
-                <p>□ Nguồn khác: .................................................................</p>
-              </div>
+              <span className="tt25-box mr-1.5">
+                {data.targetPayment?.targetGroup === '14' ? '✓' : ''}
+              </span>
+              14 – Sinh viên, học viên
             </div>
             <div>
-              <p className="font-semibold mb-0.5">Địa điểm khám:</p>
-              <div className="space-y-1 pl-2">
-                <p>□ CS KBCB &nbsp;&nbsp;&nbsp;&nbsp; □ Khám lưu động</p>
-                <p>□ Trạm Y tế &nbsp;&nbsp;&nbsp;&nbsp; □ Trường học &nbsp;&nbsp;&nbsp;&nbsp; □ KSK tại nhà</p>
+              <span className="tt25-box mr-1.5">
+                {data.targetPayment?.targetGroup === '15' ? '✓' : ''}
+              </span>
+              15 – Người lao động chính thức (theo Luật An toàn, Vệ sinh lao động)
+            </div>
+            <div>
+              <span className="tt25-box mr-1.5">
+                {data.targetPayment?.targetGroup === '16' ? '✓' : ''}
+              </span>
+              16 – Người lao động phi chính thức
+            </div>
+            <div className="tt25-line">
+              <span className="tt25-label mr-1.5">Các đối tượng khác:</span>
+              <span className="tt25-value">
+                {data.targetPayment?.targetGroup === 'other'
+                  ? data.targetPayment.targetOtherDetails
+                  : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-1.5">
+            <p className="font-bold mb-0.5">Nguồn chi trả</p>
+            <div className="space-y-0.5 pl-1">
+              <div>
+                <span className="tt25-box mr-1.5">
+                  {data.targetPayment?.paymentSource === 'employer' ? '✓' : ''}
+                </span>
+                Người sử dụng lao động chi trả
+              </div>
+              <div>
+                <span className="tt25-box mr-1.5">
+                  {data.targetPayment?.paymentSource === 'self' ? '✓' : ''}
+                </span>
+                Người dân tự chi trả
+              </div>
+              <div className="tt25-line items-center">
+                <span className="tt25-box mr-1.5">
+                  {data.targetPayment?.paymentSource === 'other' ? '✓' : ''}
+                </span>
+                <span className="tt25-label mr-1.5">Nguồn khác:</span>
+                <span className="tt25-value">
+                  {data.targetPayment?.paymentSource === 'other'
+                    ? data.targetPayment.paymentOtherDetails
+                    : ''}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-slate-300 mt-2 pt-1.5">
-            <h2 className="font-bold text-center uppercase tracking-wide text-[11px] mb-1">
-              KẾT QUẢ KHÁM SỨC KHỎE
-            </h2>
-            <p className="font-bold uppercase text-[10.5px] mb-1">I. KHÁM THỂ LỰC</p>
-            <div className="grid grid-cols-2 gap-x-6 text-[10px]">
-              <div className="space-y-1">
-                <p>- Chiều cao: ........................................ cm;</p>
-                <p>- Cân nặng: ......................................... kg;</p>
-              </div>
-              <div className="space-y-1">
-                <p>Mạch: ................................................. lần/phút;</p>
-                <p>Huyết áp: .......................................... mmHg;</p>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="font-bold mr-2">Địa điểm khám:</span>
+            <span>
+              <span className="tt25-box mr-1">
+                {(data.targetPayment?.examLocation || 'cs_kbcb') === 'cs_kbcb' ? '✓' : ''}
+              </span>
+              CS KBCB
+            </span>
+            <span>
+              <span className="tt25-box mr-1">
+                {data.targetPayment?.examLocation === 'kham_luu_dong' ? '✓' : ''}
+              </span>
+              Khám lưu động
+            </span>
+            <span>
+              <span className="tt25-box mr-1">
+                {data.targetPayment?.examLocation === 'tram_y_te' ? '✓' : ''}
+              </span>
+              Trạm Y tế
+            </span>
+            <span>
+              <span className="tt25-box mr-1">
+                {data.targetPayment?.examLocation === 'truong_hoc' ? '✓' : ''}
+              </span>
+              Trường học
+            </span>
+            <span>
+              <span className="tt25-box mr-1">
+                {data.targetPayment?.examLocation === 'ksk_tai_nha' ? '✓' : ''}
+              </span>
+              KSK tại nhà
+            </span>
           </div>
+        </div>
+
+        {/* Footer Trang 2 */}
+        <div className="mt-auto pt-2 flex items-center justify-between text-[11px] text-black">
+          <span>
+            {[(data.fullName || '').trim().toUpperCase(), formatDate(data.birthDate)]
+              .filter(Boolean)
+              .join(' – ')}
+          </span>
+          <span>
+            {data.cccd ? `${data.cccd.toUpperCase()}/` : ''}
+            {currentDay}
+            {currentMonth}
+            {currentYear}/GKSK - DYM
+          </span>
         </div>
       </div>
     </div>

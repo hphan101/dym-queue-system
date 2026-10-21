@@ -193,7 +193,7 @@ body {
   min-width: 1.5rem;
   height: 1.5rem;
   padding-inline: var(--space-2);
-  border-radius: 999px;
+  border-radius: 0.25rem;
   border-color: var(--color-rule-2);
   color: var(--color-brand-accent);
   background: var(--color-paper-2);
@@ -202,7 +202,7 @@ body {
 .dym-nav-soon {
   min-height: 1.5rem;
   padding-inline: var(--space-2);
-  border-radius: 999px;
+  border-radius: 0.25rem;
   color: var(--color-muted);
   background: var(--color-paper-3);
 }
@@ -1177,8 +1177,25 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2-5, 0.625rem);
   padding: 0;
+  overflow: hidden;
+}
+
+.dym-account-avatar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dym-account-details {
+  min-width: 0;
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .dym-sidebar-footer {
@@ -1191,9 +1208,17 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-sidebar-account-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
+}
+
+.dym-sidebar-collapse-control {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  justify-self: end;
 }
 
 .dym-sidebar-footer-actions {
@@ -1260,6 +1285,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-account-name,
 .dym-account-role {
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1271,6 +1297,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-account-name {
   color: var(--color-ink);
   font-weight: 650;
+  font-size: var(--text-sm);
 }
 
 .dym-account-role {
@@ -1535,7 +1562,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.375rem;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   color: #059669;
@@ -1579,7 +1606,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.5rem;
   padding: 0 0.875rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -1640,7 +1667,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-control-select {
   height: 2.5rem;
   padding: 0 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -1663,7 +1690,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -1750,7 +1777,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   justify-content: center;
   gap: 0.375rem;
   padding: 0 1rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid transparent;
   background: #0284c7;
   color: #ffffff;
@@ -1794,7 +1821,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   justify-content: center;
   gap: 0.4375rem;
   padding: 0 0.9375rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -1843,7 +1870,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   height: 2rem;
   padding: 0 0.625rem;
   font-size: 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   gap: 0.25rem;
 }
 
@@ -1887,7 +1914,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   flex-direction: column;
   justify-content: space-between;
   padding: 1.5rem;
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
@@ -1959,7 +1986,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   color: var(--color-ink-2);
   background: var(--color-paper);
   padding: 0.25rem 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
 }
 
@@ -1992,7 +2019,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   width: 100%;
   max-width: 24rem;
   padding: 1.75rem 1.5rem;
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   background: var(--color-paper);
   border: 1px solid var(--color-rule-2);
   transition: all 0.2s ease;
@@ -2052,7 +2079,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   gap: 0.375rem;
   margin-top: 0.75rem;
   padding: 0.2rem 0.625rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #059669;
@@ -2080,7 +2107,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   gap: 0.5rem;
   padding: 0.625rem 0.875rem;
   margin-bottom: 1.25rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   background: var(--color-paper-3);
   border: 1px solid var(--color-rule);
   color: var(--color-ink-2);
@@ -2120,7 +2147,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1.25rem;
-  border-radius: 0.75rem;
+  border-radius: 0.375rem;
   border: none;
   background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   color: #ffffff;
@@ -2149,7 +2176,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-btn-call-icon {
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
@@ -2208,7 +2235,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   justify-content: center;
   gap: 0.25rem;
   padding: 0.625rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: 0.375rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -2270,7 +2297,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   justify-content: flex-start;
   gap: 1.25rem;
   padding: 1.5rem;
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
 }
@@ -2302,7 +2329,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   background: var(--color-paper);
   border: 1px solid var(--color-rule-2);
   color: var(--color-ink);
@@ -2311,7 +2338,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 /* Progress Tracker */
 .dym-progress-card {
   padding: 1rem;
-  border-radius: 0.75rem;
+  border-radius: 0.375rem;
   background: var(--color-paper);
   border: 1px solid var(--color-rule);
 }
@@ -2337,14 +2364,14 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-progress-track {
   width: 100%;
   height: 0.5rem;
-  border-radius: 9999px;
+  border-radius: 0.1875rem;
   background: var(--color-paper-3);
   overflow: hidden;
 }
 
 .dym-progress-fill {
   height: 100%;
-  border-radius: 9999px;
+  border-radius: 0.1875rem;
   background: linear-gradient(90deg, #0284c7, #10b981);
   transition: width 0.4s ease;
 }
@@ -2358,7 +2385,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-status-item {
   padding: 1rem;
-  border-radius: 0.75rem;
+  border-radius: 0.375rem;
   background: var(--color-paper);
   border: 1px solid var(--color-rule);
   display: flex;
@@ -2424,7 +2451,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 /* --- Registry Ledger Panel (The Table Section) --- */
 .dym-registry-panel {
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   overflow: hidden;
@@ -2488,7 +2515,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-filter-tabs {
   display: inline-flex;
   padding: 0.25rem;
-  border-radius: 0.625rem;
+  border-radius: 0.25rem;
   background: var(--color-paper);
   border: 1px solid var(--color-rule-2);
   gap: 0.25rem;
@@ -2499,7 +2526,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.375rem;
   padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: 0.1875rem;
   border: none;
   background: transparent;
   color: var(--color-ink-2);
@@ -2523,7 +2550,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   font-size: 0.6875rem;
   font-weight: 700;
   padding: 0.0625rem 0.375rem;
-  border-radius: 9999px;
+  border-radius: 0.1875rem;
   background: var(--color-paper-3);
   color: var(--color-ink);
 }
@@ -2567,7 +2594,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   width: 100%;
   height: 2.25rem;
   padding: 0 2rem 0 2.25rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -2665,7 +2692,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   padding: 0.25rem 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   background: rgba(2, 132, 199, 0.08);
   border: 1px solid rgba(2, 132, 199, 0.2);
   color: #0284c7;
@@ -2712,7 +2739,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-meta-gender {
   padding: 0.0625rem 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: 0.1875rem;
   background: var(--color-paper-3);
   font-weight: 600;
 }
@@ -2725,6 +2752,31 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-phone-text {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  color: var(--color-ink-2);
+}
+
+.dym-contact-phone {
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+
+.dym-contact-id {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+}
+
+.dym-company-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.dym-address-line {
+  font-size: 0.6875rem;
+  line-height: 1.375;
   color: var(--color-ink-2);
 }
 
@@ -2744,7 +2796,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 700;
   white-space: nowrap;
@@ -2768,6 +2820,40 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   color: #dc2626;
 }
 
+.dym-status-badge.badge-print-pending {
+  background: rgba(100, 116, 139, 0.08);
+  border: 1px solid rgba(100, 116, 139, 0.24);
+  color: #64748b;
+}
+
+.dym-status-badge.badge-print-partial {
+  background: rgba(2, 132, 199, 0.1);
+  border: 1px solid rgba(2, 132, 199, 0.28);
+  color: #0284c7;
+}
+
+.dym-status-badge.badge-print-done {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  color: #059669;
+}
+
+.dym-print-status-btn {
+  cursor: pointer;
+  font-family: inherit;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.dym-print-status-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.96);
+}
+
+.dym-print-status-btn:active {
+  transform: translateY(0);
+}
+
 .dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-waiting {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
@@ -2783,6 +2869,24 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   color: #f87171;
 }
 
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-pending {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-partial {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.32);
+  color: #38bdf8;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-done {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(52, 211, 153, 0.32);
+  color: #34d399;
+}
+
 .dym-status-indicator-dot {
   width: 0.375rem;
   height: 0.375rem;
@@ -2796,7 +2900,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.375rem;
   padding: 0.3125rem 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink-2);
@@ -2834,7 +2938,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   justify-content: center;
   gap: 0.3125rem;
   padding: 0 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink-2);
@@ -2968,7 +3072,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.25rem;
   padding: 0.3125rem 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: var(--color-ink);
@@ -3007,7 +3111,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-empty-icon-wrap {
   width: 3.5rem;
   height: 3.5rem;
-  border-radius: 9999px;
+  border-radius: 0.375rem;
   background: var(--color-paper-3);
   display: flex;
   align-items: center;
@@ -3032,7 +3136,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 .dym-btn-reset-filter {
   margin-top: 1rem;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
   color: #0284c7;
@@ -3051,7 +3155,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-metric-summary-card {
   padding: 1.25rem 1.5rem;
-  border-radius: 0.875rem;
+  border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   display: flex;
@@ -3121,7 +3225,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   display: inline-flex;
   align-items: center;
   padding: 0.2rem 0.5rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -3156,7 +3260,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
+  border-radius: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 700;
 }
@@ -3216,44 +3320,70 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 }
 
 .dym-clinical-drawer-header {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--color-rule);
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 1rem;
   position: sticky;
   top: 0;
   background: var(--color-paper);
   z-index: 2;
 }
 
+.dym-clinical-drawer-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
 .dym-clinical-drawer-title-wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.dym-clinical-drawer-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .dym-clinical-drawer-kicker {
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #0284c7;
+}
+
+.dym-drawer-ticket-tag {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
 }
 
 .dym-clinical-drawer-title {
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
   color: var(--color-ink);
+  word-break: break-word;
 }
 
 .dym-clinical-drawer-close-btn {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.375rem;
+  width: 2.125rem;
+  height: 2.125rem;
+  flex-shrink: 0;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper-2);
   color: var(--color-muted);
@@ -3270,6 +3400,201 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
   border-color: #0284c7;
 }
 
+.dym-clinical-drawer-edit-btn {
+  height: 2.125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.75rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dym-clinical-drawer-edit-btn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.dym-drawer-saved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-drawer-saved-pill {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+}
+
+.dym-detail-section.is-editing {
+  border-color: rgba(2, 132, 199, 0.35);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.06);
+}
+
+.dym-drawer-input {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.6875rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dym-drawer-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.16);
+}
+
+.dym-drawer-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.375rem;
+  background: rgba(2, 132, 199, 0.06);
+  border: 1px solid rgba(2, 132, 199, 0.22);
+}
+
+.dym-drawer-btn-cancel {
+  height: 2.25rem;
+  padding: 0 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dym-drawer-btn-cancel:hover:not(:disabled) {
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+}
+
+.dym-drawer-btn-save {
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid #047857;
+  background: #059669;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 6px -1px rgba(5, 150, 105, 0.35);
+  transition: all 0.15s ease;
+}
+
+.dym-drawer-btn-save:hover:not(:disabled) {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+.dym-drawer-btn-save:disabled,
+.dym-drawer-btn-cancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dym-drawer-error-banner {
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.25rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dym-clinical-drawer-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.dym-drawer-action-btn {
+  height: 2.375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4375rem;
+  padding: 0 0.875rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dym-drawer-action-btn.is-consent {
+  background: rgba(2, 132, 199, 0.08);
+  border: 1px solid rgba(2, 132, 199, 0.28);
+  color: #0284c7;
+}
+
+.dym-drawer-action-btn.is-consent:hover {
+  background: rgba(2, 132, 199, 0.14);
+  border-color: #0284c7;
+  transform: translateY(-1px);
+}
+
+.dym-drawer-action-btn.is-tt25 {
+  background: #0284c7;
+  border: 1px solid #0369a1;
+  color: #ffffff;
+  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.35);
+}
+
+.dym-drawer-action-btn.is-tt25:hover {
+  background: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px -2px rgba(2, 132, 199, 0.45);
+}
+
+.dym-drawer-action-btn:active {
+  transform: translateY(0);
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-drawer-action-btn.is-consent {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.32);
+  color: #38bdf8;
+}
+
+.dym-admin-shell[data-color-mode="dark"] .dym-drawer-action-btn.is-consent:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
 .dym-clinical-drawer-body {
   padding: 1.5rem;
   display: flex;
@@ -3280,7 +3605,7 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-detail-section {
   padding: 1.25rem;
-  border-radius: 0.75rem;
+  border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
 }
@@ -3324,5 +3649,21 @@ body:has(.dym-admin-shell) [popover][role="tooltip"] {
 
 .dym-detail-full-width {
   grid-column: 1 / -1;
+}
+
+/* Search Query Highlighting */
+.dym-search-highlight {
+  background-color: #fef08a;
+  color: #0f172a;
+  font-weight: 700;
+  padding: 0.05rem 0.2rem;
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.45);
+}
+
+[data-color-mode="dark"] .dym-search-highlight {
+  background-color: rgba(234, 179, 8, 0.32);
+  color: #fef08a;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.55);
 }
 

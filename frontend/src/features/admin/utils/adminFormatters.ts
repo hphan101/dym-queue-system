@@ -30,8 +30,8 @@ export function formatDateTime(value: string | null | undefined): string {
 }
 
 /** Formats ISO string 'YYYY-MM-DD' into Vietnamese format 'DD/MM/YYYY' */
-export function formatDisplayDate(isoDate?: string | null): string {
-  if (!isoDate) return '--/--/----';
+export function formatDisplayDate(isoDate?: string | null, fallback = '--/--/----'): string {
+  if (!isoDate) return fallback;
   const parts = isoDate.split('-');
   if (parts.length === 3) {
     const [year, month, day] = parts;
@@ -138,13 +138,7 @@ export function formatPhone(value?: string | null): string {
 }
 
 export function formatBirthDate(value?: string | null): string {
-  if (!value) return '—';
-  const parts = value.split('-');
-  if (parts.length === 3) {
-    const [year, month, day] = parts;
-    return `${day}/${month}/${year}`;
-  }
-  return value;
+  return formatDisplayDate(value, '—');
 }
 
 export function getRegistrationDisplayState(

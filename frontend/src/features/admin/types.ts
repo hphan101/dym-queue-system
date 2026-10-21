@@ -1,4 +1,8 @@
 import type { BranchCode } from '../../types/domain';
+import type {
+  TT25MedicalHistory,
+  TT25TargetPaymentInfo,
+} from '../registration/tt25Types';
 
 export type StaffRole = 'admin' | 'receptionist';
 export type StaffStatusTab = 'all' | 'active' | 'locked';
@@ -28,6 +32,19 @@ export interface StaffFormState {
   branchCodes: BranchCode[];
 }
 
+export interface TT25StoredExtras {
+  ethnicity?: string;
+  bloodGroup?: string;
+  insuranceNumber?: string;
+  occupation?: string;
+  workplaceProvince?: string;
+  workplaceWard?: string;
+  checkupReason?: string;
+  medicalHistory?: TT25MedicalHistory;
+  targetPayment?: TT25TargetPaymentInfo;
+  consentAgreed?: boolean;
+}
+
 export interface RegistrationDetails {
   id: string;
   branch_id: string;
@@ -46,6 +63,7 @@ export interface RegistrationDetails {
   state: 'active' | 'completed' | 'cancelled';
   first_called_at: string | null;
   last_called_at: string | null;
+  tt25_data?: TT25StoredExtras | null;
 }
 
 export type RegistrationStatusTab = 'all' | 'waiting' | 'called';

@@ -4,6 +4,7 @@ import { formatQueueNumber } from '../../../lib/queueNumber';
 import type { BranchCode } from '../../../types/domain';
 import type { RegistrationRow } from '../components/QueueTable';
 import { rememberRegistrationCount } from '../registrationCountCache';
+import { formatBirthDate } from '../utils/adminFormatters';
 
 interface RegistrationRecord {
   id: string;
@@ -25,18 +26,15 @@ interface DisplayStateRecord {
   called_at: string | null;
 }
 
-function formatBirthDate(value: string) {
-  const [year, month, day] = value.split('-');
-  return year && month && day ? `${day}/${month}/${year}` : value;
-}
+const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 
 function formatRegistrationTime(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value));
+  return timeFormatter.format(new Date(value));
 }
 
 export interface DashboardQueueData {

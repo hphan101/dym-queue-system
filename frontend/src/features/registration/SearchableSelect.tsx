@@ -46,13 +46,20 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       .toLowerCase();
   };
 
+  const normalizedOptions = useMemo(() => {
+    return options.map((opt) => ({
+      ...opt,
+      searchKey: removeDiacritics(opt.label),
+    }));
+  }, [options]);
+
   const filteredOptions = useMemo(() => {
     if (!searchTerm.trim()) return options;
-    const cleanSearch = removeDiacritics(searchTerm);
-    return options.filter((opt) =>
-      removeDiacritics(opt.label).includes(cleanSearch),
+    const cleanSearch = removeDiacritics(searchTerm.trim());
+    return normalizedOptions.filter((opt) =>
+      opt.searchKey.includes(cleanSearch),
     );
-  }, [options, searchTerm]);
+  }, [options, normalizedOptions, searchTerm]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,7 +100,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           }
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={handleFocus}
-          className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] focus:outline-none focus:ring-2 transition-all cursor-pointer ${
+          className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] focus:outline-none focus:ring-2 transition-all cursor-pointer ${
             error
               ? "border-red-500 focus:ring-red-200"
               : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
@@ -107,7 +114,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </div>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto py-1">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-xl max-h-60 overflow-y-auto py-1">
           {isLoadingOptions ? (
             <div className="px-4 py-3 text-xs text-slate-400 text-center">
               {loadingMessage}

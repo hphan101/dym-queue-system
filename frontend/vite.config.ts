@@ -9,8 +9,8 @@ export default defineConfig({
     allowedHosts: true, // Cho phép truy cập qua domain tunnel bên ngoài (Cloudflare, ngrok, localtunnel)
   },
   build: {
-    // The lazy-loaded ward dataset is 114 kB after compression.
-    chunkSizeWarningLimit: 750,
+    // The lazy-loaded ward dataset and PDF libraries exceed the default limit.
+    chunkSizeWarningLimit: 1200,
   },
   resolve: {
     dedupe: ['react', 'react-dom'],
@@ -32,6 +32,12 @@ export default defineConfig({
       '@astryxdesign/core/StatusDot',
       '@astryxdesign/core/theme',
       '@stylexjs/stylex',
+      '@heroicons/react/24/outline',
+      'lucide-react',
+      'pdf-lib',
+      '@pdf-lib/fontkit',
+      '@supabase/supabase-js',
+      '@tanstack/react-query',
     ],
   },
 })

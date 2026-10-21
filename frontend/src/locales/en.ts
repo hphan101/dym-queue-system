@@ -12,32 +12,6 @@ export const en: TranslationDictionary = {
   cccd: 'Citizen ID / Passport',
   address: 'Address',
   companyName: 'Company Name',
-  province: 'Province / City',
-  ward: 'Ward / Commune',
-  addressDetail: 'Detailed Address (Street, No...)',
-  selectProvince: 'Select Province / City',
-  selectWard: 'Select Ward / Commune',
-  btnSubmit: 'Confirm Registration',
-  btnSubmitting: 'Processing...',
-  placeholderCompany: 'Enter company name',
-  placeholderCccd: 'Enter ID or passport number',
-  placeholderAddressDetail: 'House number, alley, street name...',
-
-  // Validation
-  errFullNameRequired: 'Full name is required',
-  errFullNameMin: 'Full name must be at least 2 characters',
-  errPhoneRequired: 'Phone number is required',
-  errPhoneInvalid: 'Invalid phone number (must be 10 digits)',
-  errBirthRequired: 'Date of birth is required',
-  errBirthPast: 'Date of birth must be in the past',
-  errGenderRequired: 'Please select your gender',
-  errCccdRequired: 'Citizen ID/Passport is required',
-  errCccdInvalid: 'Invalid Citizen ID or Passport',
-  errProvinceRequired: 'Please select a Province/City',
-  errWardRequired: 'Please select a Ward/Commune',
-  errAddressDetailRequired: 'Detailed address is required',
-  loadingLocations: 'Loading the address list…',
-  locationLoadError: 'The address list could not be loaded. Please tap again to retry.',
 
   // Success
   successTitle: 'Registration Successful!',
@@ -55,4 +29,3 @@ export const en: TranslationDictionary = {
   networkError: 'Unable to connect to the server. Please check your network connection.',
   noBranchError: 'This registration link does not identify a branch. Please scan the QR code at the DYM location.',
 };
-

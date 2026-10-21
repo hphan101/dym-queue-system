@@ -51,6 +51,8 @@ function formatDigits(val: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
+const DEFAULT_BIRTH_DATE = '1990-01-01';
+
 export const BirthDateInput: React.FC<BirthDateInputProps> = ({
   value,
   onChange,
@@ -96,17 +98,19 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
     }
   };
 
-  const triggerPicker = () => {
+  const handlePickerClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    const picker = e.currentTarget;
     try {
-      if (hiddenPickerRef.current) {
-        if (typeof hiddenPickerRef.current.showPicker === 'function') {
-          hiddenPickerRef.current.showPicker();
-        } else {
-          hiddenPickerRef.current.focus();
-        }
+      if (typeof picker.showPicker === 'function') {
+        picker.showPicker();
       }
     } catch {
-      hiddenPickerRef.current?.focus();
+      // Browser handles native open if showPicker was already triggered
+    }
+    if (!value) {
+      onChange(DEFAULT_BIRTH_DATE);
+      setDisplayValue(isoToDisplay(DEFAULT_BIRTH_DATE));
+      if (onErrorClear) onErrorClear();
     }
   };
 
@@ -119,36 +123,33 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
         inputMode="numeric"
         value={displayValue}
         onChange={handleTextChange}
-        placeholder="18/01/2003"
+        placeholder="01/01/1990"
         maxLength={10}
-        className={`w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+        className={`w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
           error ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
         }`}
       />
 
-      {/* Calendar Icon Button */}
-      <button
-        type="button"
-        onClick={triggerPicker}
-        className="absolute right-0 top-0 bottom-0 px-3 flex items-center justify-center text-slate-400 hover:text-dym-blue-600 transition-colors cursor-pointer"
-        title="Chọn ngày từ lịch"
-        aria-label="Chọn ngày từ lịch"
-      >
-        <Calendar className="w-4 h-4" />
-      </button>
+      {/* Calendar Icon & Full-Area Date Picker Overlay */}
+      <div className="group absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center cursor-pointer">
+        <div className="flex items-center justify-center text-slate-400 group-hover:text-dym-blue-600 transition-colors pointer-events-none">
+          <Calendar className="w-4 h-4" />
+        </div>
 
-      {/* Hidden Native Picker for Mobile & Desktop Wheel */}
-      <input
-        ref={hiddenPickerRef}
-        type="date"
-        tabIndex={-1}
-        aria-hidden="true"
-        value={value || ''}
-        max={maxDate}
-        min="1900-01-01"
-        onChange={handlePickerChange}
-        className="absolute right-0 top-0 bottom-0 w-10 opacity-0 cursor-pointer pointer-events-auto"
-      />
+        <input
+          ref={hiddenPickerRef}
+          type="date"
+          tabIndex={-1}
+          aria-label="Chọn ngày từ lịch"
+          title="Chọn ngày từ lịch"
+          value={value || DEFAULT_BIRTH_DATE}
+          max={maxDate}
+          min="1900-01-01"
+          onChange={handlePickerChange}
+          onClick={handlePickerClick}
+          className="dym-date-picker-overlay absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </div>
     </div>
   );
 };

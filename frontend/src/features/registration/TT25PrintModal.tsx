@@ -10,14 +10,16 @@ interface TT25PrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: TT25RegistrationData;
-  registrationNumber?: string;
+  onPrinted?: () => void;
+  allowPrint?: boolean;
 }
 
 export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   isOpen,
   onClose,
   data,
-  registrationNumber,
+  onPrinted,
+  allowPrint = true,
 }) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -37,7 +39,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
     setIsLoading(true);
     setError(null);
 
-    generateTT25OriginalPdf(dataRef.current, registrationNumber)
+    generateTT25OriginalPdf(dataRef.current)
       .then(({ url }) => {
         if (pdfUrlRef.current && pdfUrlRef.current !== url) {
           URL.revokeObjectURL(pdfUrlRef.current);
@@ -52,7 +54,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         setError(err instanceof Error ? err.message : 'Không thể tải file mẫu gốc.');
         setIsLoading(false);
       });
-  }, [registrationNumber]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -101,6 +103,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
+    onPrinted?.();
     const isMobile =
       typeof window !== 'undefined' &&
       (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
@@ -135,6 +138,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
   const handleDownload = () => {
     if (!pdfUrl) return;
+    onPrinted?.();
     const a = document.createElement('a');
     a.href = pdfUrl;
     const cleanName = (data.fullName || 'BenhNhan').replace(/\s+/g, '_');
@@ -149,14 +153,14 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
       {/* Top Header Bar */}
       <div className="tt25-modal-header no-print">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
             <FileText className="w-4 h-4" />
           </div>
           <div>
             <h2 className="text-sm font-bold flex items-center gap-2 text-white">
               Phiếu khám sức khỏe Thông tư 25/2026/TT-BYT
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 inline-flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Mẫu 03 (2 trang A4)
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 inline-flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Mẫu 03 (7 trang A4)
               </span>
             </h2>
             <p className="text-xs text-slate-400">
@@ -168,11 +172,11 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         {/* Action Controls */}
         <div className="flex items-center gap-2.5">
           {/* Mode Switcher */}
-          <div className="hidden sm:inline-flex bg-slate-800/90 p-0.5 rounded-lg border border-slate-700/80 mr-1 text-xs">
+          <div className="hidden sm:inline-flex bg-slate-800/90 p-0.5 rounded border border-slate-700/80 mr-1 text-xs">
             <button
               type="button"
               onClick={() => setViewMode('pdf')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
                 viewMode === 'pdf'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -183,7 +187,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('web')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer flex items-center gap-1 ${
                 viewMode === 'web'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -194,32 +198,34 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             </button>
           </div>
 
-          {pdfUrl && (
+          {allowPrint && pdfUrl && (
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded-lg transition-all cursor-pointer"
-              title="Tải file PDF điền sẵn (2 trang A4)"
+              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded transition-all cursor-pointer"
+              title="Tải file PDF điền sẵn (7 trang A4)"
             >
               <Download className="w-4 h-4 text-slate-300" />
               Tải PDF
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded-lg shadow-md transition-all cursor-pointer shrink-0"
-            title="In phiếu khám trực tiếp ra máy in"
-          >
-            <Printer className="w-4 h-4" />
-            <span>In phiếu khám<span className="hidden sm:inline"> (2 trang A4)</span></span>
-          </button>
+          {allowPrint && (
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded shadow-md transition-all cursor-pointer shrink-0"
+              title="In phiếu khám trực tiếp ra máy in"
+            >
+              <Printer className="w-4 h-4" />
+              <span>In phiếu khám<span className="hidden sm:inline"> (7 trang A4)</span></span>
+            </button>
+          )}
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer shrink-0"
+            className="p-2 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors ml-1 cursor-pointer shrink-0"
             title="Đóng cửa sổ (Esc)"
           >
             <X className="w-5 h-5" />
@@ -262,26 +268,28 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
           {!isLoading && !error && pdfUrl && (
             <div className="w-full h-full flex flex-col items-center">
               {/* Mobile quick-action banner */}
-              <div className="sm:hidden w-full p-2.5 bg-slate-900/95 border-b border-slate-700 flex items-center justify-between text-xs text-slate-200 shrink-0">
-                <span className="truncate pr-2 font-medium">Phiếu TT25 (2 trang A4)</span>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="shrink-0 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold rounded text-xs flex items-center gap-1 shadow-sm cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Mở in / AirPrint
-                </button>
-              </div>
+              {allowPrint && (
+                <div className="sm:hidden w-full p-2.5 bg-slate-900/95 border-b border-slate-700 flex items-center justify-between text-xs text-slate-200 shrink-0">
+                  <span className="truncate pr-2 font-medium">Phiếu TT25 (7 trang A4)</span>
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="shrink-0 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold rounded text-xs flex items-center gap-1 shadow-sm cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Mở in / AirPrint
+                  </button>
+                </div>
+              )}
 
               <object
-                data={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                data={`${pdfUrl}#toolbar=${allowPrint ? 1 : 0}&navpanes=0&scrollbar=1&view=FitH`}
                 type="application/pdf"
                 className="w-full flex-1 border-0"
               >
                 <iframe
                   ref={iframeRef}
-                  src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                  src={`${pdfUrl}#toolbar=${allowPrint ? 1 : 0}&navpanes=0&scrollbar=1&view=FitH`}
                   title="Phiếu khám sức khỏe Mẫu 03 TT25"
                   className="w-full h-full border-0"
                 />
@@ -291,7 +299,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         </div>
       ) : (
         <div className="tt25-viewport flex-1 overflow-y-auto">
-          <TT25PrintTemplate data={data} registrationNumber={registrationNumber} />
+          <TT25PrintTemplate data={data} />
         </div>
       )}
     </div>

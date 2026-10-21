@@ -24,7 +24,7 @@
 }
 
 .dym-admin-card {
-  border-radius: 16px;
+  border-radius: 6px;
   box-shadow: 0 20px 55px -32px rgba(17, 24, 51, 0.38);
 }
 
@@ -44,7 +44,7 @@
 .dym-admin-theme .astryx-text-input {
   min-height: 44px;
   border: 1px solid #a8cbd9;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   transition: border-color 130ms ease, box-shadow 130ms ease;
 }
@@ -66,7 +66,7 @@
 
 .dym-admin-theme .astryx-button {
   min-height: 44px;
-  border-radius: 8px;
+  border-radius: 4px;
   font-weight: 700;
   transition: background-color 130ms ease, border-color 130ms ease, transform 130ms ease;
 }
@@ -103,7 +103,7 @@
 
 .dym-admin-error {
   border: 1px solid rgba(227, 25, 59, 0.22);
-  border-radius: 8px;
+  border-radius: 4px;
   background: rgba(227, 25, 59, 0.08);
   padding: 12px;
   color: #a80720;
@@ -124,6 +124,6 @@
   }
 
   .dym-admin-card {
-    border-radius: 12px;
+    border-radius: 6px;
   }
 }

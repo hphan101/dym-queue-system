@@ -37,6 +37,7 @@ type AdminPageKey = 'dashboard' | 'registrations' | 'staff';
 interface AdminSidebarProps {
   activePage: AdminPageKey;
   branch: BranchCode;
+  date?: string;
   registrationCount: number;
   staffName: string;
   isAdmin: boolean;
@@ -124,6 +125,7 @@ function SidebarTooltip({ label, children }: SidebarTooltipProps) {
 export function AdminSidebar({
   activePage,
   branch,
+  date,
   registrationCount,
   staffName,
   isAdmin,
@@ -133,6 +135,13 @@ export function AdminSidebar({
   onThemeToggle,
   onLogout,
 }: AdminSidebarProps) {
+  const adminHref = date
+    ? `/?page=admin&branch=${branch}&date=${date}`
+    : `/?page=admin&branch=${branch}`;
+  const registrationsHref = date
+    ? `/?page=registrations&branch=${branch}&date=${date}`
+    : `/?page=registrations&branch=${branch}`;
+
   const themeToggleLabel =
     themeMode === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối';
   const themeButtonLabel =
@@ -230,19 +239,26 @@ export function AdminSidebar({
             <div className="dym-sidebar-footer">
               <div className="dym-sidebar-account-row">
                 <div className="dym-account">
-                  <Avatar name={staffName} size="md" tooltip={false} />
-                  <div>
-                    <span className="dym-account-name">{staffName}</span>
-                    <span className="dym-account-role">
+                  <div className="dym-account-avatar">
+                    <Avatar name={staffName} size="md" tooltip={false} />
+                  </div>
+                  <div className="dym-account-details">
+                    <span className="dym-account-name" title={staffName}>
+                      {staffName}
+                    </span>
+                    <span
+                      className="dym-account-role"
+                      title={isAdmin ? 'Quản trị hệ thống' : 'Nhân viên lễ tân'}
+                    >
                       {isAdmin ? 'Quản trị hệ thống' : 'Nhân viên lễ tân'}
                     </span>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="dym-sidebar-icon-control"
+                  className="dym-sidebar-icon-control dym-sidebar-collapse-control"
                   aria-label="Thu gọn thanh điều hướng"
-                  title="Thu gọn"
+                  title="Thu gọn thanh điều hướng"
                   onClick={() => onCollapsedChange(true)}
                 >
                   <ChevronLeftIcon aria-hidden="true" />
@@ -283,9 +299,9 @@ export function AdminSidebar({
                   label="Tiếp nhận"
                   icon={HomeIcon}
                   isSelected={activePage === 'dashboard'}
-                  href="/?page=admin"
+                  href={adminHref}
                   onClick={(event) =>
-                    handleInternalLinkClick(event, '/?page=admin')
+                    handleInternalLinkClick(event, adminHref)
                   }
                 />
               </SidebarTooltip>
@@ -294,9 +310,9 @@ export function AdminSidebar({
                   label="Danh sách tiếp nhận"
                   icon={ClipboardDocumentListIcon}
                   isSelected={activePage === 'registrations'}
-                  href="/?page=registrations"
+                  href={registrationsHref}
                   onClick={(event) =>
-                    handleInternalLinkClick(event, '/?page=registrations')
+                    handleInternalLinkClick(event, registrationsHref)
                   }
                 />
               </SidebarTooltip>
@@ -314,18 +330,18 @@ export function AdminSidebar({
                 label="Tiếp nhận"
                 icon={HomeIcon}
                 isSelected={activePage === 'dashboard'}
-                href="/?page=admin"
+                href={adminHref}
                 onClick={(event) =>
-                  handleInternalLinkClick(event, '/?page=admin')
+                  handleInternalLinkClick(event, adminHref)
                 }
               />
               <SideNavItem
                 label="Danh sách tiếp nhận"
                 icon={ClipboardDocumentListIcon}
                 isSelected={activePage === 'registrations'}
-                href="/?page=registrations"
+                href={registrationsHref}
                 onClick={(event) =>
-                  handleInternalLinkClick(event, '/?page=registrations')
+                  handleInternalLinkClick(event, registrationsHref)
                 }
                 endContent={
                   <span className="dym-nav-count">{registrationCount}</span>

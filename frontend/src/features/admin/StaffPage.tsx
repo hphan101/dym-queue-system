@@ -15,7 +15,6 @@ import { Avatar } from '@astryxdesign/core/Avatar';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 
-import { getTodayInVietnam } from '../../lib/date';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
@@ -24,17 +23,14 @@ import {
   getInitialStaffName,
   rememberStaffName,
 } from './adminIdentity';
-import {
-  getCachedRegistrationCount,
-  getLatestRegistrationScope,
-} from './registrationCountCache';
+import { getCachedRegistrationCount } from './registrationCountCache';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 import './staff.css';
 
 import { useAdminTheme } from './hooks/useAdminTheme';
 import { useSidebarResponsive } from './hooks/useSidebarResponsive';
-import { normalizeSearch } from './utils/adminFormatters';
+import { formatDateTime, normalizeSearch } from './utils/adminFormatters';
 import { AdminHeader } from './components/AdminHeader';
 import type {
   StaffAccount,
@@ -44,6 +40,8 @@ import type {
 import { StaffFormModal } from './components/StaffFormModal';
 import { StaffLockConfirmModal } from './components/StaffLockConfirmModal';
 import { StaffPasswordResetModal } from './components/StaffPasswordResetModal';
+import { HighlightText } from './components/HighlightText';
+import { useAdminScope } from './hooks/useAdminScope';
 
 interface StaffApiResponse {
   success: boolean;
@@ -61,24 +59,8 @@ const EMPTY_FORM: StaffFormState = {
 };
 let cachedStaffAccounts: StaffAccount[] | null = null;
 
-function getInitialRegistrationScope() {
-  return getLatestRegistrationScope() ?? {
-    branch: 'q1' as BranchCode,
-    date: getTodayInVietnam(),
-  };
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return 'Chưa đăng nhập';
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value));
+function formatLastSignIn(value: string | null) {
+  return value ? formatDateTime(value) : 'Chưa đăng nhập';
 }
 
 function apiErrorMessage(code?: string) {
@@ -143,9 +125,14 @@ async function requestStaffApi(
   return result;
 }
 
-export function StaffPage() {
+export function StaffPage({
+  isActiveTab = true,
+}: {
+  isActiveTab?: boolean;
+} = {}) {
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
+  const { branch: scopeBranch, date: scopeDate } = useAdminScope();
   const [staffName, setStaffName] = useState(getInitialStaffName);
   const [staff, setStaff] = useState<StaffAccount[]>(
     () => cachedStaffAccounts ?? [],
@@ -167,17 +154,13 @@ export function StaffPage() {
   const [confirmedPassword, setConfirmedPassword] = useState('');
   const [passwordResetError, setPasswordResetError] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [registrationScope] = useState(getInitialRegistrationScope);
 
   const searchInputId = useId();
 
   useEffect(() => {
-    const previousTitle = document.title;
+    if (!isActiveTab) return;
     document.title = 'Quản lý nhân viên | DYM Medical Center';
-    return () => {
-      document.title = previousTitle;
-    };
-  }, []);
+  }, [isActiveTab]);
 
   const loadStaff = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -219,6 +202,8 @@ export function StaffPage() {
 
   // Global search shortcut '/'
   useEffect(() => {
+    if (!isActiveTab) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === '/' &&
@@ -235,7 +220,7 @@ export function StaffPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchInputId]);
+  }, [isActiveTab, searchInputId]);
 
   const activeCount = useMemo(
     () => staff.filter((item) => item.isActive).length,
@@ -422,17 +407,15 @@ export function StaffPage() {
   };
 
   const registrationCount =
-    getCachedRegistrationCount(
-      registrationScope.branch,
-      registrationScope.date,
-    ) ?? 0;
+    getCachedRegistrationCount(scopeBranch, scopeDate) ?? 0;
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
       <div className="dym-admin-shell" data-color-mode={themeMode}>
         <AdminSidebar
           activePage="staff"
-          branch={registrationScope.branch}
+          branch={scopeBranch}
+          date={scopeDate}
           registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={true}
@@ -686,10 +669,10 @@ export function StaffPage() {
                               <Avatar name={account.displayName} size="md" tooltip={false} />
                               <div className="dym-patient-info">
                                 <span className="dym-patient-name">
-                                  {account.displayName}
+                                  <HighlightText text={account.displayName} query={query} />
                                 </span>
                                 <span className="dym-patient-meta font-mono">
-                                  @{account.loginName || 'chưa_cài_tên'}
+                                  @<HighlightText text={account.loginName || 'chưa_cài_tên'} query={query} />
                                 </span>
                               </div>
                             </div>
@@ -728,7 +711,7 @@ export function StaffPage() {
                           {/* Last Sign In */}
                           <td>
                             <span className="dym-patient-meta font-mono text-xs">
-                              {formatDateTime(account.lastSignInAt)}
+                              {formatLastSignIn(account.lastSignInAt)}
                             </span>
                           </td>
 
@@ -799,10 +782,6 @@ export function StaffPage() {
                 </div>
               )}
             </section>
-
-            <footer className="dym-admin-footer">
-              <span>© 2026 DYM Medical Center — Hệ thống điều phối phòng khám</span>
-            </footer>
           </main>
         </div>
 

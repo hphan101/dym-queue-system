@@ -1,14 +1,17 @@
 import {
-  lazy,
   startTransition,
-  Suspense,
   useEffect,
   useState,
 } from 'react';
 import { TT25RegistrationForm } from './features/registration/TT25RegistrationForm';
 import { SuccessView } from './features/registration/SuccessView';
+import { WelcomeScreen } from './features/registration/WelcomeScreen';
+import { CheckupReasonScreen } from './features/registration/CheckupReasonScreen';
+import { ConsentScreen } from './features/registration/ConsentScreen';
+import LoginPage from './features/auth/LoginPage';
+import AdminApplication from './features/admin/AdminApplication';
+import QueueDisplayPage from './features/display/QueueDisplayPage';
 import type {
-  RegistrationData,
   TT25RegistrationData,
   RegistrationResponse,
 } from './features/registration/types';
@@ -20,27 +23,11 @@ import dymLogoDark from './assets/dym-logo-dark.png';
 import { translations, type SupportedLanguage } from './locales';
 import { APP_NAVIGATION_EVENT } from './lib/navigation';
 import { formatQueueNumber } from './lib/queueNumber';
+import { saveCustomerTT25Extras } from './features/admin/hooks/useRegistrationOverrides';
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
-const LoginPage = lazy(() => import('./features/auth/LoginPage'));
-const AdminApplication = lazy(
-  () => import('./features/admin/AdminApplication'),
-);
-const QueueDisplayPage = lazy(
-  () => import('./features/display/QueueDisplayPage'),
-);
-
-function RouteLoader({ label }: { label: string }) {
-  return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 bg-[#eff9fd]">
-      <img src={dymLogoDark} alt={label} className="h-auto w-40" />
-      <div className="page-loader-dots" aria-hidden="true" />
-    </div>
-  );
-}
 
 function getBranchFromUrl(): BranchCode | null {
   const branch = new URLSearchParams(window.location.search).get('branch')?.toLowerCase();
@@ -54,22 +41,17 @@ function RegistrationApp() {
     return saved === 'en' ? saved : 'vi';
   });
 
-  useEffect(() => {
-    if (lang === 'ja') {
-      setLang('vi');
-      localStorage.setItem('dym_registration_lang', 'vi');
-    }
-  }, [lang]);
-
-  const [step, setStep] = useState<'form' | 'success'>(() => {
+  const [step, setStep] = useState<'welcome' | 'reason' | 'consent' | 'form' | 'success'>(() => {
     const savedStep = localStorage.getItem('dym_registration_step');
     const savedQueue = localStorage.getItem('dym_registration_queue');
-    return savedStep === 'success' && savedQueue ? 'success' : 'form';
+    return savedStep === 'success' && savedQueue ? 'success' : 'welcome';
   });
+  const [selectedReason, setSelectedReason] = useState<string>('');
+  const [consentAgreed, setConsentAgreed] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [registeredData, setRegisteredData] = useState<RegistrationData | TT25RegistrationData | null>(null);
+  const [registeredData, setRegisteredData] = useState<TT25RegistrationData | null>(null);
   const [queueNumber, setQueueNumber] = useState<string>(() => {
     const storedQueueNumber = localStorage.getItem('dym_registration_queue');
     return storedQueueNumber ? formatQueueNumber(storedQueueNumber) : '';
@@ -82,12 +64,29 @@ function RegistrationApp() {
     localStorage.removeItem('dym_registration_data');
   }, []);
 
-  const handleLangChange = (newLang: SupportedLanguage) => {
+  const handleSelectLanguage = (newLang: SupportedLanguage) => {
     setLang(newLang);
     localStorage.setItem('dym_registration_lang', newLang);
+    setError(null);
+    setStep('reason');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleFormSubmit = async (formData: RegistrationData | TT25RegistrationData) => {
+  const handleSelectReason = (reason: string) => {
+    setSelectedReason(reason);
+    setError(null);
+    setStep('consent');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectConsent = (agreed: boolean) => {
+    setConsentAgreed(agreed);
+    setError(null);
+    setStep('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFormSubmit = async (formData: TT25RegistrationData) => {
     setIsLoading(true);
     setShowPageLoader(false);
     setError(null);
@@ -112,12 +111,7 @@ function RegistrationApp() {
 
     const payload = {
       ...formData,
-      companyName:
-        'companyName' in formData && formData.companyName
-          ? formData.companyName
-          : 'workplace' in formData
-            ? formData.workplace
-            : '',
+      companyName: formData.workplace || '',
     };
 
     try {
@@ -131,12 +125,32 @@ function RegistrationApp() {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json() as RegistrationResponse;
+      const result = (await response.json().catch(() => null)) as RegistrationResponse | null;
 
-      if (response.ok && result.success && result.queueNumber) {
+      if (response.ok && result?.success && result.queueNumber) {
         const formattedQueueNumber = formatQueueNumber(result.queueNumber);
+        await saveCustomerTT25Extras(
+          formData.branch,
+          result.queueNumber,
+          formData.cccd,
+          {
+            ethnicity: formData.ethnicity,
+            bloodGroup: formData.bloodGroup,
+            insuranceNumber: formData.insuranceNumber,
+            occupation: formData.occupation,
+            workplaceWard: formData.workplaceWard,
+            checkupReason: formData.checkupReason,
+            medicalHistory: formData.medicalHistory,
+            targetPayment: formData.targetPayment,
+            consentAgreed,
+          },
+        );
         setQueueNumber(formattedQueueNumber);
-        setRegisteredData(formData);
+        setRegisteredData({
+          ...formData,
+          consentAgreed,
+          queueNumber: formattedQueueNumber,
+        });
         setStep('success');
         
         // Patient details remain in memory; only the queue receipt persists.
@@ -144,7 +158,7 @@ function RegistrationApp() {
         localStorage.setItem('dym_registration_queue', formattedQueueNumber);
         localStorage.setItem('dym_last_registration_time', Date.now().toString());
       } else {
-        throw new Error(result.error || translations[lang].saveError);
+        throw new Error(result?.error || translations[lang].saveError);
       }
     } catch (err: unknown) {
       console.error('Lỗi khi gửi đăng ký:', err);
@@ -162,7 +176,9 @@ function RegistrationApp() {
   };
 
   const handleReset = () => {
-    setStep('form');
+    setStep('welcome');
+    setSelectedReason('');
+    setConsentAgreed(true);
     setRegisteredData(null);
     setQueueNumber('');
     setError(null);
@@ -186,47 +202,13 @@ function RegistrationApp() {
       )}
 
       <main className="flex-grow max-w-md md:max-w-xl lg:max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-center transition-all duration-300">
-        <div className="flex justify-end mb-3">
-          <div className="inline-flex rounded-lg border border-slate-200/60 bg-white/90 p-0.5 shadow-sm text-[11px] backdrop-blur-sm">
-            <button
-              onClick={() => handleLangChange('vi')}
-              className={`px-3 py-1 rounded-md font-semibold transition-all ${
-                lang === 'vi'
-                  ? 'bg-dym-blue-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Tiếng Việt
-            </button>
-            <button
-              onClick={() => handleLangChange('en')}
-              className={`px-3 py-1 rounded-md font-semibold transition-all ${
-                lang === 'en'
-                  ? 'bg-dym-blue-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              English
-            </button>
-            {/* Tam thoi an ngon ngu tieng Nhat theo yeu cau */}
-            {/* <button
-              onClick={() => handleLangChange('ja')}
-              className={`px-3 py-1 rounded-md font-semibold transition-all ${
-                lang === 'ja'
-                  ? 'bg-dym-blue-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              日本語
-            </button> */}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-8 medical-card">
-          {step === 'form' && (
+        <div className="bg-white rounded-md shadow-xl border border-slate-200/80 p-5 sm:p-8 medical-card">
+          {branch && step === 'form' && (
             <div className="mb-6 text-center">
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-dym-blue-50 text-dym-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1.5">
-                Thông tư 25/2026/TT-BYT (Mẫu 03)
+              <span className="inline-block px-2.5 py-0.5 rounded bg-dym-blue-50 text-dym-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+                {lang === 'vi'
+                  ? 'Thông tư 25/2026/TT-BYT (Mẫu 03)'
+                  : 'Circular 25/2026/TT-BYT (Form 03)'}
               </span>
               <h2 className="text-xl font-extrabold text-slate-800">
                 {lang === 'vi' ? 'Hồ Sơ Khám Sức Khỏe' : translations[lang].title}
@@ -234,18 +216,16 @@ function RegistrationApp() {
               <p className="text-xs text-slate-500 mt-1">
                 {lang === 'vi'
                   ? 'Vui lòng hoàn tất 12 mục hành chính và tiền sử y tế để in phiếu khám'
-                  : translations[lang].subtitle}
+                  : 'Please complete the 12 administrative items and medical history to print your checkup form'}
               </p>
-              {branch && (
-                <p className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                  {BRANCH_NAMES[branch]}
-                </p>
-              )}
+              <p className="mt-2 inline-flex rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                {BRANCH_NAMES[branch]}
+              </p>
             </div>
           )}
 
           {error && (
-            <div className="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-100 flex items-start gap-2.5 text-xs text-red-700 animate-shake">
+            <div className="mb-5 p-3.5 rounded bg-red-50 border border-red-100 flex items-start gap-2.5 text-xs text-red-700 animate-shake">
               <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold">{translations[lang].failedTitle}</p>
@@ -254,18 +234,44 @@ function RegistrationApp() {
             </div>
           )}
 
-          {step === 'form' ? (
-            branch ? (
-              <TT25RegistrationForm
-                onSubmit={handleFormSubmit}
-                isLoading={isLoading}
-                branch={branch}
+          {!branch && step !== 'success' ? (
+            <div className="py-4 text-center space-y-5">
+              <img
+                src={dymLogoDark}
+                alt="DYM Medical Center Vietnam"
+                className="h-12 sm:h-14 w-auto object-contain mx-auto"
               />
-            ) : (
-              <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-center text-sm text-red-700">
+              <div className="rounded border border-red-100 bg-red-50 p-4 text-center text-sm text-red-700">
                 {translations[lang].noBranchError}
               </div>
-            )
+            </div>
+          ) : step === 'welcome' ? (
+            <WelcomeScreen
+              branch={branch}
+              onSelectLanguage={handleSelectLanguage}
+            />
+          ) : step === 'reason' ? (
+            <CheckupReasonScreen
+              branch={branch}
+              lang={lang}
+              onSelectReason={handleSelectReason}
+              onBack={() => setStep('welcome')}
+            />
+          ) : step === 'consent' ? (
+            <ConsentScreen
+              branch={branch}
+              lang={lang}
+              onSelectConsent={handleSelectConsent}
+              onBack={() => setStep('reason')}
+            />
+          ) : step === 'form' ? (
+            <TT25RegistrationForm
+              onSubmit={handleFormSubmit}
+              isLoading={isLoading}
+              branch={branch!}
+              lang={lang}
+              initialCheckupReason={selectedReason}
+            />
           ) : (
             <SuccessView
               queueNumber={queueNumber}
@@ -318,7 +324,7 @@ function RegistrationApp() {
                   <a
                     href="https://www.google.com/maps/search/?api=1&query=DYM+Medical+Center+Sài+Gòn+mPlaza+Saigon"
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="hover:text-white hover:underline transition-all leading-relaxed"
                   >
                     <span className="font-semibold text-white">DYM mPlaza Quận 1:</span> Phòng B101–B103, Tầng hầm 1, tòa nhà mPlaza Saigon, số 39 Lê Duẩn, Phường Bến Nghé, Quận 1, TP Hồ Chí Minh.
@@ -329,7 +335,7 @@ function RegistrationApp() {
                   <a
                     href="https://www.google.com/maps/search/?api=1&query=DYM+Medical+Center+Phú+Mỹ+Hưng+The+Grace"
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="hover:text-white hover:underline transition-all leading-relaxed"
                   >
                     <span className="font-semibold text-white">DYM The Grace Quận 7:</span> Phòng 3A01, Tầng 3A, Tòa nhà The Grace, 71 Hoàng Văn Thái, Phường Tân Phú, Quận 7, TP Hồ Chí Minh.
@@ -348,7 +354,7 @@ function RegistrationApp() {
                   <a
                     href="https://maps.app.goo.gl/hrh2TypSzWQJGnyq9"
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="hover:text-white hover:underline transition-all leading-relaxed"
                   >
                     <span className="font-semibold text-white">DYM Epic Tower Cầu Giấy:</span> Tầng Hầm B1, Toà Epic Tower, Ngõ 19 Duy Tân, Phường Cầu Giấy, TP Hà Nội.
@@ -406,25 +412,19 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         {isQueueDisplayPage ? (
-          <Suspense fallback={<RouteLoader label="Đang tải màn hình chờ DYM" />}>
-            <QueueDisplayPage />
-          </Suspense>
+          <QueueDisplayPage />
         ) : isAdminPage || isRegistrationsPage || isStaffPage ? (
-          <Suspense fallback={<RouteLoader label="Đang tải trang quản trị DYM" />}>
-            <AdminApplication
-              destination={
-                isStaffPage
-                  ? 'staff'
-                  : isRegistrationsPage
-                    ? 'registrations'
-                    : 'dashboard'
-              }
-            />
-          </Suspense>
+          <AdminApplication
+            destination={
+              isStaffPage
+                ? 'staff'
+                : isRegistrationsPage
+                  ? 'registrations'
+                  : 'dashboard'
+            }
+          />
         ) : isLoginPage ? (
-          <Suspense fallback={<RouteLoader label="Đang tải cổng nhân viên DYM" />}>
-            <LoginPage />
-          </Suspense>
+          <LoginPage />
         ) : (
           <RegistrationApp />
         )}

@@ -4,18 +4,27 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MagnifyingGlassIcon,
-  PrinterIcon,
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import type { BranchCode } from '../../../types/domain';
 import { STATUS_META, type QueueStatus } from '../constants/queueConstants';
-import { calculateAge, formatPhone } from '../utils/adminFormatters';
+import { usePrintStatus } from '../hooks/usePrintStatus';
+import { useRegistrationOverrides } from '../hooks/useRegistrationOverrides';
+import { calculateAge, formatBirthDate, formatPhone } from '../utils/adminFormatters';
 import { supabase } from '../../../lib/supabaseClient';
 import type { RegistrationDetails } from '../hooks/useRegistrationDetailsQuery';
-import type { TT25RegistrationData } from '../../registration/tt25Types';
+import {
+  type TT25RegistrationData,
+  createDefaultTT25Data,
+  getDefaultTargetPaymentByReason,
+} from '../../registration/tt25Types';
+import { HighlightText } from './HighlightText';
 
 const TT25PrintModal = lazy(() => import('../../registration/TT25PrintModal'));
+const ConsentPrintModal = lazy(
+  () => import('../../registration/ConsentPrintModal'),
+);
 
 export interface RegistrationRow {
   id: string;
@@ -73,10 +82,84 @@ export function QueueTable({
   const searchInputId = useId();
   const [statusFilter, setStatusFilter] = useState<TableStatusFilter>('all');
   const [printModalData, setPrintModalData] = useState<TT25RegistrationData | null>(null);
+  const [consentModalData, setConsentModalData] = useState<TT25RegistrationData | null>(null);
+  const [activePrintRowId, setActivePrintRowId] = useState<string | null>(null);
   const [loadingPrintId, setLoadingPrintId] = useState<string | null>(null);
+  const { getStatus, markPrinted, togglePrintStatus } = usePrintStatus();
+  const { overrideMap, applyToDetails } = useRegistrationOverrides();
 
-  const handlePrintClick = async (row: RegistrationRow) => {
-    setLoadingPrintId(row.id);
+  const createPrintDataFromRow = (
+    row: RegistrationRow,
+    details?: RegistrationDetails | null,
+  ): TT25RegistrationData => {
+    const mergedDetails = details ? applyToDetails(details) : null;
+    const ov = overrideMap[row.id];
+    const extras = {
+      ...(mergedDetails?.tt25_data ?? {}),
+      ...(ov?.tt25_data ?? {}),
+    };
+
+    const workplaceVal =
+      ov?.company_name !== undefined
+        ? ov.company_name
+        : mergedDetails?.company_name && mergedDetails.company_name !== '—'
+          ? mergedDetails.company_name
+          : row.companyName !== '—'
+            ? row.companyName
+            : '';
+
+    const parsedBirthDate =
+      ov?.birth_date ||
+      mergedDetails?.birth_date ||
+      (row.birthDate.includes('/')
+        ? row.birthDate.split('/').reverse().join('-')
+        : row.birthDate);
+
+    const defaultReason = workplaceVal.trim()
+      ? 'Khám sức khỏe định kỳ theo công ty'
+      : 'Khám sức khỏe cá nhân tự nguyện';
+    const resolvedReason =
+      extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
+        ? extras.checkupReason
+        : defaultReason;
+
+    const wpWard = extras.workplaceWard || '';
+    const wpProv = extras.workplaceProvince || '';
+    const resolvedWorkplaceWard =
+      wpProv && !wpWard.includes(wpProv)
+        ? [wpWard, wpProv].filter(Boolean).join(', ')
+        : wpWard;
+
+    return createDefaultTT25Data({
+      branch: row.branch,
+      fullName: ov?.full_name || mergedDetails?.full_name || row.fullName,
+      gender: ((ov?.gender || mergedDetails?.gender || row.gender) as 'Nam' | 'Nữ') || 'Nam',
+      birthDate: parsedBirthDate,
+      ethnicity: extras.ethnicity || 'Kinh',
+      bloodGroup: extras.bloodGroup || 'Chưa rõ',
+      cccd: ov?.identity_document ?? mergedDetails?.identity_document ?? '',
+      insuranceNumber: extras.insuranceNumber || '',
+      province: ov?.province ?? mergedDetails?.province ?? '',
+      ward: ov?.ward ?? mergedDetails?.ward ?? '',
+      addressDetail: ov?.address_detail ?? mergedDetails?.address_detail ?? '',
+      occupation: extras.occupation || '',
+      workplace: workplaceVal,
+      workplaceWard: resolvedWorkplaceWard,
+      phoneNumber:
+        ov?.phone_number ||
+        mergedDetails?.phone_number ||
+        (row.phone !== '—' ? row.phone : ''),
+      checkupReason: resolvedReason,
+      medicalHistory: extras.medicalHistory,
+      targetPayment:
+        extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
+      consentAgreed: extras.consentAgreed ?? true,
+      queueNumber: row.queueNumber,
+      checkupDate: mergedDetails?.queue_date || row.date,
+    });
+  };
+
+  const fetchRowPrintData = async (row: RegistrationRow): Promise<TT25RegistrationData> => {
     try {
       const { data: detailsList, error } = await supabase.rpc(
         'get_registration_details',
@@ -94,71 +177,32 @@ export function QueueTable({
         (r) => r.id === row.id,
       );
 
-      const cccdVal = match?.identity_document || '';
-      const addressVal = match?.address_detail || '';
-      const wardVal = match?.ward || '';
-      const provinceVal = match?.province || '';
-      const workplaceVal =
-        match?.company_name && match.company_name !== '—'
-          ? match.company_name
-          : row.companyName !== '—'
-            ? row.companyName
-            : '';
-
-      setPrintModalData({
-        branch: row.branch,
-        fullName: match?.full_name || row.fullName,
-        gender: ((match?.gender || row.gender) as 'Nam' | 'Nữ') || 'Nam',
-        birthDate: match?.birth_date || (row.birthDate.includes('/') ? row.birthDate.split('/').reverse().join('-') : row.birthDate),
-        ethnicity: 'Kinh',
-        bloodGroup: 'Chưa rõ',
-        cccd: cccdVal,
-        insuranceNumber: '',
-        province: provinceVal,
-        ward: wardVal,
-        addressDetail: addressVal,
-        occupation: 'Tự do',
-        workplace: workplaceVal,
-        workplaceWard: '',
-        phoneNumber: match?.phone_number || (row.phone !== '—' ? row.phone : ''),
-        checkupReason: 'Khám sức khỏe tổng quát',
-        medicalHistory: {
-          familyHistory: { hasDisease: false, diseaseDetails: '' },
-          personalHistory: {},
-          personalOtherDetails: '',
-          currentTreatment: { isTreating: false, medications: '' },
-          pregnancyHistory: { hasHistory: false, details: '' },
-          commitmentAgreed: true,
-        },
-      });
+      return createPrintDataFromRow(row, match);
     } catch (err) {
       console.error('Error getting print details:', err);
-      setPrintModalData({
-        branch: row.branch,
-        fullName: row.fullName,
-        gender: (row.gender as 'Nam' | 'Nữ') || 'Nam',
-        birthDate: row.birthDate.includes('/') ? row.birthDate.split('/').reverse().join('-') : row.birthDate,
-        ethnicity: 'Kinh',
-        bloodGroup: 'Chưa rõ',
-        cccd: '',
-        insuranceNumber: '',
-        province: '',
-        ward: '',
-        addressDetail: '',
-        occupation: 'Tự do',
-        workplace: row.companyName !== '—' ? row.companyName : '',
-        workplaceWard: '',
-        phoneNumber: row.phone !== '—' ? row.phone : '',
-        checkupReason: 'Khám sức khỏe tổng quát',
-        medicalHistory: {
-          familyHistory: { hasDisease: false, diseaseDetails: '' },
-          personalHistory: {},
-          personalOtherDetails: '',
-          currentTreatment: { isTreating: false, medications: '' },
-          pregnancyHistory: { hasHistory: false, details: '' },
-          commitmentAgreed: true,
-        },
-      });
+      return createPrintDataFromRow(row, null);
+    }
+  };
+
+  const handlePrintClick = async (row: RegistrationRow) => {
+    setLoadingPrintId(`tt25:${row.id}`);
+    try {
+      const data = await fetchRowPrintData(row);
+      setActivePrintRowId(row.id);
+      markPrinted(row.id, 'tt25');
+      setPrintModalData(data);
+    } finally {
+      setLoadingPrintId(null);
+    }
+  };
+
+  const handlePrintConsentClick = async (row: RegistrationRow) => {
+    setLoadingPrintId(`consent:${row.id}`);
+    try {
+      const data = await fetchRowPrintData(row);
+      setActivePrintRowId(row.id);
+      markPrinted(row.id, 'consent');
+      setConsentModalData(data);
     } finally {
       setLoadingPrintId(null);
     }
@@ -179,9 +223,23 @@ export function QueueTable({
 
   // Apply tab filter on rows
   const displayedRows = useMemo(() => {
-    if (statusFilter === 'all') return paginatedRows;
-    return paginatedRows.filter((r) => r.status === statusFilter);
-  }, [paginatedRows, statusFilter]);
+    const baseRows =
+      statusFilter === 'all'
+        ? paginatedRows
+        : paginatedRows.filter((r) => r.status === statusFilter);
+    return baseRows.map((r) => {
+      const ov = overrideMap[r.id];
+      if (!ov) return r;
+      return {
+        ...r,
+        fullName: ov.full_name || r.fullName,
+        gender: ov.gender || r.gender,
+        birthDate: ov.birth_date ? formatBirthDate(ov.birth_date) : r.birthDate,
+        phone: ov.phone_number || r.phone,
+        companyName: ov.company_name || '—',
+      };
+    });
+  }, [overrideMap, paginatedRows, statusFilter]);
 
   return (
     <section className="dym-registry-panel" aria-labelledby="registry-ledger-title">
@@ -318,6 +376,7 @@ export function QueueTable({
                   <th scope="col" className="col-contact">LIÊN HỆ</th>
                   <th scope="col" className="col-company">CƠ QUAN / ĐOÀN</th>
                   <th scope="col" className="col-status">TRẠNG THÁI</th>
+                  <th scope="col" className="col-print-status">TRẠNG THÁI IN</th>
                   <th scope="col" className="col-actions text-right">THAO TÁC</th>
                 </tr>
               </thead>
@@ -326,6 +385,7 @@ export function QueueTable({
                   const age = calculateAge(row.birthDate);
                   const isCalled = row.status === 'called';
                   const isUndoing = pendingUndoId === row.id;
+                  const printStatus = getStatus(row.id);
 
                   return (
                     <tr
@@ -335,7 +395,7 @@ export function QueueTable({
                       {/* Ticket Code */}
                       <td className="col-ticket">
                         <span className="dym-ticket-tag">
-                          {row.queueNumber}
+                          <HighlightText text={row.queueNumber} query={query} />
                         </span>
                       </td>
 
@@ -349,12 +409,16 @@ export function QueueTable({
                       {/* Patient Name & Demographics */}
                       <td className="col-patient">
                         <div className="dym-patient-block">
-                          <strong className="dym-patient-name">{row.fullName}</strong>
+                          <strong className="dym-patient-name">
+                            <HighlightText text={row.fullName} query={query} />
+                          </strong>
                           <div className="dym-patient-meta">
                             <span className="dym-meta-gender">{row.gender}</span>
                             {age !== null && (
                               <span className="dym-meta-age">
-                                {age} tuổi ({row.birthDate})
+                                {age} tuổi (
+                                <HighlightText text={row.birthDate} query={query} />
+                                )
                               </span>
                             )}
                           </div>
@@ -364,7 +428,7 @@ export function QueueTable({
                       {/* Contact Phone */}
                       <td className="col-contact">
                         <span className="dym-phone-text">
-                          {formatPhone(row.phone)}
+                          <HighlightText text={formatPhone(row.phone)} query={query} />
                         </span>
                       </td>
 
@@ -372,7 +436,9 @@ export function QueueTable({
                       <td className="col-company">
                         {row.companyName && row.companyName !== '—' ? (
                           <div className="dym-company-pill" title={row.companyName}>
-                            <span className="truncate">{row.companyName}</span>
+                            <span className="truncate">
+                              <HighlightText text={row.companyName} query={query} />
+                            </span>
                           </div>
                         ) : (
                           <span className="text-slate-300 font-light">—</span>
@@ -391,19 +457,46 @@ export function QueueTable({
                         </span>
                       </td>
 
+                      {/* Print Status Badge */}
+                      <td className="col-print-status">
+                        <button
+                          type="button"
+                          onClick={() => togglePrintStatus(row.id)}
+                          title={printStatus.title}
+                          className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
+                        >
+                          <span className="dym-status-indicator-dot" />
+                          {printStatus.label}
+                        </button>
+                      </td>
+
                       {/* Actions */}
                       <td className="col-actions text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             className="dym-btn-table-action"
+                            aria-label={`In phiếu Đồng thuận cho ${row.fullName}`}
+                            title="In phiếu Đồng thuận khám sức khỏe"
+                            disabled={loadingPrintId === `consent:${row.id}`}
+                            onClick={() => void handlePrintConsentClick(row)}
+                          >
+                            <span>
+                              {loadingPrintId === `consent:${row.id}` ? 'Đang nạp...' : 'In Đồng thuận'}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="dym-btn-table-action"
                             aria-label={`In phiếu khám TT25 cho ${row.fullName}`}
                             title="In phiếu khám sức khỏe TT25"
-                            disabled={loadingPrintId === row.id}
+                            disabled={loadingPrintId === `tt25:${row.id}`}
                             onClick={() => void handlePrintClick(row)}
                           >
-                            <PrinterIcon className={`w-3.5 h-3.5 text-indigo-600 ${loadingPrintId === row.id ? 'animate-spin' : ''}`} />
-                            <span>{loadingPrintId === row.id ? 'Đang nạp...' : 'In TT25'}</span>
+                            <span>
+                              {loadingPrintId === `tt25:${row.id}` ? 'Đang nạp...' : 'In TT25'}
+                            </span>
                           </button>
 
                           {isCalled && date === today && (
@@ -479,6 +572,27 @@ export function QueueTable({
             isOpen={Boolean(printModalData)}
             onClose={() => setPrintModalData(null)}
             data={printModalData}
+            onPrinted={() => {
+              if (activePrintRowId) {
+                markPrinted(activePrintRowId, 'tt25');
+              }
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Consent Print Preview Modal */}
+      {consentModalData && (
+        <Suspense fallback={null}>
+          <ConsentPrintModal
+            isOpen={Boolean(consentModalData)}
+            onClose={() => setConsentModalData(null)}
+            data={consentModalData}
+            onPrinted={() => {
+              if (activePrintRowId) {
+                markPrinted(activePrintRowId, 'consent');
+              }
+            }}
           />
         </Suspense>
       )}

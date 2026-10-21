@@ -44,6 +44,22 @@ const VIETNAMESE_DIGITS = [
 
 let displayAudioContext: AudioContext | null = null;
 
+const DISPLAY_TIME_FORMATTER = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
+const DISPLAY_DATE_FORMATTER = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  weekday: 'long',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
 function getBranchFromUrl(): BranchCode {
   const branch = new URLSearchParams(window.location.search)
     .get('branch')
@@ -57,12 +73,16 @@ function clampVolume(value: number) {
 }
 
 function getStoredVolume() {
-  const storedVolume = Number.parseFloat(
-    window.localStorage.getItem(DISPLAY_VOLUME_STORAGE_KEY) ?? '',
-  );
-  return Number.isFinite(storedVolume)
-    ? clampVolume(storedVolume)
-    : DEFAULT_DISPLAY_VOLUME;
+  try {
+    const storedVolume = Number.parseFloat(
+      window.localStorage.getItem(DISPLAY_VOLUME_STORAGE_KEY) ?? '',
+    );
+    return Number.isFinite(storedVolume)
+      ? clampVolume(storedVolume)
+      : DEFAULT_DISPLAY_VOLUME;
+  } catch {
+    return DEFAULT_DISPLAY_VOLUME;
+  }
 }
 
 function getAudioContext() {
@@ -198,10 +218,14 @@ function QueueDisplayPage() {
     const normalizedVolume = clampVolume(nextVolume);
     volumeRef.current = normalizedVolume;
     setVolume(normalizedVolume);
-    window.localStorage.setItem(
-      DISPLAY_VOLUME_STORAGE_KEY,
-      String(normalizedVolume),
-    );
+    try {
+      window.localStorage.setItem(
+        DISPLAY_VOLUME_STORAGE_KEY,
+        String(normalizedVolume),
+      );
+    } catch {
+      // Volume remains active for current session
+    }
   };
 
   useEffect(() => {
@@ -322,18 +346,8 @@ function QueueDisplayPage() {
 
   const queueNumber = displayState?.queueNumber ?? '---';
   const hasActiveCall = displayState !== null;
-  const formattedTime = new Intl.DateTimeFormat('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(now);
-  const formattedDate = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(now);
+  const formattedTime = DISPLAY_TIME_FORMATTER.format(now);
+  const formattedDate = DISPLAY_DATE_FORMATTER.format(now);
 
   return (
     <div className="dym-display-shell">

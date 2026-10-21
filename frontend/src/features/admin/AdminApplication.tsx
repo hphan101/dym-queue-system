@@ -75,12 +75,53 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
     };
   }, []);
 
-  if (!isAuthorized) return <AdminLoader />;
-  if (destination === 'registrations') {
-    return <RegistrationsPage authorizedIsAdmin={isAdmin} />;
+  const [visitedTabs, setVisitedTabs] = useState<Set<AdminDestination>>(
+    () => new Set([destination]),
+  );
+
+  useEffect(() => {
+    if (isAuthorized && !isAdmin && destination === 'staff') {
+      window.location.replace('/?page=admin');
+      return;
+    }
+
+    setVisitedTabs((prev) => {
+      if (prev.has(destination)) return prev;
+      const next = new Set(prev);
+      next.add(destination);
+      return next;
+    });
+  }, [destination, isAdmin, isAuthorized]);
+
+  if (!isAuthorized || (!isAdmin && destination === 'staff')) {
+    return <AdminLoader />;
   }
-  if (destination === 'staff' && isAdmin) return <StaffPage />;
-  return <AdminPage authorizedIsAdmin={isAdmin} />;
+
+  return (
+    <>
+      <div className={destination === 'dashboard' ? 'contents' : 'hidden'}>
+        <AdminPage
+          authorizedIsAdmin={isAdmin}
+          isActiveTab={destination === 'dashboard'}
+        />
+      </div>
+
+      {visitedTabs.has('registrations') && (
+        <div className={destination === 'registrations' ? 'contents' : 'hidden'}>
+          <RegistrationsPage
+            authorizedIsAdmin={isAdmin}
+            isActiveTab={destination === 'registrations'}
+          />
+        </div>
+      )}
+
+      {isAdmin && visitedTabs.has('staff') && (
+        <div className={destination === 'staff' ? 'contents' : 'hidden'}>
+          <StaffPage isActiveTab={destination === 'staff'} />
+        </div>
+      )}
+    </>
+  );
 }
 
 export default AdminApplication;

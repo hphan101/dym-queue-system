@@ -2,7 +2,6 @@ import { useRef, type ReactNode } from 'react';
 import {
   BellAlertIcon,
   BellSlashIcon,
-  BuildingOffice2Icon,
   CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import type { BranchCode } from '../../../types/domain';
@@ -92,7 +91,6 @@ export function AdminHeader({
         {branch && onBranchChange && branchOptions.length > 0 && (
           <div className="dym-control-group">
             <label htmlFor="branch-select" className="dym-control-label">
-              <BuildingOffice2Icon className="w-3.5 h-3.5" />
               <span>Cơ sở phòng khám</span>
             </label>
             <div className="dym-select-wrapper">
@@ -117,7 +115,6 @@ export function AdminHeader({
           <div className="dym-control-group">
             <div className="flex items-center justify-between gap-2">
               <label htmlFor="date-select-btn" className="dym-control-label">
-                <CalendarDaysIcon className="w-3.5 h-3.5" />
                 <span>Ngày tiếp nhận</span>
               </label>
               {!isToday && (

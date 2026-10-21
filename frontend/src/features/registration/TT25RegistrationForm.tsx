@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
-  User,
-  Calendar,
-  CreditCard,
-  Phone,
-  Home,
-  Building,
-  Heart,
   Activity,
   Check,
   CheckCircle2,
   AlertCircle,
   ChevronRight,
   ChevronLeft,
-  Sparkles,
   Info,
 } from 'lucide-react';
 import type { BranchCode } from '../../types/domain';
-import type { TT25RegistrationData, TT25MedicalHistory } from './tt25Types';
+import type { SupportedLanguage } from '../../locales';
+import type {
+  TT25RegistrationData,
+  TT25MedicalHistory,
+  TT25TargetPaymentInfo,
+  TT25TargetGroup,
+  TT25PaymentSource,
+} from './tt25Types';
 import {
   TT25_PERSONAL_DISEASES,
   INITIAL_TT25_MEDICAL_HISTORY,
+  getDefaultTargetPaymentByReason,
 } from './tt25Types';
 import {
   ETHNIC_GROUPS,
@@ -29,77 +29,31 @@ import {
 } from './tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
 import { BirthDateInput } from './BirthDateInput';
-
-interface Province {
-  name: string;
-  slug: string;
-  type: string;
-  name_with_type: string;
-  code: string;
-}
-
-interface Ward {
-  name: string;
-  type?: string;
-  slug?: string;
-  name_with_type: string;
-  path?: string;
-  path_with_type?: string;
-  code: string;
-  parent_code: string;
-}
-
-let provincesPromise: Promise<Province[]> | null = null;
-const wardCache = new Map<string, Promise<Ward[]>>();
-
-function loadProvinces(): Promise<Province[]> {
-  if (!provincesPromise) {
-    provincesPromise = fetch('/data/provinces.json')
-      .then(async (res) => {
-        if (!res.ok) throw new Error('PROVINCES_UNAVAILABLE');
-        const data = (await res.json()) as Record<string, Province>;
-        return Object.values(data).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-      })
-      .catch((err) => {
-        provincesPromise = null;
-        throw err;
-      });
-  }
-  return provincesPromise;
-}
-
-function loadWardsForProvince(provinceCode: string): Promise<Ward[]> {
-  if (!provinceCode) return Promise.resolve([]);
-  const cached = wardCache.get(provinceCode);
-  if (cached) return cached;
-
-  const nextPromise = fetch(`/data/wards/${provinceCode}.json`)
-    .then(async (res) => {
-      if (!res.ok) throw new Error('WARDS_UNAVAILABLE');
-      const data = (await res.json()) as Record<string, Ward>;
-      return Object.values(data).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-    })
-    .catch((err) => {
-      wardCache.delete(provinceCode);
-      throw err;
-    });
-
-  wardCache.set(provinceCode, nextPromise);
-  return nextPromise;
-}
+import {
+  loadOccupations,
+  loadProvinces,
+  loadWardsForProvince,
+  type Province,
+  type Ward,
+} from './locationService';
 
 interface TT25RegistrationFormProps {
   branch: BranchCode;
   isLoading: boolean;
   onSubmit: (data: TT25RegistrationData) => void;
+  lang?: SupportedLanguage;
+  initialCheckupReason?: string;
 }
 
 export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   branch,
   isLoading,
   onSubmit,
+  lang = 'vi',
+  initialCheckupReason,
 }) => {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const isEn = lang === 'en';
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Administrative state
   const [fullName, setFullName] = useState('');
@@ -114,19 +68,35 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [addressDetail, setAddressDetail] = useState('');
   const [occupation, setOccupation] = useState('');
   const [workplace, setWorkplace] = useState('');
+  const [workplaceProvince, setWorkplaceProvince] = useState('');
+  const [workplaceWard, setWorkplaceWard] = useState('');
+  const [workplaceWards, setWorkplaceWards] = useState<Ward[]>([]);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [checkupReason, setCheckupReason] = useState(CHECKUP_REASONS[0] || '');
+  const [checkupReason, setCheckupReason] = useState(
+    initialCheckupReason || CHECKUP_REASONS[0] || '',
+  );
+
+  useEffect(() => {
+    if (initialCheckupReason) {
+      setCheckupReason(initialCheckupReason);
+      setTargetPayment(getDefaultTargetPaymentByReason(initialCheckupReason));
+    }
+  }, [initialCheckupReason]);
 
   // Medical History state
   const [medicalHistory, setMedicalHistory] = useState<TT25MedicalHistory>(INITIAL_TT25_MEDICAL_HISTORY);
-  const [quickCheckMessage, setQuickCheckMessage] = useState(false);
 
-  // Address lookup state
+  // Target & Payment Info state (Địa điểm khám mặc định auto tick CS KBCB)
+  const [targetPayment, setTargetPayment] = useState<TT25TargetPaymentInfo>(() =>
+    getDefaultTargetPaymentByReason(initialCheckupReason || CHECKUP_REASONS[0]),
+  );
+
+  // Address & occupation lookup state
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [occupations, setOccupations] = useState<string[]>([]);
   const [locationsLoaded, setLocationsLoaded] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
-  const [_locationError, setLocationError] = useState(false);
 
   // Step 1 Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -134,7 +104,6 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   useEffect(() => {
     let isMounted = true;
     setIsLocationLoading(true);
-    setLocationError(false);
     loadProvinces()
       .then((data) => {
         if (!isMounted) return;
@@ -142,11 +111,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
         setLocationsLoaded(true);
       })
       .catch(() => {
-        if (!isMounted) return;
-        setLocationError(true);
+        // Location loading will remain retryable
       })
       .finally(() => {
         if (isMounted) setIsLocationLoading(false);
+      });
+
+    loadOccupations()
+      .then((data) => {
+        if (!isMounted) return;
+        setOccupations(data);
+      })
+      .catch(() => {
+        // Occupation loading will remain retryable
       });
 
     return () => {
@@ -166,24 +143,16 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     }
   };
 
-  // Quick Action: "Chọn tất cả là Không"
-  const handleSelectAllNegative = () => {
-    const cleanPersonal: Record<number, boolean> = {};
-    for (let i = 1; i <= 22; i++) {
-      cleanPersonal[i] = false;
+  const handleWorkplaceProvinceChange = (nextProvince: string) => {
+    setWorkplaceProvince(nextProvince);
+    setWorkplaceWard('');
+    setWorkplaceWards([]);
+    const found = provinces.find((p) => p.name === nextProvince || p.name_with_type === nextProvince);
+    if (found?.code) {
+      loadWardsForProvince(found.code)
+        .then((data) => setWorkplaceWards(data))
+        .catch(() => setWorkplaceWards([]));
     }
-
-    setMedicalHistory({
-      familyHistory: { hasDisease: false, diseaseDetails: '' },
-      personalHistory: cleanPersonal,
-      personalOtherDetails: '',
-      currentTreatment: { isTreating: false, medications: '' },
-      pregnancyHistory: { hasHistory: false, details: '' },
-      commitmentAgreed: true,
-    });
-
-    setQuickCheckMessage(true);
-    setTimeout(() => setQuickCheckMessage(false), 3000);
   };
 
   // Handle individual personal history disease toggle
@@ -202,17 +171,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!fullName.trim()) {
-      newErrors.fullName = 'Vui lòng nhập họ và tên';
+      newErrors.fullName = isEn ? 'Please enter your full name' : 'Vui lòng nhập họ và tên';
     } else if (fullName.trim().length < 2) {
-      newErrors.fullName = 'Họ và tên phải có ít nhất 2 ký tự';
+      newErrors.fullName = isEn ? 'Full name must be at least 2 characters' : 'Họ và tên phải có ít nhất 2 ký tự';
     }
 
     if (!birthDate) {
-      newErrors.birthDate = 'Vui lòng nhập ngày sinh (định dạng ngày/tháng/năm)';
+      newErrors.birthDate = isEn
+        ? 'Please enter your date of birth (DD/MM/YYYY)'
+        : 'Vui lòng nhập ngày sinh (định dạng ngày/tháng/năm)';
     } else {
       const birth = new Date(birthDate);
       if (isNaN(birth.getTime()) || birth.getFullYear() < 1900) {
-        newErrors.birthDate = 'Ngày sinh không hợp lệ';
+        newErrors.birthDate = isEn ? 'Invalid date of birth' : 'Ngày sinh không hợp lệ';
       } else {
         const today = new Date();
         let age = today.getFullYear() - birth.getFullYear();
@@ -221,28 +192,38 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           age--;
         }
         if (age < 18) {
-          newErrors.birthDate = 'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên';
+          newErrors.birthDate = isEn
+            ? 'Circular 25 applies to individuals aged 18 and above'
+            : 'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên';
         }
       }
     }
 
     const cleanCccd = cccd.trim();
     if (!cleanCccd) {
-      newErrors.cccd = 'Vui lòng nhập số CCCD hoặc số Hộ chiếu';
+      newErrors.cccd = isEn
+        ? 'Please enter your Citizen ID or Passport number'
+        : 'Vui lòng nhập số CCCD hoặc số Hộ chiếu';
     } else if (cleanCccd.length < 8) {
-      newErrors.cccd = 'Số CCCD/Hộ chiếu không hợp lệ';
+      newErrors.cccd = isEn
+        ? 'Invalid Citizen ID / Passport number'
+        : 'Số CCCD/Hộ chiếu không hợp lệ';
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
     if (!cleanPhone) {
-      newErrors.phoneNumber = 'Vui lòng nhập số điện thoại';
+      newErrors.phoneNumber = isEn ? 'Please enter your phone number' : 'Vui lòng nhập số điện thoại';
     } else if (!/^0(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
-      newErrors.phoneNumber = 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
+      newErrors.phoneNumber = isEn
+        ? 'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)'
+        : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
     }
 
-    if (!province) newErrors.province = 'Vui lòng chọn Tỉnh/Thành phố';
-    if (!ward) newErrors.ward = 'Vui lòng chọn Phường/Xã';
-    if (!addressDetail.trim()) newErrors.addressDetail = 'Vui lòng nhập địa chỉ cụ thể';
+    if (!province) newErrors.province = isEn ? 'Please select a Province / City' : 'Vui lòng chọn Tỉnh/Thành phố';
+    if (!ward) newErrors.ward = isEn ? 'Please select a Ward / Commune' : 'Vui lòng chọn Phường/Xã';
+    if (!addressDetail.trim()) {
+      newErrors.addressDetail = isEn ? 'Please enter your street address' : 'Vui lòng nhập địa chỉ cụ thể';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -262,6 +243,16 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNextToStep4 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentStep(4);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const formattedWorkplaceLocation = [workplaceWard, workplaceProvince]
+    .filter(Boolean)
+    .join(', ');
+
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalData: TT25RegistrationData = {
@@ -278,10 +269,16 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       addressDetail: addressDetail.trim(),
       occupation: occupation.trim() || 'Tự do',
       workplace: workplace.trim(),
-      workplaceWard: '',
+      workplaceWard: formattedWorkplaceLocation,
       phoneNumber: phoneNumber.replace(/[^0-9]/g, ''),
       checkupReason: checkupReason || 'Khám sức khỏe tổng quát',
       medicalHistory,
+      targetPayment: {
+        ...targetPayment,
+        targetOtherDetails: targetPayment.targetOtherDetails.trim(),
+        paymentOtherDetails: targetPayment.paymentOtherDetails.trim(),
+        examLocation: 'cs_kbcb',
+      },
     };
 
     onSubmit(finalData);
@@ -291,13 +288,20 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     <div className="w-full">
       {/* Step Indicator Header */}
       <div className="mb-7">
-        <div className="max-w-xs sm:max-w-sm mx-auto relative">
+        <div className="max-w-md mx-auto relative">
           {/* Connecting Track Line: aligned to center of 32px circle (top-4) */}
           <div className="absolute top-4 left-6 right-6 -translate-y-1/2 h-[2.5px] bg-slate-200 rounded-full overflow-hidden pointer-events-none">
             <div
               className="h-full bg-dym-blue-500 rounded-full transition-all duration-300 ease-out"
               style={{
-                width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%',
+                width:
+                  currentStep === 1
+                    ? '0%'
+                    : currentStep === 2
+                      ? '33.33%'
+                      : currentStep === 3
+                        ? '66.66%'
+                        : '100%',
               }}
             />
           </div>
@@ -305,9 +309,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Step Items */}
           <div className="flex items-start justify-between relative z-10">
             {([
-              { step: 1, label: 'Hành chính' },
-              { step: 2, label: 'Tiền sử bệnh' },
-              { step: 3, label: 'Xác nhận' },
+              { step: 1, label: isEn ? 'Personal Info' : 'Hành chính' },
+              { step: 2, label: isEn ? 'Medical History' : 'Tiền sử bệnh' },
+              { step: 3, label: isEn ? 'Target & Payment' : 'Đối tượng - Chi trả' },
+              { step: 4, label: isEn ? 'Confirm' : 'Xác nhận' },
             ] as const).map((item) => {
               const isCompleted = currentStep > item.step;
               const isCurrent = currentStep === item.step;
@@ -364,28 +369,29 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {/* ================================= STEP 1: HÀNH CHÍNH ================================= */}
       {currentStep === 1 && (
         <form onSubmit={handleNextToStep2} className="space-y-4 animate-fade-in">
-          <div className="bg-dym-blue-50/60 border border-dym-blue-100 rounded-xl p-3 text-xs text-dym-blue-900 flex items-start gap-2">
+          <div className="bg-dym-blue-50/60 border border-dym-blue-100 rounded-md p-3 text-xs text-dym-blue-900 flex items-start gap-2">
             <Info className="w-4 h-4 text-dym-blue-600 shrink-0 mt-0.5" />
             <p>
-              Vui lòng điền chính xác theo CCCD hoặc Hộ chiếu để xuất giấy khám sức khỏe theo mẫu chuẩn Bộ Y tế (Thông tư 25/2026/TT-BYT).
+              {isEn
+                ? 'Please fill in your details accurately according to your Citizen ID or Passport to issue the Ministry of Health standard medical examination form (Circular 25/2026/TT-BYT).'
+                : 'Vui lòng điền chính xác theo CCCD hoặc Hộ chiếu để xuất giấy khám sức khỏe theo mẫu chuẩn Bộ Y tế (Thông tư 25/2026/TT-BYT).'}
             </p>
           </div>
 
           {/* Họ và tên */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-              <User className="w-3.5 h-3.5 text-slate-400" />
-              1. Họ và tên (viết hoa) <span className="text-red-500">*</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              {isEn ? '1. Full Name (e.g. NGUYEN VAN A)' : '1. Họ và tên (ví dụ: NGUYỄN VĂN A)'}{' '}
+              <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => {
-                setFullName(e.target.value.toUpperCase());
+                setFullName(e.target.value);
                 if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: '' }));
               }}
-              placeholder="NGUYỄN VĂN A"
-              className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 font-semibold uppercase placeholder:normal-case placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
                 errors.fullName ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
               }`}
             />
@@ -395,9 +401,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Giới tính & Ngày sinh */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Heart className="w-3.5 h-3.5 text-slate-400" />
-                2. Giới tính <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {isEn ? '2. Gender' : '2. Giới tính'} <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {(['Nam', 'Nữ'] as const).map((g) => (
@@ -405,22 +410,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     key={g}
                     type="button"
                     onClick={() => setGender(g)}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`py-2 px-3 rounded text-xs font-semibold border transition-all ${
                       gender === g
                         ? 'bg-dym-blue-500 text-white border-dym-blue-500 shadow-sm'
                         : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    {g}
+                    {isEn ? (g === 'Nam' ? 'Male' : 'Female') : g}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                3. Ngày sinh <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {isEn ? '3. Date of Birth' : '3. Ngày sinh'} <span className="text-red-500">*</span>
               </label>
               <BirthDateInput
                 value={birthDate}
@@ -441,25 +445,31 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                4. Dân tộc
+                {isEn ? '4. Ethnicity' : '4. Dân tộc'}
               </label>
               <SearchableSelect
-                options={ETHNIC_GROUPS.map((e) => ({ value: e, label: e }))}
+                options={ETHNIC_GROUPS.map((e) => ({
+                  value: e,
+                  label: isEn && e === 'Người nước ngoài' ? 'Foreigner (Người nước ngoài)' : e,
+                }))}
                 value={ethnicity}
                 onChange={setEthnicity}
-                placeholder="Chọn dân tộc"
+                placeholder={isEn ? 'Select ethnicity' : 'Chọn dân tộc'}
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                5. Nhóm máu (nếu có)
+                {isEn ? '5. Blood Type (optional)' : '5. Nhóm máu (nếu có)'}
               </label>
               <SearchableSelect
-                options={BLOOD_GROUPS.map((b) => ({ value: b, label: b }))}
+                options={BLOOD_GROUPS.map((b) => ({
+                  value: b,
+                  label: isEn && b === 'Chưa rõ' ? 'Unknown' : b,
+                }))}
                 value={bloodGroup}
                 onChange={setBloodGroup}
-                placeholder="Chọn nhóm máu"
+                placeholder={isEn ? 'Select blood type' : 'Chọn nhóm máu'}
               />
             </div>
           </div>
@@ -467,9 +477,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Số CCCD & Số BHYT */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                6. Số CCCD / Hộ chiếu <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {isEn ? '6. Citizen ID / Passport No.' : '6. Số CCCD / Hộ chiếu'}{' '}
+                <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -479,8 +489,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   if (errors.cccd) setErrors((prev) => ({ ...prev, cccd: '' }));
                 }}
                 maxLength={12}
-                placeholder="12 chữ số CCCD"
-                className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+                placeholder={isEn ? 'Citizen ID / Passport number' : '12 chữ số CCCD'}
+                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
                   errors.cccd ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
               />
@@ -489,24 +499,24 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                7. Số thẻ BHYT (nếu có)
+                {isEn ? '7. Health Insurance No. (optional)' : '7. Số thẻ BHYT (nếu có)'}
               </label>
               <input
                 type="text"
                 value={insuranceNumber}
                 onChange={(e) => setInsuranceNumber(e.target.value.toUpperCase())}
                 maxLength={15}
-                placeholder="VD: DN4791234567890"
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all"
+                placeholder={isEn ? 'e.g. DN4791234567890' : 'VD: DN4791234567890'}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all"
               />
             </div>
           </div>
 
           {/* Nơi ở hiện tại: Tỉnh / Huyện / Xã / Địa chỉ */}
-          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5">
-            <span className="block text-xs font-semibold text-slate-800 flex items-center gap-1">
-              <Home className="w-3.5 h-3.5 text-slate-500" />
-              8. Nơi ở hiện tại <span className="text-red-500">*</span>
+          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-md space-y-2.5">
+            <span className="block text-xs font-semibold text-slate-800">
+              {isEn ? '8. Current Residence Address' : '8. Nơi ở hiện tại'}{' '}
+              <span className="text-red-500">*</span>
             </span>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -515,7 +525,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   options={provinces.map((p) => ({ value: p.name_with_type, label: p.name_with_type }))}
                   value={province}
                   onChange={handleProvinceChange}
-                  placeholder="Chọn Tỉnh / Thành phố"
+                  placeholder={isEn ? 'Select Province / City' : 'Chọn Tỉnh / Thành phố'}
                   disabled={isLocationLoading || !locationsLoaded}
                   isLoadingOptions={isLocationLoading}
                   error={Boolean(errors.province)}
@@ -531,7 +541,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     setWard(val);
                     if (errors.ward) setErrors((prev) => ({ ...prev, ward: '' }));
                   }}
-                  placeholder="Chọn Phường / Xã"
+                  placeholder={isEn ? 'Select Ward / Commune' : 'Chọn Phường / Xã'}
                   disabled={!province || wards.length === 0}
                   error={Boolean(errors.ward)}
                 />
@@ -547,8 +557,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   setAddressDetail(e.target.value);
                   if (errors.addressDetail) setErrors((prev) => ({ ...prev, addressDetail: '' }));
                 }}
-                placeholder="Số nhà, tên đường, thôn / ấp..."
-                className={`w-full px-3 py-2 bg-white border rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+                placeholder={isEn ? 'House number, street name...' : 'Số nhà, tên đường, thôn / ấp...'}
+                className={`w-full px-3 py-2 bg-white border rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
                   errors.addressDetail ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
               />
@@ -556,79 +566,109 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             </div>
           </div>
 
-          {/* Nghề nghiệp & Nơi làm việc */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                9. Nghề nghiệp
-              </label>
-              <input
-                type="text"
-                value={occupation}
-                onChange={(e) => setOccupation(e.target.value)}
-                placeholder="Nhân viên, Kỹ sư, Sinh viên..."
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all"
-              />
-            </div>
+          {/* Nghề nghiệp */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              {isEn ? '9. Occupation' : '9. Nghề nghiệp'}
+            </label>
+            <SearchableSelect
+              options={occupations.map((occ) => ({ value: occ, label: occ }))}
+              value={occupation}
+              onChange={setOccupation}
+              placeholder={
+                isEn
+                  ? 'Select or type to search occupation...'
+                  : 'Chọn hoặc nhập để tìm nghề nghiệp...'
+              }
+              isLoadingOptions={occupations.length === 0 && isLocationLoading}
+            />
+          </div>
 
+          {/* Nơi làm việc, học tập & Xã phường */}
+          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-md space-y-2.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Building className="w-3.5 h-3.5 text-slate-400" />
-                10. Nơi làm việc, học tập
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                {isEn
+                  ? '10. Workplace / School (Full company/school name)'
+                  : '10. Nơi làm việc, học tập (Tên đầy đủ công ty/trường)'}
               </label>
               <input
                 type="text"
                 value={workplace}
                 onChange={(e) => setWorkplace(e.target.value)}
-                placeholder="Tên công ty hoặc trường học"
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all"
+                placeholder={
+                  isEn
+                    ? 'Enter company or school name...'
+                    : 'Nhập tên đầy đủ công ty hoặc trường học...'
+                }
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all"
               />
+            </div>
+
+            <div>
+              <span className="block text-xs font-semibold text-slate-700 mb-1">
+                {isEn
+                  ? 'Ward / Province of workplace or school'
+                  : 'Xã, phường nơi làm việc, học tập'}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <SearchableSelect
+                  options={provinces.map((p) => ({
+                    value: p.name_with_type,
+                    label: p.name_with_type,
+                  }))}
+                  value={workplaceProvince}
+                  onChange={handleWorkplaceProvinceChange}
+                  placeholder={isEn ? 'Select Province / City' : 'Chọn Tỉnh / Thành phố'}
+                  disabled={isLocationLoading || !locationsLoaded}
+                  isLoadingOptions={isLocationLoading}
+                />
+
+                <SearchableSelect
+                  options={workplaceWards.map((w) => ({
+                    value: w.name_with_type,
+                    label: w.name_with_type,
+                  }))}
+                  value={workplaceWard}
+                  onChange={setWorkplaceWard}
+                  placeholder={isEn ? 'Select Ward / Commune' : 'Chọn Phường / Xã'}
+                  disabled={!workplaceProvince || workplaceWards.length === 0}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Điện thoại & Lý do khám */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                11. Điện thoại di động <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => {
-                  setPhoneNumber(e.target.value);
-                  if (errors.phoneNumber) setErrors((prev) => ({ ...prev, phoneNumber: '' }));
-                }}
-                maxLength={10}
-                placeholder="0912345678"
-                className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
-                  errors.phoneNumber ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
-                }`}
-              />
-              {errors.phoneNumber && <p className="text-xs text-red-500 mt-1">{errors.phoneNumber}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                12. Lý do khám sức khỏe
-              </label>
-              <SearchableSelect
-                options={CHECKUP_REASONS.map((r) => ({ value: r, label: r }))}
-                value={checkupReason}
-                onChange={setCheckupReason}
-                placeholder="Chọn lý do khám"
-              />
-            </div>
+          {/* Điện thoại di động */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              {isEn ? '11. Mobile Phone Number' : '11. Điện thoại di động'}{' '}
+              <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value);
+                if (errors.phoneNumber) setErrors((prev) => ({ ...prev, phoneNumber: '' }));
+              }}
+              maxLength={10}
+              placeholder="0912345678"
+              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+                errors.phoneNumber ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
+              }`}
+            />
+            {errors.phoneNumber && <p className="text-xs text-red-500 mt-1">{errors.phoneNumber}</p>}
           </div>
 
           {/* Next Button */}
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Tiếp tục: Khai báo tiền sử bệnh</span>
+              <span>
+                {isEn ? 'Next: Medical History Declaration' : 'Tiếp tục: Khai báo tiền sử bệnh'}
+              </span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -638,40 +678,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {/* ================================= STEP 2: TIỀN SỬ BỆNH ================================= */}
       {currentStep === 2 && (
         <form onSubmit={handleNextToStep3} className="space-y-5 animate-fade-in">
-          {/* Quick Action Button for fast filling */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3">
-            <div>
-              <h3 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-600" />
-                Nếu bạn có sức khỏe hoàn toàn bình thường:
-              </h3>
-              <p className="text-[11px] text-emerald-700 mt-0.5">
-                Bấm nút để đánh dấu nhanh tất cả mục là "Không mắc bệnh", sau đó bạn có thể chọn lại mục mình có.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSelectAllNegative}
-              className="shrink-0 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Tất cả đều Bình thường
-            </button>
-          </div>
-
-          {quickCheckMessage && (
-            <div className="p-2.5 bg-emerald-100 text-emerald-800 text-xs rounded-lg flex items-center gap-2 animate-bounce">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              Đã đánh dấu nhanh: Toàn bộ mục tiền sử là "Không". Bạn hãy kiểm tra lại nếu có bệnh lý cần ghi nhận.
-            </div>
-          )}
-
           {/* 1. Tiền sử gia đình */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-2">
+          <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-2">
             <h4 className="text-xs font-bold text-slate-800 leading-snug">
-              1. Tiền sử gia đình:
+              {isEn ? '1. Family Medical History:' : '1. Tiền sử gia đình:'}
               <span className="font-normal text-slate-600 block mt-0.5">
-                Có ai trong gia đình ông (bà) mắc một trong các bệnh: truyền nhiễm, tim mạch, đái tháo đường, lao, hen phế quản, ung thư, động kinh, rối loạn tâm thần, bệnh khác:
+                {isEn
+                  ? 'Has anyone in your family been diagnosed with: infectious diseases, cardiovascular disease, diabetes, tuberculosis, bronchial asthma, cancer, epilepsy, mental disorders, or other hereditary conditions?'
+                  : 'Có ai trong gia đình ông (bà) mắc một trong các bệnh: truyền nhiễm, tim mạch, đái tháo đường, lao, hen phế quản, ung thư, động kinh, rối loạn tâm thần, bệnh khác:'}
               </span>
             </h4>
             <div className="flex items-center gap-3">
@@ -683,13 +697,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     familyHistory: { hasDisease: false, diseaseDetails: '' },
                   }))
                 }
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                   !medicalHistory.familyHistory.hasDisease
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                Không
+                {isEn ? 'No' : 'Không'}
               </button>
               <button
                 type="button"
@@ -699,13 +713,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     familyHistory: { ...prev.familyHistory, hasDisease: true },
                   }))
                 }
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                   medicalHistory.familyHistory.hasDisease
                     ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                Có bệnh
+                {isEn ? 'Yes' : 'Có bệnh'}
               </button>
             </div>
             {medicalHistory.familyHistory.hasDisease && (
@@ -719,21 +733,27 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       familyHistory: { ...prev.familyHistory, diseaseDetails: e.target.value },
                     }))
                   }
-                  placeholder="Ghi cụ thể tên bệnh (VD: Tim mạch, tiểu đường...)"
-                  className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  placeholder={
+                    isEn
+                      ? 'Specify condition name (e.g., Heart disease, diabetes...)'
+                      : 'Ghi cụ thể tên bệnh (VD: Tim mạch, tiểu đường...)'
+                  }
+                  className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-200"
                 />
               </div>
             )}
           </div>
 
           {/* 2. Tiền sử bản thân: Bảng 22 bệnh lý */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-2.5">
+          <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-2.5">
             <div className="border-b border-slate-100 pb-2">
               <h4 className="text-xs font-bold text-slate-800">
-                2. Tiền sử bệnh, tật của bản thân:
+                {isEn ? '2. Personal Medical History:' : '2. Tiền sử bệnh, tật của bản thân:'}
               </h4>
               <p className="text-[11px] text-slate-500">
-                Ông (bà) đã hoặc đang mắc bệnh, tình trạng nào sau đây không?
+                {isEn
+                  ? 'Have you ever had or do you currently have any of the following conditions?'
+                  : 'Ông (bà) đã hoặc đang mắc bệnh, tình trạng nào sau đây không?'}
               </p>
             </div>
 
@@ -743,14 +763,15 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                    className={`p-2.5 rounded border text-xs flex items-center justify-between gap-2 transition-all ${
                       isSelected
                         ? 'border-amber-300 bg-amber-50/40'
                         : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'
                     }`}
                   >
                     <span className="font-medium text-slate-800 leading-snug">
-                      <strong className="text-slate-400 mr-1">{item.id}.</strong> {item.name}
+                      <strong className="text-slate-400 mr-1">{item.id}.</strong>{' '}
+                      {isEn ? item.nameEn : item.name}
                     </span>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
@@ -762,7 +783,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        Không
+                        {isEn ? 'No' : 'Không'}
                       </button>
                       <button
                         type="button"
@@ -773,7 +794,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        Có
+                        {isEn ? 'Yes' : 'Có'}
                       </button>
                     </div>
                   </div>
@@ -784,7 +805,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {medicalHistory.personalHistory[22] && (
               <div className="pt-2 animate-fade-in">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Ghi rõ bệnh khác của bạn:
+                  {isEn ? 'Please specify other conditions:' : 'Ghi rõ bệnh khác của bạn:'}
                 </label>
                 <input
                   type="text"
@@ -795,20 +816,26 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       personalOtherDetails: e.target.value,
                     }))
                   }
-                  placeholder="Ghi rõ tên bệnh lý khác..."
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                  placeholder={isEn ? 'Specify other medical conditions...' : 'Ghi rõ tên bệnh lý khác...'}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded text-xs"
                 />
               </div>
             )}
           </div>
 
           {/* 3. Câu hỏi khác */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-3">
-            <h4 className="text-xs font-bold text-slate-800">3. Câu hỏi khác (nếu có):</h4>
+          <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-3">
+            <h4 className="text-xs font-bold text-slate-800">
+              {isEn ? '3. Additional Questions (if applicable):' : '3. Câu hỏi khác (nếu có):'}
+            </h4>
 
             {/* a) Điều trị bệnh */}
             <div className="space-y-1.5 text-xs">
-              <p className="font-medium text-slate-700">a) Bạn có đang điều trị bệnh gì không?</p>
+              <p className="font-medium text-slate-700">
+                {isEn
+                  ? 'a) Are you currently receiving treatment for any medical condition?'
+                  : 'a) Bạn có đang điều trị bệnh gì không?'}
+              </p>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -818,13 +845,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       currentTreatment: { isTreating: false, medications: '' },
                     }))
                   }
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                  className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                     !medicalHistory.currentTreatment.isTreating
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
-                  Không
+                  {isEn ? 'No' : 'Không'}
                 </button>
                 <button
                   type="button"
@@ -834,13 +861,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       currentTreatment: { ...prev.currentTreatment, isTreating: true },
                     }))
                   }
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                  className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                     medicalHistory.currentTreatment.isTreating
                       ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
-                  Có điều trị
+                  {isEn ? 'Yes, currently under treatment' : 'Có điều trị'}
                 </button>
               </div>
               {medicalHistory.currentTreatment.isTreating && (
@@ -854,8 +881,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         currentTreatment: { ...prev.currentTreatment, medications: e.target.value },
                       }))
                     }
-                    placeholder="Liệt kê các thuốc đang dùng và liều lượng..."
-                    className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded-lg text-xs text-slate-900"
+                    placeholder={
+                      isEn
+                        ? 'List current medications and dosages...'
+                        : 'Liệt kê các thuốc đang dùng và liều lượng...'
+                    }
+                    className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900"
                   />
                 </div>
               )}
@@ -864,7 +895,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {/* b) Tiền sử thai sản (Đối với nữ) */}
             {gender === 'Nữ' && (
               <div className="space-y-1.5 text-xs border-t border-slate-100 pt-2.5 animate-fade-in">
-                <p className="font-medium text-slate-700">b) Tiền sử thai sản (Đối với phụ nữ):</p>
+                <p className="font-medium text-slate-700">
+                  {isEn ? 'b) Obstetric / Pregnancy History (For women):' : 'b) Tiền sử thai sản (Đối với phụ nữ):'}
+                </p>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -874,13 +907,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         pregnancyHistory: { hasHistory: false, details: '' },
                       }))
                     }
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                       !medicalHistory.pregnancyHistory?.hasHistory
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
-                    Không
+                    {isEn ? 'No' : 'Không'}
                   </button>
                   <button
                     type="button"
@@ -890,13 +923,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         pregnancyHistory: { hasHistory: true, details: prev.pregnancyHistory?.details || '' },
                       }))
                     }
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold border transition-all ${
                       medicalHistory.pregnancyHistory?.hasHistory
                         ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
-                    Có
+                    {isEn ? 'Yes' : 'Có'}
                   </button>
                 </div>
                 {medicalHistory.pregnancyHistory?.hasHistory && (
@@ -910,8 +943,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                           pregnancyHistory: { hasHistory: true, details: e.target.value },
                         }))
                       }
-                      placeholder="Ghi rõ tình trạng thai sản hoặc thuốc đang dùng..."
-                      className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded-lg text-xs text-slate-900"
+                      placeholder={
+                        isEn
+                          ? 'Specify pregnancy status or obstetric history...'
+                          : 'Ghi rõ tình trạng thai sản hoặc thuốc đang dùng...'
+                      }
+                      className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900"
                     />
                   </div>
                 )}
@@ -924,94 +961,421 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className="py-3 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
-              Quay lại
+              {isEn ? 'Back' : 'Quay lại'}
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Xem lại & Xác nhận</span>
+              <span>
+                {isEn
+                  ? 'Next: Target & Payment Info'
+                  : 'Tiếp tục: Thông tin đối tượng - chi trả'}
+              </span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </form>
       )}
 
-      {/* ================================= STEP 3: XÁC NHẬN ================================= */}
+      {/* ================================= STEP 3: THÔNG TIN ĐỐI TƯỢNG - CHI TRẢ ================================= */}
       {currentStep === 3 && (
+        <form onSubmit={handleNextToStep4} className="space-y-4 animate-fade-in">
+          <div className="bg-dym-blue-50/60 border border-dym-blue-100 rounded-md p-3 text-xs text-dym-blue-900 flex items-start gap-2">
+            <Info className="w-4 h-4 text-dym-blue-600 shrink-0 mt-0.5" />
+            <p>
+              {isEn
+                ? 'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical Facility (CS KBCB).'
+                : 'Vui lòng chọn thông tin đối tượng và nguồn chi trả theo mẫu Thông tư 25/2026/TT-BYT. Địa điểm khám được tự động tích chọn là Cơ sở KBCB (CS KBCB).'}
+            </p>
+          </div>
+
+          {/* 1. Đối tượng */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-2.5">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                {isEn ? '1. Target Category' : '1. Đối tượng khám sức khỏe'}
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {isEn
+                  ? 'Target code from 1 to 17 according to the Circular appendix:'
+                  : 'Đối tượng (ghi số từ 1 đến 17 theo mã đối tượng tại phụ lục):'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {([
+                {
+                  id: '14' as TT25TargetGroup,
+                  labelVi: '14 – Sinh viên, học viên',
+                  labelEn: '14 – Student / Trainee',
+                },
+                {
+                  id: '15' as TT25TargetGroup,
+                  labelVi: '15 – Người lao động chính thức (theo Luật An toàn, Vệ sinh lao động)',
+                  labelEn: '15 – Official employee (under Law on Occupational Safety and Health)',
+                },
+                {
+                  id: '16' as TT25TargetGroup,
+                  labelVi: '16 – Người lao động phi chính thức',
+                  labelEn: '16 – Informal worker',
+                },
+                {
+                  id: 'other' as TT25TargetGroup,
+                  labelVi: 'Các đối tượng khác',
+                  labelEn: 'Other target category',
+                },
+              ]).map((opt) => {
+                const isSelected = targetPayment.targetGroup === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setTargetPayment((prev) => ({
+                        ...prev,
+                        targetGroup: opt.id,
+                      }))
+                    }
+                    className={`w-full p-2.5 rounded border text-left text-xs flex items-center gap-2.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-dym-blue-500 bg-dym-blue-50/50 text-dym-blue-900 font-semibold shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </span>
+                    <span className="leading-snug">{isEn ? opt.labelEn : opt.labelVi}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {targetPayment.targetGroup === 'other' && (
+              <div className="pt-1 animate-fade-in">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  {isEn ? 'Specify other target category:' : 'Ghi rõ đối tượng khác:'}
+                </label>
+                <input
+                  type="text"
+                  value={targetPayment.targetOtherDetails}
+                  onChange={(e) =>
+                    setTargetPayment((prev) => ({
+                      ...prev,
+                      targetOtherDetails: e.target.value,
+                    }))
+                  }
+                  placeholder={
+                    isEn
+                      ? 'Enter target category or code (1 - 17)...'
+                      : 'Nhập cụ thể đối tượng khác...'
+                  }
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 2. Nguồn chi trả */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-2.5">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                {isEn ? '2. Payment Source' : '2. Nguồn chi trả'}
+              </h4>
+            </div>
+
+            <div className="space-y-2">
+              {([
+                {
+                  id: 'employer' as TT25PaymentSource,
+                  labelVi: 'Người sử dụng lao động chi trả',
+                  labelEn: 'Paid by employer',
+                },
+                {
+                  id: 'self' as TT25PaymentSource,
+                  labelVi: 'Người dân tự chi trả',
+                  labelEn: 'Self-paid by examinee',
+                },
+                {
+                  id: 'other' as TT25PaymentSource,
+                  labelVi: 'Nguồn khác',
+                  labelEn: 'Other payment source',
+                },
+              ]).map((opt) => {
+                const isSelected = targetPayment.paymentSource === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setTargetPayment((prev) => ({
+                        ...prev,
+                        paymentSource: opt.id,
+                      }))
+                    }
+                    className={`w-full p-2.5 rounded border text-left text-xs flex items-center gap-2.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-dym-blue-500 bg-dym-blue-50/50 text-dym-blue-900 font-semibold shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </span>
+                    <span className="leading-snug">{isEn ? opt.labelEn : opt.labelVi}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {targetPayment.paymentSource === 'other' && (
+              <div className="pt-1 animate-fade-in">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  {isEn ? 'Specify other payment source:' : 'Ghi rõ nguồn chi trả khác:'}
+                </label>
+                <input
+                  type="text"
+                  value={targetPayment.paymentOtherDetails}
+                  onChange={(e) =>
+                    setTargetPayment((prev) => ({
+                      ...prev,
+                      paymentOtherDetails: e.target.value,
+                    }))
+                  }
+                  placeholder={
+                    isEn ? 'Enter other payment source...' : 'Nhập cụ thể nguồn chi trả khác...'
+                  }
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 3. Địa điểm khám (Auto tick CS KBCB) */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                {isEn ? '3. Examination Location' : '3. Địa điểm khám'}
+              </h4>
+              <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                {isEn ? 'Auto-selected: CS KBCB' : 'Mặc định: CS KBCB'}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {([
+                { id: 'cs_kbcb', label: 'CS KBCB', active: true },
+                { id: 'kham_luu_dong', label: 'Khám lưu động', active: false },
+                { id: 'tram_y_te', label: 'Trạm Y tế', active: false },
+                { id: 'truong_hoc', label: 'Trường học', active: false },
+                { id: 'ksk_tai_nha', label: 'KSK tại nhà', active: false },
+              ] as const).map((loc) => (
+                <div
+                  key={loc.id}
+                  className={`px-3 py-2 rounded border text-xs flex items-center gap-2 select-none ${
+                    loc.active
+                      ? 'border-dym-blue-500 bg-dym-blue-50/60 text-dym-blue-900 font-bold'
+                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 ${
+                      loc.active
+                        ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                        : 'border-slate-300 bg-white'
+                    }`}
+                  >
+                    {loc.active && <Check className="w-3 h-3 stroke-[3]" />}
+                  </span>
+                  <span>{loc.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Stepper Navigation */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(2)}
+              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {isEn ? 'Back' : 'Quay lại'}
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>{isEn ? 'Review & Confirm' : 'Xem lại & Xác nhận'}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ================================= STEP 4: XÁC NHẬN ================================= */}
+      {currentStep === 4 && (
         <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3 text-xs">
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-3 text-xs">
             <h3 className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Tóm tắt hồ sơ khám sức khỏe Thông tư 25
+              {isEn
+                ? 'Health Checkup Registration Summary (Circular 25)'
+                : 'Tóm tắt hồ sơ khám sức khỏe Thông tư 25'}
             </h3>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div>
-                <span className="text-slate-400 block text-[11px]">Họ và tên:</span>
-                <span className="font-bold text-slate-800 text-sm">{fullName}</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Full Name:' : 'Họ và tên:'}
+                </span>
+                <span className="font-bold text-slate-800 text-sm uppercase">{fullName.trim().toUpperCase()}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Giới tính & Ngày sinh:</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Gender & Date of Birth:' : 'Giới tính & Ngày sinh:'}
+                </span>
                 <span className="font-medium text-slate-700">
-                  {gender} — {birthDate.split('-').reverse().join('/')}
+                  {isEn ? (gender === 'Nam' ? 'Male' : 'Female') : gender} —{' '}
+                  {birthDate.split('-').reverse().join('/')}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Số CCCD / Hộ chiếu:</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Citizen ID / Passport:' : 'Số CCCD / Hộ chiếu:'}
+                </span>
                 <span className="font-medium text-slate-700">{cccd}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Số điện thoại:</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Phone Number:' : 'Số điện thoại:'}
+                </span>
                 <span className="font-medium text-slate-700">{phoneNumber}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Dân tộc / Nhóm máu:</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Ethnicity / Blood Type:' : 'Dân tộc / Nhóm máu:'}
+                </span>
                 <span className="font-medium text-slate-700">
-                  {ethnicity} / {bloodGroup}
+                  {ethnicity} / {isEn && bloodGroup === 'Chưa rõ' ? 'Unknown' : bloodGroup}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Thẻ BHYT:</span>
-                <span className="font-medium text-slate-700">{insuranceNumber || 'Không có'}</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Health Insurance:' : 'Thẻ BHYT:'}
+                </span>
+                <span className="font-medium text-slate-700">
+                  {insuranceNumber || (isEn ? 'None' : 'Không có')}
+                </span>
               </div>
               <div className="col-span-2">
-                <span className="text-slate-400 block text-[11px]">Nơi ở hiện tại:</span>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Current Address:' : 'Nơi ở hiện tại:'}
+                </span>
                 <span className="font-medium text-slate-700">
                   {addressDetail}, {ward}, {province}
                 </span>
               </div>
+              {(workplace || formattedWorkplaceLocation) && (
+                <div className="col-span-2">
+                  <span className="text-slate-400 block text-[11px]">
+                    {isEn ? 'Workplace / School:' : 'Nơi làm việc, học tập:'}
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {workplace}{' '}
+                    {formattedWorkplaceLocation ? `(${formattedWorkplaceLocation})` : ''}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Tóm tắt tiền sử bệnh */}
             <div className="border-t border-slate-100 pt-2.5 mt-2">
-              <span className="text-slate-400 block text-[11px] mb-1">Tiền sử y tế:</span>
+              <span className="text-slate-400 block text-[11px] mb-1">
+                {isEn ? 'Medical History:' : 'Tiền sử y tế:'}
+              </span>
               {Object.values(medicalHistory.personalHistory).some(Boolean) ||
               medicalHistory.familyHistory.hasDisease ||
               medicalHistory.currentTreatment.isTreating ? (
-                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Có ghi nhận tiền sử bệnh lý.</p>
+                    <p className="font-semibold">
+                      {isEn ? 'Medical history conditions recorded.' : 'Có ghi nhận tiền sử bệnh lý.'}
+                    </p>
                     <p className="text-[10px] text-amber-700">
-                      Hệ thống đã lưu đầy đủ các mục bạn chọn để điền vào phiếu khám nộp Bác sĩ.
+                      {isEn
+                        ? 'Your selected items have been saved for your doctor examination form.'
+                        : 'Hệ thống đã lưu đầy đủ các mục bạn chọn để điền vào phiếu khám nộp Bác sĩ.'}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2">
+                <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <p className="font-medium">Tiền sử sức khỏe hoàn toàn bình thường.</p>
+                  <p className="font-medium">
+                    {isEn ? 'No medical history conditions reported.' : 'Tiền sử sức khỏe hoàn toàn bình thường.'}
+                  </p>
                 </div>
               )}
+            </div>
+
+            {/* Tóm tắt Thông tin đối tượng - Chi trả */}
+            <div className="border-t border-slate-100 pt-2.5 mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Target Category:' : 'Đối tượng:'}
+                </span>
+                <span className="font-medium text-slate-700">
+                  {targetPayment.targetGroup === '14'
+                    ? '14 – Sinh viên, học viên'
+                    : targetPayment.targetGroup === '15'
+                      ? '15 – NLĐ chính thức'
+                      : targetPayment.targetGroup === '16'
+                        ? '16 – NLĐ phi chính thức'
+                        : targetPayment.targetOtherDetails || 'Đối tượng khác'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Payment Source:' : 'Nguồn chi trả:'}
+                </span>
+                <span className="font-medium text-slate-700">
+                  {targetPayment.paymentSource === 'employer'
+                    ? 'Người sử dụng lao động'
+                    : targetPayment.paymentSource === 'self'
+                      ? 'Người dân tự chi trả'
+                      : targetPayment.paymentOtherDetails || 'Nguồn khác'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">
+                  {isEn ? 'Exam Location:' : 'Địa điểm khám:'}
+                </span>
+                <span className="font-semibold text-dym-blue-700">CS KBCB</span>
+              </div>
             </div>
           </div>
 
           {/* Cam đoan */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md text-xs space-y-2">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
@@ -1025,7 +1389,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 className="mt-0.5 rounded border-slate-300 text-dym-blue-600 focus:ring-dym-blue-500 w-4 h-4"
               />
               <span className="text-slate-700 leading-relaxed font-medium">
-                Tôi xin cam đoan những điều khai trên đây hoàn toàn đúng với sự thật theo sự hiểu biết của tôi.
+                {isEn
+                  ? 'I hereby certify that the information declared above is true and accurate to the best of my knowledge.'
+                  : 'Tôi xin cam đoan những điều khai trên đây hoàn toàn đúng với sự thật theo sự hiểu biết của tôi.'}
               </span>
             </label>
           </div>
@@ -1034,19 +1400,27 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setCurrentStep(2)}
-              className="py-3 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              onClick={() => setCurrentStep(3)}
+              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
-              Sửa tiền sử bệnh
+              {isEn ? 'Back' : 'Quay lại'}
             </button>
             <button
               type="submit"
               disabled={isLoading || !medicalHistory.commitmentAgreed}
-              className="flex-1 py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] disabled:bg-slate-300 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="flex-1 py-3 bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] disabled:bg-slate-300 text-white font-bold text-sm rounded shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <Activity className="w-4 h-4" />
-              <span>{isLoading ? 'Đang gửi thông tin...' : 'Xác nhận & Gửi thông tin'}</span>
+              <span>
+                {isLoading
+                  ? isEn
+                    ? 'Submitting...'
+                    : 'Đang gửi thông tin...'
+                  : isEn
+                    ? 'Confirm & Submit'
+                    : 'Xác nhận & Gửi thông tin'}
+              </span>
             </button>
           </div>
         </form>

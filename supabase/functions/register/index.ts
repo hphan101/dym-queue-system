@@ -1,35 +1,17 @@
 import {
+  getClientIp,
   isOriginAllowed,
+  isRecord,
+  isSafeText,
   jsonResponse,
   responseHeaders,
 } from "../_shared/http.ts";
-import { createAdminClient } from "../_shared/supabase.ts";
-
-function getSupabaseSecretKey(): string | null {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (serviceRoleKey) return serviceRoleKey;
-
-  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
-  if (secretKeys) {
-    try {
-      const parsed = JSON.parse(secretKeys) as Record<string, unknown>;
-      const defaultKey = parsed.default;
-      if (typeof defaultKey === "string" && defaultKey.length > 0) {
-        return defaultKey;
-      }
-    } catch {
-      console.error(JSON.stringify({ code: "INVALID_SUPABASE_SECRET_KEYS" }));
-    }
-  }
-
-  return null;
-}
+import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
 const COOLDOWN_SECONDS = 600;
 const IP_RATE_LIMIT_REQUESTS = 1000;
 const IP_RATE_LIMIT_WINDOW_SECONDS = 600;
-const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
 const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;
 const IDENTITY_PATTERN = /^([0-9]{12}|[A-Z][A-Z0-9]{6,12})$/;
 const BRANCHES = new Set(["q1", "q7", "hn"]);
@@ -59,10 +41,6 @@ interface IssuedRegistration {
 interface IpLimitResult {
   allowed: boolean;
   retry_after_seconds: number;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringField(
@@ -138,27 +116,19 @@ function isValidDate(value: string): boolean {
   );
 }
 
-function isValidText(value: string, min: number, max: number): boolean {
-  return (
-    value.length >= min &&
-    value.length <= max &&
-    !CONTROL_CHARACTERS.test(value)
-  );
-}
-
 function isValidPayload(payload: RegistrationPayload): boolean {
   return (
     BRANCHES.has(payload.branch) &&
-    isValidText(payload.fullName, 2, 100) &&
+    isSafeText(payload.fullName, 2, 100) &&
     PHONE_PATTERN.test(payload.phoneNumber) &&
     isValidDate(payload.birthDate) &&
     GENDERS.has(payload.gender) &&
     IDENTITY_PATTERN.test(payload.cccd) &&
-    isValidText(payload.companyName, 0, 150) &&
-    isValidText(payload.province, 1, 120) &&
-    isValidText(payload.ward, 1, 120) &&
-    isValidText(payload.addressDetail, 3, 250) &&
-    isValidText(payload.honeypot, 0, 200)
+    isSafeText(payload.companyName, 0, 150) &&
+    isSafeText(payload.province, 1, 120) &&
+    isSafeText(payload.ward, 1, 120) &&
+    isSafeText(payload.addressDetail, 3, 250) &&
+    isSafeText(payload.honeypot, 0, 200)
   );
 }
 
@@ -195,22 +165,6 @@ function createFingerprint(
   );
 }
 
-function getClientIp(request: Request): string | null {
-  const candidates = [
-    request.headers.get("cf-connecting-ip"),
-    request.headers.get("x-real-ip"),
-    request.headers.get("x-forwarded-for")?.split(",")[0],
-  ];
-
-  for (const candidate of candidates) {
-    const value = candidate?.trim();
-    if (value && /^[0-9a-fA-F:.]{3,64}$/.test(value)) {
-      return value.toLowerCase();
-    }
-  }
-
-  return null;
-}
 
 function databaseErrorText(error: {
   message?: string;
@@ -386,7 +340,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     const { data, error } = await supabase.rpc("issue_registration", {
       p_branch_code: payload.branch,
-      p_full_name: payload.fullName,
+      p_full_name: payload.fullName.trim().toUpperCase(),
       p_birth_date: payload.birthDate,
       p_gender: payload.gender,
       p_phone_number: payload.phoneNumber,

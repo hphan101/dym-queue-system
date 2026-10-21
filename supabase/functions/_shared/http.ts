@@ -11,14 +11,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Frame-Options": "DENY",
 };
 
-function configuredOrigins(): Set<string> {
-  const configured = Deno.env.get("ALLOWED_ORIGINS")
-    ?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  return new Set(
-    configured?.length ? configured : DEFAULT_ALLOWED_ORIGINS,
+function configuredOrigins(): string[] {
+  return (
+    Deno.env.get("ALLOWED_ORIGINS")
+      ?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? []
   );
 }
 
@@ -48,7 +46,13 @@ export function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
 
-  // Allow tunneling and preview domains (loca.lt, trycloudflare.com, ngrok, vercel)
+  // If explicit ALLOWED_ORIGINS are provided, enforce them strictly
+  const configured = configuredOrigins();
+  if (configured.length > 0) {
+    return configured.some((rule) => wildcardOriginMatches(origin, rule));
+  }
+
+  // In development / fallback mode when ALLOWED_ORIGINS is not set, allow preview tunnels
   if (
     /^https?:\/\/([a-z0-9-]+\.)*(loca\.lt|trycloudflare\.com|ngrok-free\.app|ngrok\.io|vercel\.app)(:\d+)?$/i
       .test(origin)
@@ -56,9 +60,26 @@ export function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
 
-  return Array.from(configuredOrigins()).some((rule) =>
+  return DEFAULT_ALLOWED_ORIGINS.some((rule) =>
     wildcardOriginMatches(origin, rule)
   );
+}
+
+export function getClientIp(request: Request): string | null {
+  const candidates = [
+    request.headers.get("cf-connecting-ip"),
+    request.headers.get("x-real-ip"),
+    request.headers.get("x-forwarded-for")?.split(",")[0],
+  ];
+
+  for (const candidate of candidates) {
+    const value = candidate?.trim();
+    if (value && /^[0-9a-fA-F:.]{3,64}$/.test(value)) {
+      return value.toLowerCase();
+    }
+  }
+
+  return null;
 }
 
 export function responseHeaders(origin: string | null): Headers {
@@ -91,3 +112,19 @@ export function jsonResponse(
 
   return new Response(JSON.stringify(body), { status, headers });
 }
+
+export const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
+export const LOGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function isSafeText(value: string, min: number, max: number): boolean {
+  return (
+    value.length >= min &&
+    value.length <= max &&
+    !CONTROL_CHARACTERS.test(value)
+  );
+}
+
