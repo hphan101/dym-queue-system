@@ -4,7 +4,9 @@ import { formatQueueNumber } from '../../../lib/queueNumber';
 import type { BranchCode } from '../../../types/domain';
 import type { RegistrationRow } from '../components/QueueTable';
 import { rememberRegistrationCount } from '../registrationCountCache';
+import type { TT25StoredExtras } from '../types';
 import { formatBirthDate } from '../utils/adminFormatters';
+import { syncPrintStatusesFromServer } from './usePrintStatus';
 
 interface RegistrationRecord {
   id: string;
@@ -17,6 +19,7 @@ interface RegistrationRecord {
   company_name: string | null;
   registered_at: string;
   first_called_at: string | null;
+  tt25_data?: TT25StoredExtras | null;
 }
 
 interface DisplayStateRecord {
@@ -83,9 +86,11 @@ export function useDashboardQueueQuery({
         throw new Error(displayResult.error.message);
       }
 
-      const fetchedRows = (
-        (registrationsResult.data as RegistrationRecord[] | null) ?? []
-      ).map(
+      const rawRecords =
+        (registrationsResult.data as RegistrationRecord[] | null) ?? [];
+      syncPrintStatusesFromServer(rawRecords);
+
+      const fetchedRows = rawRecords.map(
         (record): RegistrationRow => ({
           id: record.id,
           queueNumber: formatQueueNumber(record.queue_number),
@@ -98,6 +103,7 @@ export function useDashboardQueueQuery({
           companyName: record.company_name?.trim() || '—',
           branch,
           status: record.first_called_at ? 'called' : 'waiting',
+          tt25_data: record.tt25_data ?? null,
         }),
       );
 

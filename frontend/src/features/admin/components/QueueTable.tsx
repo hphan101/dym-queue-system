@@ -14,6 +14,7 @@ import { useRegistrationOverrides } from '../hooks/useRegistrationOverrides';
 import { calculateAge, formatBirthDate, formatPhone } from '../utils/adminFormatters';
 import { supabase } from '../../../lib/supabaseClient';
 import type { RegistrationDetails } from '../hooks/useRegistrationDetailsQuery';
+import type { TT25StoredExtras } from '../types';
 import {
   type TT25RegistrationData,
   createDefaultTT25Data,
@@ -38,6 +39,7 @@ export interface RegistrationRow {
   companyName: string;
   branch: BranchCode;
   status: QueueStatus;
+  tt25_data?: TT25StoredExtras | null;
 }
 
 interface QueueTableProps {
@@ -385,7 +387,7 @@ export function QueueTable({
                   const age = calculateAge(row.birthDate);
                   const isCalled = row.status === 'called';
                   const isUndoing = pendingUndoId === row.id;
-                  const printStatus = getStatus(row.id);
+                  const printStatus = getStatus(row.id, row.tt25_data);
 
                   return (
                     <tr
@@ -461,7 +463,7 @@ export function QueueTable({
                       <td className="col-print-status">
                         <button
                           type="button"
-                          onClick={() => togglePrintStatus(row.id)}
+                          onClick={() => togglePrintStatus(row.id, row.tt25_data)}
                           title={printStatus.title}
                           className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
                         >

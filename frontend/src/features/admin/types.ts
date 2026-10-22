@@ -43,6 +43,8 @@ export interface TT25StoredExtras {
   medicalHistory?: TT25MedicalHistory;
   targetPayment?: TT25TargetPaymentInfo;
   consentAgreed?: boolean;
+  printedConsent?: boolean;
+  printedTT25?: boolean;
 }
 
 export interface RegistrationDetails {

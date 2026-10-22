@@ -50,7 +50,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
               row.first_called_at,
             );
             const age = calculateAge(row.birth_date);
-            const printStatus = getStatus(row.id);
+            const printStatus = getStatus(row.id, row.tt25_data);
 
             return (
               <tr key={row.id}>
@@ -175,7 +175,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 <td>
                   <button
                     type="button"
-                    onClick={() => togglePrintStatus(row.id)}
+                    onClick={() => togglePrintStatus(row.id, row.tt25_data)}
                     title={printStatus.title}
                     className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
                   >

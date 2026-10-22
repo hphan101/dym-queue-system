@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
@@ -42,9 +44,13 @@ import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useRegistrationDetailsQuery } from './hooks/useRegistrationDetailsQuery';
 import { useAdminScope } from './hooks/useAdminScope';
-import { markRegistrationPrinted } from './hooks/usePrintStatus';
+import {
+  markRegistrationPrinted,
+  usePrintStatus,
+} from './hooks/usePrintStatus';
 import { useRegistrationOverrides } from './hooks/useRegistrationOverrides';
 import { normalizeSearch } from './utils/adminFormatters';
+import { exportRegistrationsToExcel } from './utils/exportRegistrationsExcel';
 import { AdminHeader } from './components/AdminHeader';
 import {
   CustomerNoticeModal,
@@ -93,6 +99,12 @@ export function RegistrationsPage({
 
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RegistrationStatusTab>('all');
+  const [printFilter, setPrintFilter] = useState<
+    'all' | 'unprinted' | 'partial' | 'printed'
+  >('all');
+  const [companyFilter, setCompanyFilter] = useState('all');
+  const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false);
+  const [companySearchQuery, setCompanySearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(null);
   const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
@@ -105,6 +117,8 @@ export function RegistrationsPage({
     useState<CustomerNotificationItem | null>(null);
 
   const noticeTimer = useRef<number | null>(null);
+  const companyFilterRef = useRef<HTMLDivElement | null>(null);
+  const companySearchInputRef = useRef<HTMLInputElement | null>(null);
   const isActiveTabRef = useRef(isActiveTab);
   isActiveTabRef.current = isActiveTab;
   const searchInputId = useId();
@@ -122,6 +136,7 @@ export function RegistrationsPage({
   });
 
   const { applyToDetails, applyToDetailsList } = useRegistrationOverrides();
+  const { getStatus } = usePrintStatus();
   const rows = useMemo(
     () => applyToDetailsList(fetchedRows ?? []),
     [applyToDetailsList, fetchedRows],
@@ -302,7 +317,94 @@ export function RegistrationsPage({
     return Math.round((tabCounts.called / tabCounts.all) * 100);
   }, [tabCounts]);
 
-  // Filter rows by search and status tab
+  // Print status breakdown counts
+  const printCounts = useMemo(() => {
+    let unprinted = 0;
+    let partial = 0;
+    let printed = 0;
+    for (const row of rows) {
+      const st = getStatus(row.id, row.tt25_data);
+      if (st.isFull) {
+        printed++;
+      } else if (st.isPrinted) {
+        partial++;
+      } else {
+        unprinted++;
+      }
+    }
+    return { unprinted, partial, printed };
+  }, [getStatus, rows]);
+
+  // Extract distinct companies for the company dropdown filter
+  const companyFilterData = useMemo(() => {
+    const map = new Map<string, number>();
+    let individualCount = 0;
+
+    for (const row of rows) {
+      const comp = row.company_name?.trim() ?? '';
+      if (comp && comp !== '—' && comp !== 'Khách vãng lai') {
+        map.set(comp, (map.get(comp) ?? 0) + 1);
+      } else {
+        individualCount++;
+      }
+    }
+
+    const companies = Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
+    return { companies, individualCount };
+  }, [rows]);
+
+  const filteredCompanyOptions = useMemo(() => {
+    const normalized = normalizeSearch(companySearchQuery);
+    if (!normalized) return companyFilterData.companies;
+    return companyFilterData.companies.filter((c) =>
+      normalizeSearch(c.name).includes(normalized),
+    );
+  }, [companyFilterData.companies, companySearchQuery]);
+
+  const companyTriggerLabel = useMemo(() => {
+    if (companyFilter === 'all') {
+      return `Đơn vị: Tất cả (${rows.length})`;
+    }
+    if (companyFilter === '__individual__') {
+      return `Khách cá nhân (${companyFilterData.individualCount})`;
+    }
+    const found = companyFilterData.companies.find(
+      (c) => c.name === companyFilter,
+    );
+    return `${companyFilter} (${found?.count ?? 0})`;
+  }, [companyFilter, companyFilterData, rows.length]);
+
+  useEffect(() => {
+    if (!isCompanyMenuOpen) return;
+    const timer = window.setTimeout(() => {
+      companySearchInputRef.current?.focus();
+    }, 20);
+    const handleMouseDown = (event: MouseEvent) => {
+      if (
+        companyFilterRef.current &&
+        !companyFilterRef.current.contains(event.target as Node)
+      ) {
+        setIsCompanyMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCompanyMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isCompanyMenuOpen]);
+
+  // Filter rows by search, status tab, print status, and company
   const filteredRows = useMemo(() => {
     const normalizedQuery = normalizeSearch(query);
 
@@ -314,6 +416,25 @@ export function RegistrationsPage({
         }
       } else if (statusFilter === 'called') {
         if (!row.first_called_at && row.state !== 'completed') {
+          return false;
+        }
+      }
+
+      // Print status filter match
+      if (printFilter !== 'all') {
+        const st = getStatus(row.id, row.tt25_data);
+        if (printFilter === 'unprinted' && st.isPrinted) return false;
+        if (printFilter === 'partial' && (!st.isPrinted || st.isFull)) return false;
+        if (printFilter === 'printed' && !st.isFull) return false;
+      }
+
+      // Company filter match
+      if (companyFilter !== 'all') {
+        const comp = row.company_name?.trim() ?? '';
+        const isIndividual = !comp || comp === '—' || comp === 'Khách vãng lai';
+        if (companyFilter === '__individual__') {
+          if (!isIndividual) return false;
+        } else if (comp !== companyFilter) {
           return false;
         }
       }
@@ -336,7 +457,7 @@ export function RegistrationsPage({
 
       return normalizeSearch(searchableText).includes(normalizedQuery);
     });
-  }, [query, rows, statusFilter]);
+  }, [companyFilter, getStatus, printFilter, query, rows, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -350,7 +471,13 @@ export function RegistrationsPage({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [branch, date, query, statusFilter]);
+  }, [branch, date, query, statusFilter, printFilter, companyFilter]);
+
+  useEffect(() => {
+    setCompanyFilter('all');
+    setCompanySearchQuery('');
+    setIsCompanyMenuOpen(false);
+  }, [branch, date]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -399,20 +526,46 @@ export function RegistrationsPage({
               setQuery('');
             }}
             actions={
-              <button
-                type="button"
-                className="dym-btn-action-secondary"
-                aria-busy={isLoading}
-                disabled={isLoading}
-                onClick={() => void refetchRegistrations()}
-                title="Làm mới danh sách dữ liệu (F5)"
-              >
-                <ArrowPathIcon
-                  className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
-                  aria-hidden="true"
-                />
-                <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="dym-btn-action-secondary"
+                  disabled={isLoading || filteredRows.length === 0}
+                  onClick={() =>
+                    exportRegistrationsToExcel({
+                      rows: filteredRows,
+                      branch,
+                      date,
+                    })
+                  }
+                  title={
+                    filteredRows.length === 0
+                      ? 'Không có dữ liệu để xuất Excel'
+                      : `Xuất ${filteredRows.length} hồ sơ ra file Excel (.xlsx)`
+                  }
+                >
+                  <ArrowDownTrayIcon
+                    className="w-4 h-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>Xuất Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="dym-btn-action-secondary"
+                  aria-busy={isLoading}
+                  disabled={isLoading}
+                  onClick={() => void refetchRegistrations()}
+                  title="Làm mới danh sách dữ liệu (F5)"
+                >
+                  <ArrowPathIcon
+                    className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                    aria-hidden="true"
+                  />
+                  <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+                </button>
+              </div>
             }
           />
 
@@ -582,6 +735,148 @@ export function RegistrationsPage({
                     </button>
                   </div>
 
+                  {/* Quick Filter by Print Status */}
+                  <select
+                    aria-label="Lọc theo trạng thái in"
+                    value={printFilter}
+                    onChange={(e) =>
+                      setPrintFilter(
+                        e.target.value as
+                          | 'all'
+                          | 'unprinted'
+                          | 'partial'
+                          | 'printed',
+                      )
+                    }
+                    className={`dym-registry-select ${printFilter !== 'all' ? 'is-filtered' : ''}`}
+                  >
+                    <option value="all">Trạng thái in: Tất cả ({rows.length})</option>
+                    <option value="unprinted">
+                      Chưa in ({printCounts.unprinted})
+                    </option>
+                    <option value="partial">
+                      Đã in 1 phần ({printCounts.partial})
+                    </option>
+                    <option value="printed">
+                      Đã in đủ ({printCounts.printed})
+                    </option>
+                  </select>
+
+                  {/* Quick Filter by Company (Searchable Popover) */}
+                  <div className="dym-company-filter-wrap" ref={companyFilterRef}>
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={isCompanyMenuOpen}
+                      onClick={() => setIsCompanyMenuOpen((prev) => !prev)}
+                      className={`dym-company-filter-trigger ${companyFilter !== 'all' ? 'is-filtered' : ''}`}
+                      title={companyTriggerLabel}
+                    >
+                      <span className="truncate">{companyTriggerLabel}</span>
+                      <ChevronDownIcon
+                        className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    {isCompanyMenuOpen && (
+                      <div
+                        className="dym-company-filter-menu"
+                        role="listbox"
+                        aria-label="Chọn đơn vị hoặc công ty"
+                      >
+                        <div className="dym-company-filter-search-box">
+                          <MagnifyingGlassIcon
+                            className="w-3.5 h-3.5 text-slate-400 absolute left-4 pointer-events-none"
+                            aria-hidden="true"
+                          />
+                          <input
+                            ref={companySearchInputRef}
+                            type="text"
+                            value={companySearchQuery}
+                            onChange={(e) => setCompanySearchQuery(e.target.value)}
+                            placeholder="Tìm tên công ty / đơn vị..."
+                            className="dym-company-filter-search-input"
+                          />
+                          {companySearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setCompanySearchQuery('')}
+                              className="absolute right-3.5 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                              aria-label="Xóa tìm kiếm công ty"
+                            >
+                              <XMarkIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="dym-company-filter-list">
+                          {!companySearchQuery.trim() && (
+                            <>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={companyFilter === 'all'}
+                                className={`dym-company-filter-option ${companyFilter === 'all' ? 'is-selected' : ''}`}
+                                onClick={() => {
+                                  setCompanyFilter('all');
+                                  setIsCompanyMenuOpen(false);
+                                }}
+                              >
+                                <span className="truncate">Đơn vị: Tất cả</span>
+                                <span className="dym-company-filter-count">
+                                  {rows.length}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={companyFilter === '__individual__'}
+                                className={`dym-company-filter-option ${companyFilter === '__individual__' ? 'is-selected' : ''}`}
+                                onClick={() => {
+                                  setCompanyFilter('__individual__');
+                                  setIsCompanyMenuOpen(false);
+                                }}
+                              >
+                                <span className="truncate">Khách cá nhân</span>
+                                <span className="dym-company-filter-count">
+                                  {companyFilterData.individualCount}
+                                </span>
+                              </button>
+                            </>
+                          )}
+
+                          {filteredCompanyOptions.length > 0 ? (
+                            filteredCompanyOptions.map((c) => (
+                              <button
+                                key={c.name}
+                                type="button"
+                                role="option"
+                                aria-selected={companyFilter === c.name}
+                                className={`dym-company-filter-option ${companyFilter === c.name ? 'is-selected' : ''}`}
+                                onClick={() => {
+                                  setCompanyFilter(c.name);
+                                  setIsCompanyMenuOpen(false);
+                                }}
+                                title={c.name}
+                              >
+                                <span className="truncate">{c.name}</span>
+                                <span className="dym-company-filter-count">
+                                  {c.count}
+                                </span>
+                              </button>
+                            ))
+                          ) : companySearchQuery.trim() ? (
+                            <div className="px-3 py-3 text-center text-xs text-slate-400">
+                              Không tìm thấy đơn vị phù hợp
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Search Field */}
                   <div className="dym-search-wrapper">
                     <label htmlFor={searchInputId} className="sr-only">
@@ -634,13 +929,18 @@ export function RegistrationsPage({
                   <p className="dym-empty-desc">
                     Không có bệnh nhân nào phù hợp với bộ lọc hiện tại. Hãy thử đổi ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
                   </p>
-                  {(query || statusFilter !== 'all') && (
+                  {(query ||
+                    statusFilter !== 'all' ||
+                    printFilter !== 'all' ||
+                    companyFilter !== 'all') && (
                     <button
                       type="button"
                       className="dym-btn-reset-filter"
                       onClick={() => {
                         setQuery('');
                         setStatusFilter('all');
+                        setPrintFilter('all');
+                        setCompanyFilter('all');
                       }}
                     >
                       Đặt lại bộ lọc

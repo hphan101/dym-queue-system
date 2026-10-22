@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
+import type { TT25StoredExtras } from '../types';
 
 export interface PrintStatusItem {
   consent: boolean;
@@ -11,6 +13,9 @@ type PrintStatusMap = Record<string, PrintStatusItem>;
 const STORAGE_KEY = 'dym_registration_print_status_v1';
 const EVENT_NAME = 'dym-print-status-change';
 const MAX_STORED_ITEMS = 2000;
+const OPTIMISTIC_LOCK_MS = 4000;
+
+const inFlightIds = new Set<string>();
 
 function readStorage(): PrintStatusMap {
   if (typeof window === 'undefined') return {};
@@ -40,6 +45,83 @@ function writeStorage(map: PrintStatusMap): void {
   }
 }
 
+async function persistPrintStatusToSupabase(
+  registrationId: string,
+  consent: boolean | null,
+  tt25: boolean | null,
+): Promise<void> {
+  if (!registrationId) return;
+  inFlightIds.add(registrationId);
+  try {
+    const { error } = await supabase.rpc('update_registration_print_status', {
+      p_registration_id: registrationId,
+      p_printed_consent: consent,
+      p_printed_tt25: tt25,
+    });
+    if (error) {
+      console.warn('Could not sync print status to Supabase:', error);
+    }
+  } catch (err) {
+    console.warn('Error syncing print status to Supabase:', err);
+  } finally {
+    inFlightIds.delete(registrationId);
+  }
+}
+
+export function syncPrintStatusesFromServer(
+  items: Array<{ id: string; tt25_data?: TT25StoredExtras | null }>,
+): void {
+  if (!items.length || typeof window === 'undefined') return;
+  const currentMap = readStorage();
+  let changed = false;
+  const now = Date.now();
+
+  for (const item of items) {
+    const extras = item.tt25_data;
+    if (
+      !extras ||
+      (extras.printedConsent === undefined && extras.printedTT25 === undefined)
+    ) {
+      continue;
+    }
+
+    if (inFlightIds.has(item.id)) {
+      continue;
+    }
+
+    const existing = currentMap[item.id];
+    if (existing && now - existing.updatedAt < OPTIMISTIC_LOCK_MS) {
+      continue;
+    }
+
+    const nextConsent =
+      extras.printedConsent !== undefined
+        ? Boolean(extras.printedConsent)
+        : Boolean(existing?.consent);
+    const nextTt25 =
+      extras.printedTT25 !== undefined
+        ? Boolean(extras.printedTT25)
+        : Boolean(existing?.tt25);
+
+    if (
+      !existing ||
+      existing.consent !== nextConsent ||
+      existing.tt25 !== nextTt25
+    ) {
+      currentMap[item.id] = {
+        consent: nextConsent,
+        tt25: nextTt25,
+        updatedAt: existing?.updatedAt ?? 0,
+      };
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    writeStorage(currentMap);
+  }
+}
+
 export function markRegistrationPrinted(
   registrationId: string,
   docType: 'consent' | 'tt25',
@@ -52,30 +134,47 @@ export function markRegistrationPrinted(
     tt25: false,
     updatedAt: 0,
   };
-  currentMap[registrationId] = {
+  const nextItem: PrintStatusItem = {
     ...existing,
     [docType]: printed,
     updatedAt: Date.now(),
   };
+  currentMap[registrationId] = nextItem;
   writeStorage(currentMap);
+
+  void persistPrintStatusToSupabase(
+    registrationId,
+    docType === 'consent' ? printed : null,
+    docType === 'tt25' ? printed : null,
+  );
 }
 
-export function cycleRegistrationPrintStatus(registrationId: string): void {
+export function cycleRegistrationPrintStatus(
+  registrationId: string,
+  serverExtras?: TT25StoredExtras | null,
+): void {
   if (!registrationId) return;
   const currentMap = readStorage();
   const existing = currentMap[registrationId];
-  const isBothPrinted = Boolean(existing?.consent && existing?.tt25);
+  const effectiveConsent =
+    existing !== undefined
+      ? existing.consent
+      : Boolean(serverExtras?.printedConsent);
+  const effectiveTt25 =
+    existing !== undefined
+      ? existing.tt25
+      : Boolean(serverExtras?.printedTT25);
+  const isBothPrinted = Boolean(effectiveConsent && effectiveTt25);
 
-  if (isBothPrinted) {
-    delete currentMap[registrationId];
-  } else {
-    currentMap[registrationId] = {
-      consent: true,
-      tt25: true,
-      updatedAt: Date.now(),
-    };
-  }
+  const nextValue = !isBothPrinted;
+  currentMap[registrationId] = {
+    consent: nextValue,
+    tt25: nextValue,
+    updatedAt: Date.now(),
+  };
   writeStorage(currentMap);
+
+  void persistPrintStatusToSupabase(registrationId, nextValue, nextValue);
 }
 
 export function getPrintStatusDisplay(item?: PrintStatusItem): {
@@ -148,12 +247,32 @@ export function usePrintStatus() {
     [],
   );
 
-  const togglePrintStatus = useCallback((registrationId: string) => {
-    cycleRegistrationPrintStatus(registrationId);
-  }, []);
+  const togglePrintStatus = useCallback(
+    (registrationId: string, serverExtras?: TT25StoredExtras | null) => {
+      cycleRegistrationPrintStatus(registrationId, serverExtras);
+    },
+    [],
+  );
 
   const getStatus = useCallback(
-    (registrationId: string) => getPrintStatusDisplay(statusMap[registrationId]),
+    (registrationId: string, serverExtras?: TT25StoredExtras | null) => {
+      const localItem = statusMap[registrationId];
+      if (localItem !== undefined) {
+        return getPrintStatusDisplay(localItem);
+      }
+      if (
+        serverExtras &&
+        (serverExtras.printedConsent !== undefined ||
+          serverExtras.printedTT25 !== undefined)
+      ) {
+        return getPrintStatusDisplay({
+          consent: Boolean(serverExtras.printedConsent),
+          tt25: Boolean(serverExtras.printedTT25),
+          updatedAt: 0,
+        });
+      }
+      return getPrintStatusDisplay(undefined);
+    },
     [statusMap],
   );
 
