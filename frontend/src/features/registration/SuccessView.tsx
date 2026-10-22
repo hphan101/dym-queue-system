@@ -15,7 +15,7 @@ interface SuccessViewProps {
   lang: SupportedLanguage;
 }
 
-export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNumber, data, onReset, lang }) => {
+export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang }) => {
   const t = translations[lang];
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -65,27 +65,24 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber: _queueNum
           <CheckCircle2 className="w-12 h-12 text-dym-blue-500" />
         </div>
         <h2 className="text-2xl font-bold text-slate-800">
-          {lang === 'vi' ? 'Điền thông tin thành công' : t.successTitle}
+          {t.successTitle}
         </h2>
         <p className="text-sm text-slate-500">
-          {lang === 'vi'
-            ? 'Thông tin của quý khách đã được ghi nhận trên hệ thống. Vui lòng di chuyển đến quầy tiếp đón để được hỗ trợ.'
-            : t.successThanks}
+          {t.successThanks}
         </p>
       </div>
 
-      {/* Tam thoi an STT theo yeu cau */}
-      {/* <div className="bg-gradient-to-br from-dym-blue-50 to-white border border-dym-blue-100 rounded-2xl p-6 pulse-soft max-w-sm mx-auto">
+      <div className="bg-gradient-to-br from-dym-blue-50 to-white border border-dym-blue-100 rounded-2xl p-6 pulse-soft max-w-sm mx-auto">
         <p className="text-xs font-semibold text-dym-blue-700 uppercase tracking-widest mb-1">
           {t.queueLabel}
         </p>
         <div className="text-5xl font-extrabold text-dym-blue-800 tracking-tight my-2">
-          {_queueNumber}
+          {queueNumber}
         </div>
         <p className="text-xs text-slate-500 mt-2">
           {t.successNote}
         </p>
-      </div> */}
+      </div>
 
       {data && <div className="text-left bg-white border border-slate-200 rounded-md p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
         <h3 className="font-bold text-slate-700 border-b border-slate-100 pb-2 flex items-center gap-1.5">

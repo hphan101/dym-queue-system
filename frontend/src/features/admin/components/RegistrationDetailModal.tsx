@@ -20,6 +20,7 @@ import {
   type Ward,
 } from '../../registration/locationService';
 import { CHECKUP_REASONS } from '../../registration/tt25Constants';
+import { validateVietnamCccd } from '../../registration/cccdValidator';
 import {
   type TT25PaymentSource,
   type TT25TargetGroup,
@@ -203,6 +204,18 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     if (!form.full_name.trim()) {
       setFormError('Vui lòng nhập họ và tên khách hàng.');
       return;
+    }
+
+    if (form.identity_document.trim()) {
+      const cccdErr = validateVietnamCccd({
+        cccd: form.identity_document,
+        gender: form.gender === 'Nữ' ? 'Nữ' : 'Nam',
+        birthDate: form.birth_date || effectiveRow.birth_date,
+      });
+      if (cccdErr) {
+        setFormError(cccdErr);
+        return;
+      }
     }
 
     setIsSaving(true);

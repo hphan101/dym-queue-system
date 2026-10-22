@@ -29,6 +29,7 @@ import {
 } from './tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
 import { BirthDateInput } from './BirthDateInput';
+import { validateVietnamCccd } from './cccdValidator';
 import {
   loadOccupations,
   loadProvinces,
@@ -199,15 +200,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       }
     }
 
-    const cleanCccd = cccd.trim();
-    if (!cleanCccd) {
-      newErrors.cccd = isEn
-        ? 'Please enter your Citizen ID or Passport number'
-        : 'Vui lòng nhập số CCCD hoặc số Hộ chiếu';
-    } else if (cleanCccd.length < 8) {
-      newErrors.cccd = isEn
-        ? 'Invalid Citizen ID / Passport number'
-        : 'Số CCCD/Hộ chiếu không hợp lệ';
+    const cccdError = validateVietnamCccd({
+      cccd,
+      gender,
+      birthDate,
+      isEn,
+    });
+    if (cccdError) {
+      newErrors.cccd = cccdError;
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
@@ -409,7 +409,18 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   <button
                     key={g}
                     type="button"
-                    onClick={() => setGender(g)}
+                    onClick={() => {
+                      setGender(g);
+                      if (cccd.trim().length === 12) {
+                        const err = validateVietnamCccd({
+                          cccd,
+                          gender: g,
+                          birthDate,
+                          isEn,
+                        });
+                        setErrors((prev) => ({ ...prev, cccd: err || '' }));
+                      }
+                    }}
                     className={`py-2 px-3 rounded text-xs font-semibold border transition-all ${
                       gender === g
                         ? 'bg-dym-blue-500 text-white border-dym-blue-500 shadow-sm'
@@ -430,7 +441,22 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 value={birthDate}
                 onChange={(val) => {
                   setBirthDate(val);
-                  if (errors.birthDate) setErrors((prev) => ({ ...prev, birthDate: '' }));
+                  setErrors((prev) => {
+                    const nextCccdErr =
+                      cccd.trim().length === 12
+                        ? validateVietnamCccd({
+                            cccd,
+                            gender,
+                            birthDate: val,
+                            isEn,
+                          }) || ''
+                        : prev.cccd;
+                    return {
+                      ...prev,
+                      birthDate: '',
+                      cccd: nextCccdErr,
+                    };
+                  });
                 }}
                 error={errors.birthDate}
                 onErrorClear={() => {
@@ -485,8 +511,30 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 type="text"
                 value={cccd}
                 onChange={(e) => {
-                  setCccd(e.target.value.toUpperCase());
-                  if (errors.cccd) setErrors((prev) => ({ ...prev, cccd: '' }));
+                  const nextVal = e.target.value.toUpperCase();
+                  setCccd(nextVal);
+                  if (nextVal.trim().length === 12) {
+                    const err = validateVietnamCccd({
+                      cccd: nextVal,
+                      gender,
+                      birthDate,
+                      isEn,
+                    });
+                    setErrors((prev) => ({ ...prev, cccd: err || '' }));
+                  } else if (errors.cccd) {
+                    setErrors((prev) => ({ ...prev, cccd: '' }));
+                  }
+                }}
+                onBlur={() => {
+                  if (cccd.trim()) {
+                    const err = validateVietnamCccd({
+                      cccd,
+                      gender,
+                      birthDate,
+                      isEn,
+                    });
+                    setErrors((prev) => ({ ...prev, cccd: err || '' }));
+                  }
                 }}
                 maxLength={12}
                 placeholder={isEn ? 'Citizen ID / Passport number' : '12 chữ số CCCD'}

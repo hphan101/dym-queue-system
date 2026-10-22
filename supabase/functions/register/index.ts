@@ -16,6 +16,15 @@ const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;
 const IDENTITY_PATTERN = /^([0-9]{12}|[A-Z][A-Z0-9]{6,12})$/;
 const BRANCHES = new Set(["q1", "q7", "hn"]);
 const GENDERS = new Set(["Nam", "Nữ"]);
+const VALID_CCCD_PROVINCE_CODES = new Set([
+  "001", "002", "004", "006", "008", "010", "011", "012", "014", "015",
+  "017", "019", "020", "022", "024", "025", "026", "027", "030", "031",
+  "033", "034", "035", "036", "037", "038", "040", "042", "044", "045",
+  "046", "048", "049", "051", "052", "054", "056", "058", "060", "062",
+  "064", "066", "067", "068", "070", "072", "074", "075", "077", "079",
+  "080", "082", "083", "084", "086", "087", "089", "091", "092", "093",
+  "094", "095", "096",
+]);
 
 interface RegistrationPayload {
   branch: string;
@@ -116,6 +125,43 @@ function isValidDate(value: string): boolean {
   );
 }
 
+function isValidIdentityDocument(
+  cccd: string,
+  gender: string,
+  birthDate: string,
+): boolean {
+  if (!IDENTITY_PATTERN.test(cccd)) return false;
+
+  // Foreign passport starting with an uppercase letter
+  if (/^[A-Z][A-Z0-9]{6,12}$/.test(cccd)) {
+    return true;
+  }
+
+  // 12-digit Vietnamese CCCD rules
+  if (!/^\d{12}$/.test(cccd)) return false;
+
+  const provinceCode = cccd.slice(0, 3);
+  if (!VALID_CCCD_PROVINCE_CODES.has(provinceCode)) return false;
+
+  const birthYear = Number(birthDate.slice(0, 4));
+  if (!Number.isFinite(birthYear) || birthYear < 1900 || birthYear > 2399) {
+    return false;
+  }
+
+  const centuryIndex = Math.floor((birthYear - 1900) / 100);
+  const expectedGenderDigit = centuryIndex * 2 + (gender === "Nữ" ? 1 : 0);
+  if (Number(cccd[3]) !== expectedGenderDigit) {
+    return false;
+  }
+
+  const expectedYearCode = String(birthYear).slice(-2);
+  if (cccd.slice(4, 6) !== expectedYearCode) {
+    return false;
+  }
+
+  return true;
+}
+
 function isValidPayload(payload: RegistrationPayload): boolean {
   return (
     BRANCHES.has(payload.branch) &&
@@ -123,7 +169,7 @@ function isValidPayload(payload: RegistrationPayload): boolean {
     PHONE_PATTERN.test(payload.phoneNumber) &&
     isValidDate(payload.birthDate) &&
     GENDERS.has(payload.gender) &&
-    IDENTITY_PATTERN.test(payload.cccd) &&
+    isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate) &&
     isSafeText(payload.companyName, 0, 150) &&
     isSafeText(payload.province, 1, 120) &&
     isSafeText(payload.ward, 1, 120) &&
