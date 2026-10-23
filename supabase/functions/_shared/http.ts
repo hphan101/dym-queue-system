@@ -33,12 +33,24 @@ function wildcardOriginMatches(origin: string, rule: string): boolean {
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
 
-  // Allow localhost & loopback on any port
+  // 1. If explicit ALLOWED_ORIGINS are configured, enforce them first
+  const configured = configuredOrigins();
+  if (configured.length > 0) {
+    if (configured.some((rule) => wildcardOriginMatches(origin, rule))) {
+      return true;
+    }
+    // Always allow localhost loopback for local Vite development
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+      return true;
+    }
+    return false;
+  }
+
+  // 2. Fallback when ALLOWED_ORIGINS is not set (local/dev environment)
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
     return true;
   }
 
-  // Allow LAN private IPs (10.x.x.x, 192.168.x.x, 172.16-31.x.x) on any port
   if (
     /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/i
       .test(origin)
@@ -46,13 +58,6 @@ export function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
 
-  // If explicit ALLOWED_ORIGINS are provided, enforce them strictly
-  const configured = configuredOrigins();
-  if (configured.length > 0) {
-    return configured.some((rule) => wildcardOriginMatches(origin, rule));
-  }
-
-  // In development / fallback mode when ALLOWED_ORIGINS is not set, allow preview tunnels
   if (
     /^https?:\/\/([a-z0-9-]+\.)*(loca\.lt|trycloudflare\.com|ngrok-free\.app|ngrok\.io|vercel\.app)(:\d+)?$/i
       .test(origin)
@@ -66,17 +71,21 @@ export function isOriginAllowed(origin: string | null): boolean {
 }
 
 export function getClientIp(request: Request): string | null {
-  const candidates = [
-    request.headers.get("cf-connecting-ip"),
-    request.headers.get("x-real-ip"),
-    request.headers.get("x-forwarded-for")?.split(",")[0],
-  ];
+  // Prioritize Cloudflare's edge-verified header on Supabase Edge Functions.
+  // Only fall back to the rightmost X-Forwarded-For hop when cf-connecting-ip is absent.
+  const cfIp = request.headers.get("cf-connecting-ip")?.trim();
+  if (cfIp && /^[0-9a-fA-F:.]{3,64}$/.test(cfIp)) {
+    return cfIp.toLowerCase();
+  }
 
-  for (const candidate of candidates) {
-    const value = candidate?.trim();
-    if (value && /^[0-9a-fA-F:.]{3,64}$/.test(value)) {
-      return value.toLowerCase();
-    }
+  const forwardedParts = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const lastForwarded = forwardedParts?.at(-1);
+  if (lastForwarded && /^[0-9a-fA-F:.]{3,64}$/.test(lastForwarded)) {
+    return lastForwarded.toLowerCase();
   }
 
   return null;

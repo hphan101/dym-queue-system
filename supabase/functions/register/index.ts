@@ -10,7 +10,7 @@ import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts"
 
 const MAX_REQUEST_BYTES = 16_384;
 const COOLDOWN_SECONDS = 600;
-const IP_RATE_LIMIT_REQUESTS = 1000;
+const IP_RATE_LIMIT_REQUESTS = 250;
 const IP_RATE_LIMIT_WINDOW_SECONDS = 600;
 const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;
 const IDENTITY_PATTERN = /^([0-9]{12}|[A-Z][A-Z0-9]{6,12})$/;
@@ -38,6 +38,7 @@ interface RegistrationPayload {
   addressDetail: string;
   companyName: string;
   honeypot: string;
+  tt25Extras: Record<string, unknown>;
 }
 
 interface IssuedRegistration {
@@ -93,6 +94,34 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     return null;
   }
 
+  const tt25Extras: Record<string, unknown> = {};
+  const optionalTextFields: Array<[string, number]> = [
+    ["ethnicity", 60],
+    ["bloodGroup", 20],
+    ["insuranceNumber", 30],
+    ["occupation", 120],
+    ["workplaceProvince", 120],
+    ["workplaceWard", 160],
+    ["checkupReason", 160],
+  ];
+
+  for (const [key, maxLen] of optionalTextFields) {
+    const val = stringField(value, key, true);
+    if (val !== null && val.length <= maxLen && isSafeText(val, 0, maxLen)) {
+      tt25Extras[key] = val;
+    }
+  }
+
+  if (isRecord(value.medicalHistory)) {
+    tt25Extras.medicalHistory = value.medicalHistory;
+  }
+  if (isRecord(value.targetPayment)) {
+    tt25Extras.targetPayment = value.targetPayment;
+  }
+  if (typeof value.consentAgreed === "boolean") {
+    tt25Extras.consentAgreed = value.consentAgreed;
+  }
+
   return {
     branch: branch.toLowerCase(),
     fullName,
@@ -105,6 +134,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     addressDetail,
     companyName,
     honeypot,
+    tt25Extras,
   };
 }
 
@@ -454,6 +484,31 @@ Deno.serve(async (request: Request): Promise<Response> => {
         500,
         origin,
       );
+    }
+
+    const parsedQueueInt = Number.parseInt(String(issued.queue_number), 10);
+    if (
+      Number.isFinite(parsedQueueInt) &&
+      Object.keys(payload.tt25Extras).length > 0
+    ) {
+      const { error: extrasError } = await supabase.rpc(
+        "save_registration_tt25_data",
+        {
+          p_branch_code: payload.branch,
+          p_queue_number: parsedQueueInt,
+          p_identity_document: payload.cccd,
+          p_tt25_data: payload.tt25Extras,
+        },
+      );
+      if (extrasError) {
+        console.warn(
+          JSON.stringify({
+            requestId,
+            code: "TT25_EXTRAS_SAVE_WARNING",
+            databaseCode: extrasError.code,
+          }),
+        );
+      }
     }
 
     return jsonResponse(

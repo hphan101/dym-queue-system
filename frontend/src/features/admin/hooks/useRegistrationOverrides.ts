@@ -75,7 +75,7 @@ function readCustomerExtras(): CustomerExtrasMap {
 }
 
 export async function saveCustomerTT25Extras(
-  branch: BranchCode,
+  _branch: BranchCode,
   queueNumber: number | string,
   identityDocument: string,
   extras: TT25StoredExtras,
@@ -83,7 +83,7 @@ export async function saveCustomerTT25Extras(
   const qNum = Number.parseInt(String(queueNumber), 10);
   const cleanDoc = (identityDocument || '').trim().toUpperCase();
 
-  // 1. Save locally for immediate access on same browser
+  // Save locally for immediate access on same browser (Supabase persistence is handled by the register Edge Function)
   if (typeof window !== 'undefined') {
     try {
       const map = readCustomerExtras();
@@ -93,20 +93,6 @@ export async function saveCustomerTT25Extras(
       window.dispatchEvent(new CustomEvent(EVENT_NAME));
     } catch {
       // Ignore storage quota errors
-    }
-  }
-
-  // 2. Persist to Supabase so Admin on any machine gets full TT25 data
-  if (Number.isFinite(qNum) && cleanDoc) {
-    try {
-      await supabase.rpc('save_registration_tt25_data', {
-        p_branch_code: branch,
-        p_queue_number: qNum,
-        p_identity_document: cleanDoc,
-        p_tt25_data: extras,
-      });
-    } catch (err) {
-      console.info('Saved TT25 extras locally:', err);
     }
   }
 }

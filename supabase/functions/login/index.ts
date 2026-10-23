@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   getClientIp,
   isOriginAllowed,
@@ -16,6 +16,7 @@ import {
 const MAX_REQUEST_BYTES = 4_096;
 const MAX_ACCOUNTS = 1_000;
 const RATE_WINDOW_MS = 10 * 60 * 1_000;
+const RATE_WINDOW_SECONDS = 600;
 const RATE_MAX_ATTEMPTS = 20;
 const attempts = new Map<string, { count: number; expiresAt: number }>();
 
@@ -33,7 +34,7 @@ function requestKey(request: Request, loginName: string) {
   return `${clientIp}:${loginName}`;
 }
 
-function mayAttempt(key: string): boolean {
+function mayAttemptInMemory(key: string): boolean {
   const now = Date.now();
   cleanupExpiredAttempts(now);
   const entry = attempts.get(key);
@@ -44,6 +45,53 @@ function mayAttempt(key: string): boolean {
   if (entry.count >= RATE_MAX_ATTEMPTS) return false;
   entry.count += 1;
   return true;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function checkPersistentLoginRateLimit(
+  adminClient: SupabaseClient,
+  key: string,
+): Promise<boolean> {
+  try {
+    const keyHash = await sha256Hex(`login_rate_limit|${key}`);
+    const { data, error } = await adminClient.rpc(
+      "consume_registration_ip_limit",
+      {
+        p_ip_hash: keyHash,
+        p_max_requests: RATE_MAX_ATTEMPTS,
+        p_window_seconds: RATE_WINDOW_SECONDS,
+      },
+    );
+    if (error) return true;
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { allowed?: boolean }
+      | undefined;
+    return row ? Boolean(row.allowed) : true;
+  } catch {
+    return true;
+  }
+}
+
+async function isActiveStaffAccount(
+  adminClient: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return false;
+  return Boolean(data.is_active);
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {
@@ -86,7 +134,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!LOGIN_NAME_PATTERN.test(loginName) || !password || password.length > 72) {
     return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
   }
-  if (!mayAttempt(requestKey(request, loginName))) {
+
+  const rateKey = requestKey(request, loginName);
+  if (!mayAttemptInMemory(rateKey)) {
     return jsonResponse({ success: false, code: "OVER_REQUEST_RATE_LIMIT" }, 429, origin);
   }
 
@@ -99,6 +149,19 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   try {
+    const adminClient = createAdminClient(supabaseUrl, secretKey);
+    const allowedPersistent = await checkPersistentLoginRateLimit(
+      adminClient,
+      rateKey,
+    );
+    if (!allowedPersistent) {
+      return jsonResponse(
+        { success: false, code: "OVER_REQUEST_RATE_LIMIT" },
+        429,
+        origin,
+      );
+    }
+
     const authClient = createClient(supabaseUrl, publishableKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -111,7 +174,16 @@ Deno.serve(async (request: Request): Promise<Response> => {
         password,
       });
 
-    if (!directError && directData?.session) {
+    if (!directError && directData?.session && directData.user) {
+      const active = await isActiveStaffAccount(adminClient, directData.user.id);
+      if (!active) {
+        return jsonResponse(
+          { success: false, code: "INVALID_CREDENTIALS" },
+          401,
+          origin,
+        );
+      }
+
       return jsonResponse(
         {
           success: true,
@@ -125,8 +197,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
       );
     }
 
-    // Fallback path: Tìm kiếm tài khoản legacy hoặc tài khoản quản trị viên ban đầu
-    const adminClient = createAdminClient(supabaseUrl, secretKey);
+    // Chỉ thực hiện fallback tìm kiếm email legacy đối với tài khoản quản trị khởi tạo ban đầu
+    if (loginName !== "admin") {
+      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
+    }
+
     const { data: users, error: usersError } = await adminClient.auth.admin.listUsers({
       page: 1,
       perPage: MAX_ACCOUNTS,
@@ -139,12 +214,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return String(storedName ?? legacyName ?? "").toLowerCase() === loginName;
     });
 
-    if (!account?.email) {
-      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
-    }
-
-    // Tránh thử lại nếu đã thử đúng email này ở fast-path
-    if (account.email.toLowerCase() === standardInternalEmail) {
+    if (!account?.email || account.email.toLowerCase() === standardInternalEmail) {
       return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
     }
 
@@ -152,7 +222,12 @@ Deno.serve(async (request: Request): Promise<Response> => {
       email: account.email,
       password,
     });
-    if (error || !data.session) {
+    if (error || !data.session || !data.user) {
+      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
+    }
+
+    const active = await isActiveStaffAccount(adminClient, data.user.id);
+    if (!active) {
       return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
     }
 

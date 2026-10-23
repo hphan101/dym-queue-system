@@ -112,6 +112,7 @@ function RegistrationApp() {
     const payload = {
       ...formData,
       companyName: formData.workplace || '',
+      consentAgreed,
     };
 
     try {
