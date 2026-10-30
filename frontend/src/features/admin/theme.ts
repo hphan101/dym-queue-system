@@ -5,6 +5,9 @@ export const dymAdminTheme = defineTheme({
   radius: { base: 3, multiplier: 1 },
   motion: { fast: 120, medium: 220, slow: 420, ratio: 0.75 },
   tokens: {
+    '--font-family-body': ['var(--font-body)', 'var(--font-body)'],
+    '--font-family-heading': ['var(--font-display)', 'var(--font-display)'],
+    '--font-family-code': ['var(--font-mono)', 'var(--font-mono)'],
     '--color-accent': [
       'var(--color-brand-accent)',
       'var(--color-brand-accent)',

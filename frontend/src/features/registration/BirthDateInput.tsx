@@ -125,7 +125,7 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
         onChange={handleTextChange}
         placeholder="01/01/1990"
         maxLength={10}
-        className={`w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-all ${
+        className={`w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
           error ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
         }`}
       />

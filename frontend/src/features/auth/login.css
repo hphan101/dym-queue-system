@@ -14,7 +14,7 @@
   --color-icon-accent: #197fa6;
   --color-border: rgba(37, 142, 183, 0.22);
   --color-border-emphasized: #a8cbd9;
-  --color-shadow: rgba(17, 24, 51, 0.14);
+  --color-shadow: rgba(0, 0, 0, 0.06);
 }
 
 .dym-admin-logo {
@@ -25,7 +25,19 @@
 
 .dym-admin-card {
   border-radius: 6px;
-  box-shadow: 0 20px 55px -32px rgba(17, 24, 51, 0.38);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  animation: dymLoginCardIn 240ms cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes dymLoginCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .dym-admin-theme .astryx-heading {
@@ -46,7 +58,9 @@
   border: 1px solid #a8cbd9;
   border-radius: 4px;
   background: #ffffff;
-  transition: border-color 130ms ease, box-shadow 130ms ease;
+  transition:
+    border-color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
+    box-shadow 160ms cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
 .dym-admin-theme .astryx-text-input:focus-within {
@@ -57,6 +71,7 @@
 .dym-admin-theme .astryx-text-input input {
   padding-inline: 12px;
   color: #111833;
+  font-size: 1rem;
 }
 
 .dym-admin-theme .astryx-text-input input::placeholder {
@@ -68,7 +83,11 @@
   min-height: 44px;
   border-radius: 4px;
   font-weight: 700;
-  transition: background-color 130ms ease, border-color 130ms ease, transform 130ms ease;
+  user-select: none;
+  transition:
+    background-color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
+    border-color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
+    transform 120ms cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
 .dym-admin-theme .astryx-button.primary {
@@ -76,8 +95,15 @@
   color: #f8fbfd;
 }
 
-.dym-admin-theme .astryx-button.primary:hover {
-  background: #1b2852;
+@media (hover: hover) {
+  .dym-admin-theme .astryx-button.primary:hover {
+    background: #1b2852;
+  }
+
+  .dym-admin-theme .astryx-button.secondary:hover {
+    border-color: #63c4e8;
+    background: #f7fcfe;
+  }
 }
 
 .dym-admin-theme .astryx-button.secondary {
@@ -86,13 +112,8 @@
   color: #111833;
 }
 
-.dym-admin-theme .astryx-button.secondary:hover {
-  border-color: #63c4e8;
-  background: #f7fcfe;
-}
-
-.dym-admin-theme .astryx-button:active {
-  transform: translateY(1px);
+.dym-admin-theme .astryx-button:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
 .dym-admin-theme .astryx-button:focus-visible,

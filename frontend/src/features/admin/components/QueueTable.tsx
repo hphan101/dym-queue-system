@@ -3,10 +3,14 @@ import {
   ArrowUturnLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  MagnifyingGlassIcon,
   UserGroupIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { Search, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { BranchCode } from '../../../types/domain';
 import { STATUS_META, type QueueStatus } from '../constants/queueConstants';
 import { usePrintStatus } from '../hooks/usePrintStatus';
@@ -87,7 +91,7 @@ export function QueueTable({
   const [consentModalData, setConsentModalData] = useState<TT25RegistrationData | null>(null);
   const [activePrintRowId, setActivePrintRowId] = useState<string | null>(null);
   const [loadingPrintId, setLoadingPrintId] = useState<string | null>(null);
-  const { getStatus, markPrinted, togglePrintStatus } = usePrintStatus();
+  const { getStatus, markPrinted } = usePrintStatus();
   const { overrideMap, applyToDetails } = useRegistrationOverrides();
 
   const createPrintDataFromRow = (
@@ -246,95 +250,171 @@ export function QueueTable({
   return (
     <section className="dym-registry-panel" aria-labelledby="registry-ledger-title">
       {/* Top Toolbar */}
-      <div className="dym-registry-toolbar">
+      <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
         <div className="dym-registry-title-block">
-          <span className="dym-registry-kicker">DANH SÁCH TIẾP NHẬN</span>
-          <h2 id="registry-ledger-title" className="dym-registry-heading">
-            Danh sách khám tại {branchName}
+          <h2 id="registry-ledger-title" className="dym-registry-title">
+            Danh Sách Khám Tại {branchName}
           </h2>
-          <p className="dym-registry-desc">
-            Theo dõi thời gian đăng ký, thông tin định danh và trạng thái điều phối từng lượt.
-          </p>
         </div>
 
         {/* Quick Filter Tabs & Search Bar */}
-        <div className="dym-registry-controls">
-          {/* Status Quick Filter Tabs */}
-          <div className="dym-tab-group" role="tablist" aria-label="Lọc theo trạng thái">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === 'all'}
-              className={`dym-tab-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
-              onClick={() => setStatusFilter('all')}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Status Quick Filter Tabs (shadcn Tabs + Badge) */}
+          <Tabs
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as TableStatusFilter)}
+          >
+            <TabsList
+              aria-label="Lọc theo trạng thái"
+              className="h-9 bg-muted p-1"
             >
-              <span>Tất cả</span>
-              <span className="dym-tab-badge">{tabCounts.all}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === 'waiting'}
-              className={`dym-tab-btn is-waiting ${statusFilter === 'waiting' ? 'is-active' : ''}`}
-              onClick={() => setStatusFilter('waiting')}
-            >
-              <span className="dym-tab-dot-waiting" />
-              <span>Chờ gọi</span>
-              <span className="dym-tab-badge">{tabCounts.waiting}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === 'called'}
-              className={`dym-tab-btn is-called ${statusFilter === 'called' ? 'is-active' : ''}`}
-              onClick={() => setStatusFilter('called')}
-            >
-              <span className="dym-tab-dot-called" />
-              <span>Đã gọi</span>
-              <span className="dym-tab-badge">{tabCounts.called}</span>
-            </button>
-          </div>
+              <TabsTrigger
+                value="all"
+                className="h-7 gap-1.5 px-3 text-xs font-medium"
+              >
+                <span>Tất cả</span>
+                <Badge
+                  variant="secondary"
+                  className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                >
+                  {tabCounts.all}
+                </Badge>
+              </TabsTrigger>
 
-          {/* Search Box */}
-          <div className="dym-search-wrapper">
+              <TabsTrigger
+                value="waiting"
+                className="h-7 gap-1.5 px-3 text-xs font-medium"
+              >
+                <span
+                  className="size-1.5 rounded-full bg-amber-500"
+                  aria-hidden="true"
+                />
+                <span>Chờ gọi</span>
+                <Badge
+                  variant="secondary"
+                  className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                >
+                  {tabCounts.waiting}
+                </Badge>
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="called"
+                className="h-7 gap-1.5 px-3 text-xs font-medium"
+              >
+                <span
+                  className="size-1.5 rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+                <span>Đã gọi</span>
+                <Badge
+                  variant="secondary"
+                  className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                >
+                  {tabCounts.called}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Search Box (shadcn Input + Clear Button / Kbd) */}
+          <div className="relative w-full sm:w-64 lg:w-72">
             <label htmlFor={searchInputId} className="sr-only">
               Tìm kiếm lượt đăng ký
             </label>
-            <div className="dym-search-input-box">
-              <MagnifyingGlassIcon className="dym-search-icon" aria-hidden="true" />
-              <input
-                id={searchInputId}
-                type="search"
-                className="dym-search-field"
-                placeholder="Tìm tên, SĐT, số thứ tự, công ty..."
-                value={query}
-                onChange={(e) => onQueryChange(e.target.value)}
-              />
-              {query ? (
-                <button
-                  type="button"
-                  className="dym-search-clear-btn"
-                  onClick={() => onQueryChange('')}
-                  aria-label="Xóa từ khóa tìm kiếm"
-                >
-                  <XMarkIcon className="w-4 h-4" />
-                </button>
-              ) : (
-                <kbd className="dym-search-shortcut" title="Phím tắt: /">
-                  /
-                </kbd>
-              )}
-            </div>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              id={searchInputId}
+              type="search"
+              placeholder="Tìm tên, SĐT, số thứ tự, công ty..."
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+            />
+            {query ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => onQueryChange('')}
+                aria-label="Xóa từ khóa tìm kiếm"
+                className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X aria-hidden="true" />
+              </Button>
+            ) : (
+              <kbd
+                className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                title="Phím tắt: /"
+              >
+                /
+              </kbd>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Table Content */}
       {isDataLoading ? (
-        <div className="dym-table-empty-box" aria-live="polite">
-          <div className="page-loader-dots" aria-hidden="true" />
-          <h3 className="dym-empty-title">Đang đồng bộ danh sách tiếp nhận</h3>
-          <p className="dym-empty-desc">Dữ liệu hàng chờ được tải trực tiếp từ máy chủ Supabase.</p>
+        <div
+          className="dym-table-scroller"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label="Đang tải danh sách tiếp nhận"
+        >
+          <table className="dym-table-precision">
+            <thead>
+              <tr>
+                <th scope="col" className="col-ticket">MÃ SỐ</th>
+                <th scope="col" className="col-time">GIỜ VÀO</th>
+                <th scope="col" className="col-patient">TÊN KHÁCH HÀNG</th>
+                <th scope="col" className="col-contact">LIÊN HỆ</th>
+                <th scope="col" className="col-company">CÔNG TY</th>
+                <th scope="col" className="col-status">TRẠNG THÁI</th>
+                <th scope="col" className="col-print-status">TRẠNG THÁI IN</th>
+                <th scope="col" className="col-actions text-right">THAO TÁC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <tr key={index} className="dym-table-row">
+                  <td className="col-ticket">
+                    <Skeleton className="h-6 w-14 rounded-md" />
+                  </td>
+                  <td className="col-time">
+                    <Skeleton className="h-4 w-12" />
+                  </td>
+                  <td className="col-patient">
+                    <div className="flex flex-col gap-1.5">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                  </td>
+                  <td className="col-contact">
+                    <Skeleton className="h-4 w-24" />
+                  </td>
+                  <td className="col-company">
+                    <Skeleton className="h-5 w-40 rounded-md" />
+                  </td>
+                  <td className="col-status">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </td>
+                  <td className="col-print-status">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </td>
+                  <td className="col-actions text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Skeleton className="h-7 w-24 rounded-md" />
+                      <Skeleton className="h-7 w-16 rounded-md" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : displayedRows.length === 0 ? (
         <div className="dym-table-empty-box">
@@ -373,10 +453,10 @@ export function QueueTable({
               <thead>
                 <tr>
                   <th scope="col" className="col-ticket">MÃ SỐ</th>
-                  <th scope="col" className="col-time">GIỜ BỐC</th>
-                  <th scope="col" className="col-patient">HỌ VÀ TÊN</th>
+                  <th scope="col" className="col-time">GIỜ VÀO</th>
+                  <th scope="col" className="col-patient">TÊN KHÁCH HÀNG</th>
                   <th scope="col" className="col-contact">LIÊN HỆ</th>
-                  <th scope="col" className="col-company">CƠ QUAN / ĐOÀN</th>
+                  <th scope="col" className="col-company">CÔNG TY</th>
                   <th scope="col" className="col-status">TRẠNG THÁI</th>
                   <th scope="col" className="col-print-status">TRẠNG THÁI IN</th>
                   <th scope="col" className="col-actions text-right">THAO TÁC</th>
@@ -461,15 +541,13 @@ export function QueueTable({
 
                       {/* Print Status Badge */}
                       <td className="col-print-status">
-                        <button
-                          type="button"
-                          onClick={() => togglePrintStatus(row.id, row.tt25_data)}
+                        <span
                           title={printStatus.title}
-                          className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
+                          className={`dym-status-badge ${printStatus.cls}`}
                         >
                           <span className="dym-status-indicator-dot" />
                           {printStatus.label}
-                        </button>
+                        </span>
                       </td>
 
                       {/* Actions */}

@@ -162,7 +162,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
             <FileText className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold flex items-center gap-2 text-white">
+            <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 text-white">
               Phiếu Đồng Thuận Khám Sức Khỏe
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 inline-flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> 1 trang A4
@@ -183,9 +183,9 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStatementMode('agree')}
-                className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer ${
                   statementMode === 'agree'
-                    ? 'bg-emerald-600 text-white shadow-sm'
+                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
@@ -194,9 +194,9 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStatementMode('disagree')}
-                className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer ${
                   statementMode === 'disagree'
-                    ? 'bg-amber-600 text-white shadow-sm'
+                    ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-sm'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
@@ -205,7 +205,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStatementMode('blank')}
-                className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer ${
                   statementMode === 'blank'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-300 hover:text-white'
@@ -221,7 +221,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('pdf')}
-              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer ${
                 viewMode === 'pdf'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -232,7 +232,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('web')}
-              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer flex items-center gap-1 ${
                 viewMode === 'web'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -247,7 +247,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded transition-colors cursor-pointer"
               title="Tải file PDF Đồng thuận"
             >
               <Download className="w-4 h-4" />
@@ -260,7 +260,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({
               type="button"
               onClick={handlePrint}
               disabled={viewMode === 'pdf' && (isLoading || Boolean(error))}
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded shadow transition-all cursor-pointer disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-700 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded shadow transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               <Printer className="w-4 h-4" />
               <span>In Phiếu Đồng Thuận</span>

@@ -1,29 +1,27 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
-  CheckCircleIcon,
-  KeyIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  MagnifyingGlassIcon,
-  PencilSquareIcon,
   PlusIcon,
   UserGroupIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { Search, X } from 'lucide-react';
 import { Avatar } from '@astryxdesign/core/Avatar';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
 import {
-  clearRememberedStaffName,
   getInitialStaffName,
   rememberStaffName,
+  signOutAdminSession,
 } from './adminIdentity';
-import { getCachedRegistrationCount } from './registrationCountCache';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 import './staff.css';
@@ -39,6 +37,7 @@ import type {
 } from './types';
 import { StaffFormModal } from './components/StaffFormModal';
 import { StaffLockConfirmModal } from './components/StaffLockConfirmModal';
+import { StaffDeleteConfirmModal } from './components/StaffDeleteConfirmModal';
 import { StaffPasswordResetModal } from './components/StaffPasswordResetModal';
 import { HighlightText } from './components/HighlightText';
 import { useAdminScope } from './hooks/useAdminScope';
@@ -68,7 +67,7 @@ function apiErrorMessage(code?: string) {
     case 'ACCOUNT_EXISTS':
       return 'Tài khoản đăng nhập này đã tồn tại trên hệ thống.';
     case 'SELF_ADMIN_PROTECTION':
-      return 'Bạn không thể tự khóa hoặc tự hạ quyền quản trị của chính mình.';
+      return 'Bạn không thể tự khóa, tự xóa hoặc tự hạ quyền quản trị của chính mình.';
     case 'INVALID_DATA':
       return 'Thông tin không hợp lệ. Vui lòng kiểm tra lại họ tên, tài khoản và mật khẩu.';
     case 'ADMIN_REQUIRED':
@@ -90,26 +89,58 @@ function apiErrorMessage(code?: string) {
   }
 }
 
+async function getValidAccessToken(forceRefresh = false): Promise<string> {
+  if (forceRefresh) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session?.access_token) {
+      throw new Error('AUTH_REQUIRED');
+    }
+    return data.session.access_token;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (session.expires_at && session.expires_at - nowSec < 60) {
+    const { data } = await supabase.auth.refreshSession();
+    if (data.session?.access_token) {
+      return data.session.access_token;
+    }
+  }
+
+  return session.access_token;
+}
+
 async function requestStaffApi(
   method: 'GET' | 'POST',
   body?: Record<string, unknown>,
 ) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) throw new Error('AUTH_REQUIRED');
-
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const response = await fetch(`${supabaseUrl}/functions/v1/manage-staff`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: publishableKey,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+
+  const executeFetch = async (accessToken: string) =>
+    fetch(`${supabaseUrl}/functions/v1/manage-staff`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: publishableKey,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+  let token = await getValidAccessToken(false);
+  let response = await executeFetch(token);
+
+  if (response.status === 401) {
+    token = await getValidAccessToken(true);
+    response = await executeFetch(token);
+  }
 
   let result: StaffApiResponse | null = null;
   try {
@@ -134,6 +165,7 @@ export function StaffPage({
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { branch: scopeBranch, date: scopeDate } = useAdminScope();
   const [staffName, setStaffName] = useState(getInitialStaffName);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [staff, setStaff] = useState<StaffAccount[]>(
     () => cachedStaffAccounts ?? [],
   );
@@ -144,10 +176,23 @@ export function StaffPage({
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [bannerTick, setBannerTick] = useState(0);
+
+  const showError = (message: string | null) => {
+    setError(message);
+    if (message) setBannerTick((tick) => tick + 1);
+  };
+
+  const showSuccess = (message: string | null) => {
+    setSuccess(message);
+    if (message) setBannerTick((tick) => tick + 1);
+  };
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<StaffFormState>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [accountPendingConfirmation, setAccountPendingConfirmation] =
+    useState<StaffAccount | null>(null);
+  const [accountPendingDeletion, setAccountPendingDeletion] =
     useState<StaffAccount | null>(null);
   const [passwordResetAccount, setPasswordResetAccount] = useState<StaffAccount | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -162,6 +207,46 @@ export function StaffPage({
     document.title = 'Quản lý nhân viên | DYM Medical Center';
   }, [isActiveTab]);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = window.setTimeout(() => {
+      setSuccess(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [success, bannerTick]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => {
+      setError(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [error, bannerTick]);
+
+  useEffect(() => {
+    if (!formError) return;
+    const timer = window.setTimeout(() => {
+      setFormError(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [formError]);
+
+  useEffect(() => {
+    if (!passwordResetError) return;
+    const timer = window.setTimeout(() => {
+      setPasswordResetError(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [passwordResetError]);
+
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user?.id) {
+        setCurrentUserId(data.session.user.id);
+      }
+    });
+  }, []);
+
   const loadStaff = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
     setError(null);
@@ -170,6 +255,7 @@ export function StaffPage({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error('AUTH_REQUIRED');
+      setCurrentUserId(user.id);
 
       const [{ data: profile }, result] = await Promise.all([
         supabase
@@ -190,7 +276,7 @@ export function StaffPage({
       setStaff(nextStaff);
     } catch (requestError) {
       const code = requestError instanceof Error ? requestError.message : undefined;
-      setError(apiErrorMessage(code));
+      showError(apiErrorMessage(code));
     } finally {
       if (showLoading) setIsLoading(false);
     }
@@ -247,7 +333,11 @@ export function StaffPage({
       const searchable = [
         account.displayName,
         account.loginName,
-        account.role === 'admin' ? 'quản trị' : 'lễ tân',
+        account.role === 'admin'
+          ? 'quản trị'
+          : account.role === 'operator'
+            ? 'vận hành'
+            : 'lễ tân',
         ...account.branches.map((b) => b.name),
       ].join(' ');
 
@@ -291,10 +381,11 @@ export function StaffPage({
       form.displayName.trim().length < 2 ||
       !/^[a-z0-9][a-z0-9._-]{2,31}$/i.test(form.loginName.trim()) ||
       (!form.userId && form.password.length < 6) ||
-      (form.role === 'receptionist' && form.branchCodes.length === 0)
+      ((form.role === 'receptionist' || form.role === 'operator') &&
+        form.branchCodes.length === 0)
     ) {
       setFormError(
-        'Vui lòng nhập đủ thông tin, mật khẩu từ 6 ký tự và chọn ít nhất một chi nhánh cho lễ tân.',
+        'Vui lòng nhập đủ thông tin, mật khẩu từ 6 ký tự và chọn ít nhất một chi nhánh cho nhân viên lễ tân / vận hành.',
       );
       return;
     }
@@ -310,7 +401,7 @@ export function StaffPage({
           role: form.role,
           branchCodes: form.branchCodes,
         });
-        setSuccess(`Đã cập nhật ${form.displayName.trim()}.`);
+        showSuccess(`Đã cập nhật ${form.displayName.trim()}.`);
       } else {
         await requestStaffApi('POST', {
           action: 'create',
@@ -320,7 +411,7 @@ export function StaffPage({
           role: form.role,
           branchCodes: form.branchCodes,
         });
-        setSuccess(`Đã tạo tài khoản cho ${form.displayName.trim()}.`);
+        showSuccess(`Đã tạo tài khoản cho ${form.displayName.trim()}.`);
       }
       setIsFormOpen(false);
       await loadStaff(false);
@@ -333,22 +424,47 @@ export function StaffPage({
   };
 
   const setAccountActive = async (account: StaffAccount) => {
+    const nextIsActive = !account.isActive;
+    let activeActorId = currentUserId;
+    if (!activeActorId) {
+      const { data } = await supabase.auth.getSession();
+      activeActorId = data.session?.user?.id ?? null;
+      if (activeActorId) setCurrentUserId(activeActorId);
+    }
+
+    if (!nextIsActive && activeActorId && account.userId === activeActorId) {
+      showSuccess(null);
+      showError(apiErrorMessage('SELF_ADMIN_PROTECTION'));
+      return;
+    }
+
+    const previousStaff = staff;
+    const optimisticStaff = staff.map((item) =>
+      item.userId === account.userId
+        ? { ...item, isActive: nextIsActive }
+        : item,
+    );
+
     setPendingAccountId(account.userId);
-    setError(null);
-    setSuccess(null);
+    showError(null);
+    cachedStaffAccounts = optimisticStaff;
+    setStaff(optimisticStaff);
+    showSuccess(
+      `Đã ${account.isActive ? 'khóa' : 'mở khóa'} tài khoản ${account.displayName}.`,
+    );
+
     try {
       await requestStaffApi('POST', {
         action: 'set-active',
         userId: account.userId,
-        isActive: !account.isActive,
+        isActive: nextIsActive,
       });
-      setSuccess(
-        `Đã ${account.isActive ? 'khóa' : 'mở khóa'} tài khoản ${account.displayName}.`,
-      );
-      await loadStaff(false);
     } catch (requestError) {
+      cachedStaffAccounts = previousStaff;
+      setStaff(previousStaff);
+      showSuccess(null);
       const code = requestError instanceof Error ? requestError.message : undefined;
-      setError(apiErrorMessage(code));
+      showError(apiErrorMessage(code));
     } finally {
       setPendingAccountId(null);
     }
@@ -356,10 +472,65 @@ export function StaffPage({
 
   const requestAccountActiveChange = (account: StaffAccount) => {
     if (account.isActive) {
+      if (currentUserId && account.userId === currentUserId) {
+        showSuccess(null);
+        showError(apiErrorMessage('SELF_ADMIN_PROTECTION'));
+        return;
+      }
       setAccountPendingConfirmation(account);
       return;
     }
     void setAccountActive(account);
+  };
+
+  const deleteStaffAccount = async (account: StaffAccount) => {
+    let activeActorId = currentUserId;
+    if (!activeActorId) {
+      const { data } = await supabase.auth.getSession();
+      activeActorId = data.session?.user?.id ?? null;
+      if (activeActorId) setCurrentUserId(activeActorId);
+    }
+
+    if (activeActorId && account.userId === activeActorId) {
+      showSuccess(null);
+      showError(apiErrorMessage('SELF_ADMIN_PROTECTION'));
+      return;
+    }
+
+    const previousStaff = staff;
+    const optimisticStaff = staff.filter(
+      (item) => item.userId !== account.userId,
+    );
+
+    setPendingAccountId(account.userId);
+    showError(null);
+    cachedStaffAccounts = optimisticStaff;
+    setStaff(optimisticStaff);
+    showSuccess(`Đã xóa tài khoản ${account.displayName}.`);
+
+    try {
+      await requestStaffApi('POST', {
+        action: 'delete',
+        userId: account.userId,
+      });
+    } catch (requestError) {
+      cachedStaffAccounts = previousStaff;
+      setStaff(previousStaff);
+      showSuccess(null);
+      const code = requestError instanceof Error ? requestError.message : undefined;
+      showError(apiErrorMessage(code));
+    } finally {
+      setPendingAccountId(null);
+    }
+  };
+
+  const requestAccountDelete = (account: StaffAccount) => {
+    if (currentUserId && account.userId === currentUserId) {
+      showSuccess(null);
+      showError(apiErrorMessage('SELF_ADMIN_PROTECTION'));
+      return;
+    }
+    setAccountPendingDeletion(account);
   };
 
   const openPasswordReset = (account: StaffAccount) => {
@@ -390,7 +561,7 @@ export function StaffPage({
         userId: passwordResetAccount.userId,
         password: newPassword,
       });
-      setSuccess(`Đã đổi mật khẩu cho ${passwordResetAccount.displayName}.`);
+      showSuccess(`Đã đổi mật khẩu cho ${passwordResetAccount.displayName}.`);
       setPasswordResetAccount(null);
     } catch (requestError) {
       const code = requestError instanceof Error ? requestError.message : undefined;
@@ -400,15 +571,6 @@ export function StaffPage({
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    clearRememberedStaffName();
-    window.location.assign('/?page=login');
-  };
-
-  const registrationCount =
-    getCachedRegistrationCount(scopeBranch, scopeDate) ?? 0;
-
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
       <div className="dym-admin-shell" data-color-mode={themeMode}>
@@ -416,7 +578,6 @@ export function StaffPage({
           activePage="staff"
           branch={scopeBranch}
           date={scopeDate}
-          registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={true}
           themeMode={themeMode}
@@ -425,7 +586,7 @@ export function StaffPage({
           onThemeToggle={() =>
             setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))
           }
-          onLogout={() => void handleLogout()}
+          onLogout={() => void signOutAdminSession()}
         />
 
         <div className="dym-admin-workspace">
@@ -433,197 +594,236 @@ export function StaffPage({
           <AdminHeader
             title="Quản lý nhân viên"
             actions={
-              <>
-                <button
+              <div className="flex items-center gap-2">
+                <Button
                   type="button"
-                  className="dym-btn-action-primary"
+                  size="sm"
                   onClick={openCreateForm}
                   title="Thêm tài khoản nhân viên mới"
+                  className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
                 >
-                  <PlusIcon className="w-4 h-4" />
+                  <PlusIcon className="size-3.5 shrink-0" />
                   <span>Thêm nhân viên</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="dym-btn-action-secondary"
+                  variant="outline"
+                  size="sm"
                   disabled={isLoading}
                   onClick={() => void loadStaff()}
                   title="Làm mới danh sách nhân viên (F5)"
+                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
                 >
-                  <ArrowPathIcon className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+                  <ArrowPathIcon
+                    className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                    aria-hidden="true"
+                  />
                   <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-                </button>
-              </>
+                </Button>
+              </div>
             }
           />
 
           <main className="dym-admin-content">
             {error && (
-              <div className="dym-data-error" role="alert">
-                {error}
+              <div className="dym-data-error flex items-center justify-between gap-3" role="alert">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  aria-label="Đóng thông báo lỗi"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                </button>
               </div>
             )}
             {success && (
               <div className="dym-staff-success" role="status">
-                {success}
+                <span>{success}</span>
+                <button
+                  type="button"
+                  onClick={() => setSuccess(null)}
+                  aria-label="Đóng thông báo"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                </button>
               </div>
             )}
-
-            {/* Overview Summary Metrics Grid */}
-            <section
-              className="dym-metrics-summary-grid"
-              aria-label="Tổng quan nhân viên"
-            >
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Tổng tài khoản</span>
-                  <UserGroupIcon className="dym-metric-summary-icon" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number">
-                    {staff.length}
-                  </strong>
-                  <span className="dym-metric-summary-unit">nhân sự</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Tổng số tài khoản đã đăng ký trên hệ thống
-                </div>
-              </div>
-
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Đang hoạt động</span>
-                  <CheckCircleIcon className="dym-metric-summary-icon text-emerald-500" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number text-emerald-600 dark:text-emerald-400">
-                    {activeCount}
-                  </strong>
-                  <span className="dym-metric-summary-unit">tài khoản</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Có quyền truy cập và điều phối tại quầy
-                </div>
-              </div>
-
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Đã khóa / Tạm dừng</span>
-                  <LockClosedIcon className="dym-metric-summary-icon text-amber-500" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number text-amber-600 dark:text-amber-400">
-                    {staff.length - activeCount}
-                  </strong>
-                  <span className="dym-metric-summary-unit">tạm dừng</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Tài khoản vô hiệu hóa không thể đăng nhập
-                </div>
-              </div>
-            </section>
 
             {/* Precision Table Panel */}
             <section
               className="dym-registry-panel"
               aria-labelledby="staff-list-title"
             >
-              {/* Toolbar */}
-              <div className="dym-registry-toolbar">
+              {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
+              <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
                 <div className="dym-registry-title-block">
-                  <span className="dym-registry-kicker">DANH MỤC TÀI KHOẢN</span>
                   <h2 id="staff-list-title" className="dym-registry-title">
-                    Nhân Viên Phòng Khám DYM
+                    Danh Sách Nhân Viên Phòng Khám
                   </h2>
-                  <p className="dym-registry-desc">
-                    Quản lý tài khoản nhân viên, thiết lập vai trò tiếp nhận và phân công cơ sở hoạt động.
-                  </p>
                 </div>
 
                 {/* Filter Tabs & Search Controls */}
-                <div className="dym-registry-controls">
-                  {/* Status Tabs */}
-                  <div
-                    className="dym-tab-group"
-                    role="tablist"
-                    aria-label="Lọc theo trạng thái tài khoản"
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {/* Status Tabs (shadcn Tabs + Badge) */}
+                  <Tabs
+                    value={statusFilter}
+                    onValueChange={(value) =>
+                      setStatusFilter(value as StaffStatusTab)
+                    }
                   >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'all'}
-                      className={`dym-tab-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('all')}
+                    <TabsList
+                      aria-label="Lọc theo trạng thái tài khoản"
+                      className="h-9 bg-muted p-1"
                     >
-                      <span>Tất cả</span>
-                      <span className="dym-tab-badge">{tabCounts.all}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'active'}
-                      className={`dym-tab-btn is-called ${statusFilter === 'active' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('active')}
-                    >
-                      <span className="dym-tab-dot-called" />
-                      <span>Hoạt động</span>
-                      <span className="dym-tab-badge">{tabCounts.active}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'locked'}
-                      className={`dym-tab-btn is-waiting ${statusFilter === 'locked' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('locked')}
-                    >
-                      <span className="dym-tab-dot-waiting" />
-                      <span>Đã khóa</span>
-                      <span className="dym-tab-badge">{tabCounts.locked}</span>
-                    </button>
-                  </div>
+                      <TabsTrigger
+                        value="all"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
+                      >
+                        <span>Tất cả</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.all}
+                        </Badge>
+                      </TabsTrigger>
 
-                  {/* Search Field */}
-                  <div className="dym-search-wrapper">
+                      <TabsTrigger
+                        value="active"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
+                      >
+                        <span
+                          className="size-1.5 rounded-full bg-emerald-500"
+                          aria-hidden="true"
+                        />
+                        <span>Hoạt động</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.active}
+                        </Badge>
+                      </TabsTrigger>
+
+                      <TabsTrigger
+                        value="locked"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
+                      >
+                        <span
+                          className="size-1.5 rounded-full bg-amber-500"
+                          aria-hidden="true"
+                        />
+                        <span>Đã khóa</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.locked}
+                        </Badge>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+
+                  {/* Search Field (shadcn Input + Clear Button / Kbd) */}
+                  <div className="relative w-full sm:w-64 lg:w-72">
                     <label htmlFor={searchInputId} className="sr-only">
                       Tìm kiếm nhân viên
                     </label>
-                    <div className="dym-search-input-box">
-                      <MagnifyingGlassIcon className="dym-search-icon" aria-hidden="true" />
-                      <input
-                        id={searchInputId}
-                        type="search"
-                        className="dym-search-field"
-                        placeholder="Tìm tên, tài khoản, chi nhánh..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                      {query ? (
-                        <button
-                          type="button"
-                          className="dym-search-clear-btn"
-                          onClick={() => setQuery('')}
-                          aria-label="Xóa từ khóa tìm kiếm"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <kbd className="dym-search-shortcut" title="Phím tắt: /">
-                          /
-                        </kbd>
-                      )}
-                    </div>
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      id={searchInputId}
+                      type="search"
+                      placeholder="Tìm tên, tài khoản, chi nhánh..."
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                    />
+                    {query ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setQuery('')}
+                        aria-label="Xóa từ khóa tìm kiếm"
+                        className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X aria-hidden="true" />
+                      </Button>
+                    ) : (
+                      <kbd
+                        className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                        title="Phím tắt: /"
+                      >
+                        /
+                      </kbd>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Data Table */}
               {isLoading ? (
-                <div className="dym-table-empty-box" aria-live="polite">
-                  <div className="page-loader-dots" aria-hidden="true" />
-                  <h3 className="dym-empty-title">Đang tải danh sách nhân viên</h3>
-                  <p className="dym-empty-desc">
-                    Hệ thống đang đồng bộ dữ liệu bảo mật từ Supabase.
-                  </p>
+                <div
+                  className="dym-table-scroller"
+                  aria-busy="true"
+                  aria-live="polite"
+                  aria-label="Đang tải danh sách nhân viên"
+                >
+                  <table className="dym-table-precision">
+                    <thead>
+                      <tr>
+                        <th scope="col">Nhân Viên</th>
+                        <th scope="col">Vai Trò</th>
+                        <th scope="col">Cơ Sở Tiếp Nhận</th>
+                        <th scope="col">Đăng Nhập Gần Nhất</th>
+                        <th scope="col">Trạng Thái</th>
+                        <th scope="col" className="text-right">Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <tr key={index}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              <Skeleton className="size-9 shrink-0 rounded-full" />
+                              <div className="flex flex-col gap-1.5">
+                                <Skeleton className="h-4 w-36" />
+                                <Skeleton className="h-3 w-24" />
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <Skeleton className="h-5 w-24 rounded-md" />
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-1.5">
+                              <Skeleton className="h-5 w-12 rounded-md" />
+                              <Skeleton className="h-5 w-12 rounded-md" />
+                            </div>
+                          </td>
+                          <td>
+                            <Skeleton className="h-3.5 w-28" />
+                          </td>
+                          <td>
+                            <Skeleton className="h-6 w-24 rounded-full" />
+                          </td>
+                          <td className="text-right">
+                            <div className="dym-table-actions-group">
+                              <Skeleton className="h-7 w-14 rounded-md" />
+                              <Skeleton className="h-7 w-20 rounded-md" />
+                              <Skeleton className="h-7 w-16 rounded-md" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : filteredStaff.length === 0 ? (
                 <div className="dym-table-empty-box">
@@ -671,7 +871,7 @@ export function StaffPage({
                                 <span className="dym-patient-name">
                                   <HighlightText text={account.displayName} query={query} />
                                 </span>
-                                <span className="dym-patient-meta font-mono">
+                                <span className="dym-patient-meta tabular-nums">
                                   @<HighlightText text={account.loginName || 'chưa_cài_tên'} query={query} />
                                 </span>
                               </div>
@@ -684,10 +884,16 @@ export function StaffPage({
                               className={`dym-role-badge ${
                                 account.role === 'admin'
                                   ? 'role-admin'
-                                  : 'role-receptionist'
+                                  : account.role === 'operator'
+                                    ? 'role-operator'
+                                    : 'role-receptionist'
                               }`}
                             >
-                              {account.role === 'admin' ? 'Quản trị viên' : 'Lễ tân'}
+                              {account.role === 'admin'
+                                ? 'Quản trị viên'
+                                : account.role === 'operator'
+                                  ? 'Vận hành'
+                                  : 'Lễ tân'}
                             </span>
                           </td>
 
@@ -710,7 +916,7 @@ export function StaffPage({
 
                           {/* Last Sign In */}
                           <td>
-                            <span className="dym-patient-meta font-mono text-xs">
+                            <span className="dym-patient-meta tabular-nums text-xs">
                               {formatLastSignIn(account.lastSignInAt)}
                             </span>
                           </td>
@@ -730,49 +936,60 @@ export function StaffPage({
                           {/* Actions */}
                           <td className="text-right">
                             <div className="dym-table-actions-group">
-                              <button
+                              <Button
                                 type="button"
-                                className="dym-btn-table-action action-edit"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => openEditForm(account)}
                                 title="Chỉnh sửa thông tin tài khoản"
+                                className="h-8 px-3 text-xs font-medium"
                               >
-                                <PencilSquareIcon className="w-3.5 h-3.5 text-sky-600" aria-hidden="true" />
-                                <span>Sửa</span>
-                              </button>
+                                Sửa
+                              </Button>
 
-                              <button
+                              <Button
                                 type="button"
-                                className="dym-btn-table-action action-key"
+                                variant="outline"
+                                size="sm"
                                 disabled={isResettingPassword}
                                 onClick={() => openPasswordReset(account)}
                                 title="Đặt lại mật khẩu cho tài khoản này"
+                                className="h-8 px-3 text-xs font-medium"
                               >
-                                <KeyIcon className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
-                                <span>Mật khẩu</span>
-                              </button>
+                                Mật khẩu
+                              </Button>
 
-                              <button
+                              <Button
                                 type="button"
-                                className={`dym-btn-table-action ${
-                                  account.isActive ? 'action-lock' : 'action-unlock'
-                                }`}
+                                variant="outline"
+                                size="sm"
                                 disabled={pendingAccountId === account.userId}
                                 onClick={() => requestAccountActiveChange(account)}
-                                title={account.isActive ? 'Khóa tài khoản này' : 'Mở khóa kích hoạt lại tài khoản'}
+                                title={
+                                  account.isActive
+                                    ? 'Khóa tài khoản này'
+                                    : 'Mở khóa kích hoạt lại tài khoản'
+                                }
+                                className="h-8 px-3 text-xs font-medium"
                               >
-                                {account.isActive ? (
-                                  <LockClosedIcon className="w-3.5 h-3.5 text-rose-600" aria-hidden="true" />
-                                ) : (
-                                  <LockOpenIcon className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
-                                )}
-                                <span>
-                                  {pendingAccountId === account.userId
-                                    ? 'Đang lưu...'
-                                    : account.isActive
-                                      ? 'Khóa'
-                                      : 'Mở khóa'}
-                                </span>
-                              </button>
+                                {pendingAccountId === account.userId
+                                  ? 'Đang lưu...'
+                                  : account.isActive
+                                    ? 'Khóa'
+                                    : 'Mở khóa'}
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={pendingAccountId === account.userId}
+                                onClick={() => requestAccountDelete(account)}
+                                title="Xóa tài khoản này"
+                                className="h-8 px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                Xóa
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -808,7 +1025,18 @@ export function StaffPage({
           isPending={Boolean(pendingAccountId)}
         />
 
-        {/* Modal 3: Password Reset */}
+        {/* Modal 3: Confirm Account Deletion */}
+        <StaffDeleteConfirmModal
+          account={accountPendingDeletion}
+          onClose={() => setAccountPendingDeletion(null)}
+          onConfirm={(account) => {
+            setAccountPendingDeletion(null);
+            void deleteStaffAccount(account);
+          }}
+          isPending={Boolean(pendingAccountId)}
+        />
+
+        {/* Modal 4: Password Reset */}
         <StaffPasswordResetModal
           account={passwordResetAccount}
           onClose={() => setPasswordResetAccount(null)}

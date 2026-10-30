@@ -1,5 +1,8 @@
 import React from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { StaffAccount } from '../types';
 
 export interface StaffPasswordResetModalProps {
@@ -36,18 +39,18 @@ export const StaffPasswordResetModal: React.FC<StaffPasswordResetModalProps> = (
         aria-labelledby="staff-password-reset-title"
       >
         <header>
-          <div>
-            <span className="dym-eyebrow">Bảo mật tài khoản</span>
-            <h2 id="staff-password-reset-title">Đặt lại mật khẩu</h2>
-          </div>
-          <button
+          <h2 id="staff-password-reset-title">Đặt lại mật khẩu</h2>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Đóng"
             disabled={isResetting}
             onClick={onClose}
+            className="size-8 text-muted-foreground hover:text-foreground"
           >
-            <XMarkIcon aria-hidden="true" />
-          </button>
+            <X aria-hidden="true" />
+          </Button>
         </header>
         <form onSubmit={(event) => void onReset(event)}>
           <p className="dym-staff-password-note">
@@ -58,9 +61,12 @@ export const StaffPasswordResetModal: React.FC<StaffPasswordResetModalProps> = (
               {passwordResetError}
             </div>
           )}
-          <label>
-            <span>Mật khẩu mới</span>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="staff-new-password" className="text-xs font-medium">
+              Mật khẩu mới
+            </Label>
+            <Input
+              id="staff-new-password"
               type="password"
               value={newPassword}
               minLength={6}
@@ -70,12 +76,18 @@ export const StaffPasswordResetModal: React.FC<StaffPasswordResetModalProps> = (
               autoComplete="new-password"
               placeholder="Tối thiểu 6 ký tự"
               onChange={(event) => setNewPassword(event.target.value)}
+              className="h-9 bg-background text-sm shadow-sm"
             />
-            <small>Tối thiểu 6 ký tự. Gửi mật khẩu qua kênh an toàn.</small>
-          </label>
-          <label>
-            <span>Xác nhận mật khẩu mới</span>
-            <input
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label
+              htmlFor="staff-confirm-password"
+              className="text-xs font-medium"
+            >
+              Xác nhận mật khẩu mới
+            </Label>
+            <Input
+              id="staff-confirm-password"
               type="password"
               value={confirmedPassword}
               minLength={6}
@@ -84,24 +96,28 @@ export const StaffPasswordResetModal: React.FC<StaffPasswordResetModalProps> = (
               autoComplete="new-password"
               placeholder="Nhập lại mật khẩu mới"
               onChange={(event) => setConfirmedPassword(event.target.value)}
+              className="h-9 bg-background text-sm shadow-sm"
             />
-          </label>
+          </div>
           <footer>
-            <button
+            <Button
               type="button"
-              className="dym-btn-action-secondary"
+              variant="outline"
+              size="sm"
               disabled={isResetting}
               onClick={onClose}
+              className="h-9 px-4 text-xs font-medium"
             >
               Hủy
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="dym-btn-action-primary"
+              size="sm"
               disabled={isResetting}
+              className="h-9 px-4 text-xs font-medium shadow-sm"
             >
               {isResetting ? 'Đang lưu…' : 'Lưu mật khẩu mới'}
-            </button>
+            </Button>
           </footer>
         </form>
       </section>

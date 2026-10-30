@@ -4,7 +4,7 @@ import type {
   TT25TargetPaymentInfo,
 } from '../registration/tt25Types';
 
-export type StaffRole = 'admin' | 'receptionist';
+export type StaffRole = 'admin' | 'operator' | 'receptionist';
 export type StaffStatusTab = 'all' | 'active' | 'locked';
 
 export interface StaffBranch {

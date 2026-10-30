@@ -84,7 +84,6 @@ export function QueueMetrics({
         <div className="dym-terminal-header">
           <div className="dym-terminal-radar">
             <span className="dym-radar-pulse" aria-hidden="true" />
-            <span className="dym-terminal-pill">QUẦY TIẾP ĐÓN TRỰC TIẾP</span>
             <span className="dym-terminal-branch">{branchName}</span>
           </div>
           <div className="dym-terminal-clock" aria-label="Giờ tiếp nhận hiện tại">
@@ -95,17 +94,12 @@ export function QueueMetrics({
 
         {/* Central Display Number Ticket */}
         <div className="dym-terminal-display">
-          <span className="dym-display-kicker">
-            {isCallingActive ? 'KHÁCH ĐANG PHỤC VỤ TẠI QUẦY' : 'SẴN SÀNG TIẾP NHẬN'}
-          </span>
-
           <div
             className={`dym-display-number-card ${
               isCallingActive ? 'is-active' : 'is-idle'
             }`}
           >
             <div className="dym-number-glow" aria-hidden="true" />
-            <span className="dym-number-ticket-header">DYM MEDICAL RECEIPT</span>
             <strong
               className="dym-display-digits"
               aria-label={`Đang gọi số ${currentQueue}`}
@@ -190,7 +184,6 @@ export function QueueMetrics({
       <aside className="dym-terminal-ledger" aria-labelledby="status-ledger-title">
         <div className="dym-ledger-header">
           <div>
-            <span className="dym-ledger-subtitle">TIẾN ĐỘ TIẾP NHẬN</span>
             <h2 id="status-ledger-title" className="dym-ledger-title">
               Lưu lượng trong ngày
             </h2>
@@ -216,7 +209,7 @@ export function QueueMetrics({
           >
             <div
               className="dym-progress-fill"
-              style={{ width: `${Math.min(100, Math.max(0, completionRate))}%` }}
+              style={{ transform: `scaleX(${Math.min(100, Math.max(0, completionRate)) / 100})` }}
             />
           </div>
         </div>
@@ -239,14 +232,7 @@ export function QueueMetrics({
                 </div>
                 <div className="dym-status-count-row">
                   <strong className="dym-status-number">{count}</strong>
-                  <span className="dym-status-unit">bệnh nhân</span>
-                </div>
-                <div className="dym-status-footnote">
-                  {isWaiting
-                    ? count > 0
-                      ? 'Đang ngồi tại sảnh chờ'
-                      : 'Không có bệnh nhân chờ'
-                    : 'Đã hoàn tất tiếp đón'}
+                  <span className="dym-status-unit">khách hàng</span>
                 </div>
               </div>
             );

@@ -1,3 +1,5 @@
+import { supabase } from '../../lib/supabaseClient';
+
 const STAFF_NAME_STORAGE_KEY = 'dym-admin-staff-name';
 const STAFF_NAME_FALLBACK = 'Tài khoản DYM';
 
@@ -33,7 +35,16 @@ export function clearRememberedStaffName() {
   cachedStaffName = '';
   try {
     window.sessionStorage.removeItem(STAFF_NAME_STORAGE_KEY);
+    window.sessionStorage.removeItem('dym_registration_overrides_v1');
+    window.localStorage.removeItem('dym_registration_overrides_v1');
+    window.localStorage.removeItem('dym_tt25_customer_extras_v1');
   } catch {
     // Nothing else is required when browser storage is unavailable.
   }
+}
+
+export async function signOutAdminSession() {
+  await supabase.auth.signOut();
+  clearRememberedStaffName();
+  window.location.assign('/?page=login');
 }

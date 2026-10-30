@@ -9,6 +9,13 @@ import {
   formatRegistrationTime,
 } from './adminFormatters';
 
+function neutralizeSpreadsheetFormula(value: string): string {
+  if (/^[\s]*[=+\-@]/.test(value) || /^[\t\r]/.test(value)) {
+    return `'${value}`;
+  }
+  return value;
+}
+
 function escapeXml(value: string): string {
   let cleaned = '';
   for (let i = 0; i < value.length; i++) {
@@ -195,7 +202,7 @@ export function exportRegistrationsToExcel({
     'Số phiếu',
     'Ngày khám',
     'Giờ đăng ký',
-    'Họ và tên',
+    'Tên khách hàng',
     'Giới tính',
     'Ngày sinh',
     'Tuổi',
@@ -303,7 +310,9 @@ export function exportRegistrationsToExcel({
         if (cell.isNum && typeof cell.val === 'number') {
           return `<c r="${ref}" s="${styleId}" t="n"><v>${cell.val}</v></c>`;
         }
-        return `<c r="${ref}" s="${styleId}" t="inlineStr"><is><t>${escapeXml(String(cell.val ?? ''))}</t></is></c>`;
+        const rawText = String(cell.val ?? '');
+        const safeText = neutralizeSpreadsheetFormula(rawText);
+        return `<c r="${ref}" s="${styleId}" t="inlineStr"><is><t>${escapeXml(safeText)}</t></is></c>`;
       })
       .join('');
 

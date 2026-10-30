@@ -13,6 +13,10 @@ export function getInitialThemeMode(): AdminThemeMode {
 }
 
 let sharedThemeMode: AdminThemeMode = getInitialThemeMode();
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('data-color-mode', sharedThemeMode);
+  document.documentElement.classList.toggle('dark', sharedThemeMode === 'dark');
+}
 const themeListeners = new Set<(mode: AdminThemeMode) => void>();
 
 function updateSharedThemeMode(action: SetStateAction<AdminThemeMode>) {
@@ -20,6 +24,10 @@ function updateSharedThemeMode(action: SetStateAction<AdminThemeMode>) {
     typeof action === 'function' ? action(sharedThemeMode) : action;
   if (nextMode === sharedThemeMode) return;
   sharedThemeMode = nextMode;
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-color-mode', nextMode);
+    document.documentElement.classList.toggle('dark', nextMode === 'dark');
+  }
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, nextMode);
   } catch {

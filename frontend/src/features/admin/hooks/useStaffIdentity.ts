@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
 import { getInitialStaffName, rememberStaffName } from '../adminIdentity';
+import type { StaffRole } from '../types';
 
 export function useStaffIdentity() {
   const [staffName, setStaffName] = useState<string>(getInitialStaffName);
+  const [staffRole, setStaffRole] = useState<StaffRole>('receptionist');
   const [branchIds, setBranchIds] = useState<Partial<Record<BranchCode, string>>>({});
   const [isLoadingIdentity, setIsLoadingIdentity] = useState(true);
   const [identityError, setIdentityError] = useState<string | null>(null);
@@ -59,6 +61,14 @@ export function useStaffIdentity() {
           }
         }
 
+        if (
+          profile?.role === 'admin' ||
+          profile?.role === 'operator' ||
+          profile?.role === 'receptionist'
+        ) {
+          setStaffRole(profile.role);
+        }
+
         if (profile?.display_name) {
           const nextStaffName = String(profile.display_name);
           rememberStaffName(nextStaffName);
@@ -86,6 +96,7 @@ export function useStaffIdentity() {
   return {
     staffName,
     setStaffName,
+    staffRole,
     branchIds,
     isLoadingIdentity,
     identityError,

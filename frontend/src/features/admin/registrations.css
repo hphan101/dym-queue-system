@@ -173,7 +173,8 @@
 
 .dym-records-summary strong {
   color: var(--color-ink);
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
 }
 
 .dym-records-summary > span {
@@ -444,7 +445,7 @@
   color: var(--color-success);
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .dym-records-refresh:hover:not(:disabled),
   .dym-records-summary button:hover:not(:disabled),
   .dym-records-error button:hover:not(:disabled),

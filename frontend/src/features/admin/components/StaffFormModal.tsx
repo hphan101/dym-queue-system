@@ -1,5 +1,16 @@
 import React from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { BRANCH_NAMES } from '../../../config/branches';
 import type { BranchCode } from '../../../types/domain';
 import type { StaffFormState, StaffRole } from '../types';
@@ -38,20 +49,20 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
         aria-labelledby="staff-form-title"
       >
         <header>
-          <div>
-            <span className="dym-eyebrow">Tài khoản nhân sự</span>
-            <h2 id="staff-form-title">
-              {form.userId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
-            </h2>
-          </div>
-          <button
+          <h2 id="staff-form-title">
+            {form.userId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
+          </h2>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Đóng hộp thoại"
             disabled={isSaving}
             onClick={onClose}
+            className="size-8 text-muted-foreground hover:text-foreground"
           >
-            <XMarkIcon aria-hidden="true" />
-          </button>
+            <X aria-hidden="true" />
+          </Button>
         </header>
 
         <form onSubmit={(event) => void onSave(event)}>
@@ -61,63 +72,94 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
             </div>
           )}
 
-          <label>
-            <span>Họ và tên nhân viên</span>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="staff-display-name" className="text-xs font-medium">
+              Họ và tên nhân viên
+            </Label>
+            <Input
+              id="staff-display-name"
               type="text"
               value={form.displayName}
               maxLength={100}
               required
               autoFocus
-              placeholder="vd: Nguyễn Văn A"
+              placeholder="VD: Nguyễn Văn A"
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
                   displayName: event.target.value,
                 }))
               }
+              className="h-9 bg-background text-sm shadow-sm"
             />
-          </label>
+          </div>
 
           <div className="dym-staff-form-grid">
-            <label>
-              <span>Tài khoản đăng nhập</span>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="staff-login-name" className="text-xs font-medium">
+                Tài khoản đăng nhập
+              </Label>
+              <Input
+                id="staff-login-name"
                 type="text"
                 value={form.loginName}
                 maxLength={32}
                 required
                 autoComplete="username"
-                placeholder="vd: letan.q1"
+                placeholder="VD: letan.q1"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
                     loginName: event.target.value,
                   }))
                 }
+                className="h-9 bg-background text-sm shadow-sm"
               />
-            </label>
-            <label>
-              <span>Vai trò hệ thống</span>
-              <select
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="staff-role-select" className="text-xs font-medium">
+                Vai trò hệ thống
+              </Label>
+              <Select
                 value={form.role}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    role: event.target.value as StaffRole,
+                    role: value as StaffRole,
                   }))
                 }
               >
-                <option value="receptionist">Nhân viên lễ tân</option>
-                <option value="admin">Quản trị viên</option>
-              </select>
-            </label>
+                <SelectTrigger
+                  id="staff-role-select"
+                  className="h-9 bg-background text-sm shadow-sm"
+                >
+                  <SelectValue placeholder="Chọn vai trò" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="receptionist" className="text-sm">
+                      Nhân viên lễ tân
+                    </SelectItem>
+                    <SelectItem value="operator" className="text-sm">
+                      Nhân viên vận hành
+                    </SelectItem>
+                    <SelectItem value="admin" className="text-sm">
+                      Quản trị viên
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {!form.userId && (
-            <label>
-              <span>Mật khẩu tạm thời</span>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="staff-password" className="text-xs font-medium">
+                Mật khẩu tạm thời
+              </Label>
+              <Input
+                id="staff-password"
                 type="password"
                 value={form.password}
                 minLength={6}
@@ -131,9 +173,9 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
                     password: event.target.value,
                   }))
                 }
+                className="h-9 bg-background text-sm shadow-sm"
               />
-              <small>Gửi mật khẩu cho nhân viên qua kênh an toàn.</small>
-            </label>
+            </div>
           )}
 
           <fieldset>
@@ -159,25 +201,28 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
           </fieldset>
 
           <footer>
-            <button
+            <Button
               type="button"
-              className="dym-btn-action-secondary"
+              variant="outline"
+              size="sm"
               disabled={isSaving}
               onClick={onClose}
+              className="h-9 px-4 text-xs font-medium"
             >
               Hủy
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="dym-btn-action-primary"
+              size="sm"
               disabled={isSaving}
+              className="h-9 px-4 text-xs font-medium shadow-sm"
             >
               {isSaving
                 ? 'Đang lưu…'
                 : form.userId
                   ? 'Lưu thay đổi'
                   : 'Tạo tài khoản'}
-            </button>
+            </Button>
           </footer>
         </form>
       </section>

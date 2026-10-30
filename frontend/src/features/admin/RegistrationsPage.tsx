@@ -3,19 +3,42 @@ import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
-  MagnifyingGlassIcon,
-  SignalSlashIcon,
   UserGroupIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
+import {
+  Building2,
+  Check,
+  ChevronsUpDown,
+  Printer,
+  Search,
+  X,
+} from 'lucide-react';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 import { useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 import {
   type TT25RegistrationData,
@@ -33,8 +56,11 @@ import { formatQueueNumber } from '../../lib/queueNumber';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
-import { clearRememberedStaffName } from './adminIdentity';
-import { getCachedRegistrationCount } from './registrationCountCache';
+import { signOutAdminSession } from './adminIdentity';
+import {
+  REALTIME_REGISTRATION_COLUMNS,
+  type RealtimeConnectionState,
+} from './constants/queueConstants';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 import './registrations.css';
@@ -56,33 +82,63 @@ import {
   CustomerNoticeModal,
   type CustomerNotificationItem,
 } from './components/CustomerNoticeModal';
+import { RealtimeConnectionAlert } from './components/RealtimeConnectionAlert';
 import { RegistrationDetailModal } from './components/RegistrationDetailModal';
 import { RegistrationsTable } from './components/RegistrationsTable';
 import type { RegistrationDetails, RegistrationStatusTab } from './types';
+import type { BulkPrintMode } from '../registration/bulkPrintPdf';
 
 export type { RegistrationDetails };
 
-type RealtimeConnectionState =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'offline';
-
 const PAGE_SIZE = 15;
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
-const REALTIME_REGISTRATION_COLUMNS = [
-  'id',
-  'branch_id',
-  'queue_date',
-  'queue_number',
-  'full_name',
-  'phone_number',
-  'state',
-  'registered_at',
-  'first_called_at',
-  'last_called_at',
-  'updated_at',
-];
+const REALTIME_REFETCH_DEBOUNCE_MS = 700;
+
+function buildPrintData(
+  targetRow: RegistrationDetails,
+  branch: BranchCode,
+): TT25RegistrationData {
+  const extras = targetRow.tt25_data ?? {};
+  const defaultReason = targetRow.company_name?.trim()
+    ? 'Khám sức khỏe định kỳ theo công ty'
+    : 'Khám sức khỏe cá nhân tự nguyện';
+  const resolvedReason =
+    extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
+      ? extras.checkupReason
+      : defaultReason;
+
+  const wpWard = extras.workplaceWard || '';
+  const wpProv = extras.workplaceProvince || '';
+  const resolvedWorkplaceWard =
+    wpProv && !wpWard.includes(wpProv)
+      ? [wpWard, wpProv].filter(Boolean).join(', ')
+      : wpWard;
+
+  return createDefaultTT25Data({
+    branch,
+    fullName: targetRow.full_name,
+    gender: (targetRow.gender as 'Nam' | 'Nữ') || 'Nam',
+    birthDate: targetRow.birth_date,
+    ethnicity: extras.ethnicity || 'Kinh',
+    bloodGroup: extras.bloodGroup || 'Chưa rõ',
+    cccd: targetRow.identity_document,
+    insuranceNumber: extras.insuranceNumber || '',
+    province: targetRow.province,
+    ward: targetRow.ward,
+    addressDetail: targetRow.address_detail,
+    occupation: extras.occupation || '',
+    workplace: targetRow.company_name || '',
+    workplaceWard: resolvedWorkplaceWard,
+    phoneNumber: targetRow.phone_number,
+    checkupReason: resolvedReason,
+    medicalHistory: extras.medicalHistory,
+    targetPayment:
+      extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
+    consentAgreed: extras.consentAgreed ?? true,
+    queueNumber: formatQueueNumber(targetRow.queue_number),
+    checkupDate: targetRow.queue_date,
+  });
+}
 
 export function RegistrationsPage({
   authorizedIsAdmin,
@@ -94,7 +150,8 @@ export function RegistrationsPage({
   const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
-  const { staffName, branchIds, identityError } = useStaffIdentity();
+  const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
+    useStaffIdentity();
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [query, setQuery] = useState('');
@@ -117,16 +174,25 @@ export function RegistrationsPage({
     useState<CustomerNotificationItem | null>(null);
 
   const noticeTimer = useRef<number | null>(null);
-  const companyFilterRef = useRef<HTMLDivElement | null>(null);
+  const realtimeRefetchTimer = useRef<number | null>(null);
+  const hasPendingRealtimeRefetch = useRef(false);
   const companySearchInputRef = useRef<HTMLInputElement | null>(null);
   const isActiveTabRef = useRef(isActiveTab);
   isActiveTabRef.current = isActiveTab;
   const searchInputId = useId();
   const branchId = branchIds[branch];
 
+  useEffect(() => {
+    const availableCodes = Object.keys(branchIds) as BranchCode[];
+    if (availableCodes.length > 0 && !branchIds[branch]) {
+      setBranch(availableCodes[0]);
+    }
+  }, [branchIds, branch, setBranch]);
+
   const {
     data: fetchedRows,
-    isLoading,
+    isPending: isQueryPending,
+    isFetching: isQueryFetching,
     error: queryError,
     refetch: refetchRegistrations,
   } = useRegistrationDetailsQuery({
@@ -134,6 +200,16 @@ export function RegistrationsPage({
     branchId,
     date,
   });
+
+  const hasAvailableBranches = Object.keys(branchIds).length > 0;
+  const isWaitingForBranchSync = hasAvailableBranches && !branchId;
+  const isLoading =
+    isLoadingIdentity ||
+    isWaitingForBranchSync ||
+    (Boolean(branchId) &&
+      !identityError &&
+      !queryError &&
+      (isQueryPending || (isQueryFetching && !fetchedRows)));
 
   const { applyToDetails, applyToDetailsList } = useRegistrationOverrides();
   const { getStatus } = usePrintStatus();
@@ -146,53 +222,77 @@ export function RegistrationsPage({
   const printModalData = useMemo<TT25RegistrationData | null>(() => {
     const rawTarget = printModalRow || consentModalRow;
     if (!rawTarget) return null;
-    const targetRow = applyToDetails(rawTarget);
-    const extras = targetRow.tt25_data ?? {};
-    const defaultReason = targetRow.company_name?.trim()
-      ? 'Khám sức khỏe định kỳ theo công ty'
-      : 'Khám sức khỏe cá nhân tự nguyện';
-    const resolvedReason =
-      extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
-        ? extras.checkupReason
-        : defaultReason;
-
-    const wpWard = extras.workplaceWard || '';
-    const wpProv = extras.workplaceProvince || '';
-    const resolvedWorkplaceWard =
-      wpProv && !wpWard.includes(wpProv)
-        ? [wpWard, wpProv].filter(Boolean).join(', ')
-        : wpWard;
-
-    return createDefaultTT25Data({
-      branch,
-      fullName: targetRow.full_name,
-      gender: (targetRow.gender as 'Nam' | 'Nữ') || 'Nam',
-      birthDate: targetRow.birth_date,
-      ethnicity: extras.ethnicity || 'Kinh',
-      bloodGroup: extras.bloodGroup || 'Chưa rõ',
-      cccd: targetRow.identity_document,
-      insuranceNumber: extras.insuranceNumber || '',
-      province: targetRow.province,
-      ward: targetRow.ward,
-      addressDetail: targetRow.address_detail,
-      occupation: extras.occupation || '',
-      workplace: targetRow.company_name || '',
-      workplaceWard: resolvedWorkplaceWard,
-      phoneNumber: targetRow.phone_number,
-      checkupReason: resolvedReason,
-      medicalHistory: extras.medicalHistory,
-      targetPayment:
-        extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
-      consentAgreed: extras.consentAgreed ?? true,
-      queueNumber: formatQueueNumber(targetRow.queue_number),
-      checkupDate: targetRow.queue_date,
-    });
+    return buildPrintData(applyToDetails(rawTarget), branch);
   }, [applyToDetails, branch, printModalRow, consentModalRow]);
+
+  // Bulk print (Consent / TT25 merged into one PDF)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
+  const [padForDuplex, setPadForDuplex] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCheckedIds(new Set());
+  }, [branch, date]);
+
+  const toggleChecked = (ids: string[], checked: boolean) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const handleBulkPrint = async (mode: BulkPrintMode) => {
+    const targets = rows
+      .filter((row) => checkedIds.has(row.id))
+      .sort((a, b) => a.queue_number - b.queue_number);
+    if (targets.length === 0 || bulkProgress) return;
+
+    // Open the tab synchronously so the popup blocker allows it after the async work.
+    const printTab = window.open('', '_blank');
+    setBulkProgress(`Đang tạo 0/${targets.length}...`);
+    try {
+      const { generateBulkPrintPdf } = await import('../registration/bulkPrintPdf');
+      const url = await generateBulkPrintPdf(
+        targets.map((row) => buildPrintData(applyToDetails(row), branch)),
+        mode,
+        padForDuplex,
+        (done, total) => setBulkProgress(`Đang tạo ${done}/${total}...`),
+      );
+      if (printTab) {
+        printTab.location.href = url;
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `In_hang_loat_${mode}_${date}.pdf`;
+        a.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
+
+      for (const row of targets) {
+        if (mode !== 'tt25') markRegistrationPrinted(row.id, 'consent');
+        if (mode !== 'consent') markRegistrationPrinted(row.id, 'tt25');
+      }
+      setCheckedIds(new Set());
+    } catch (err) {
+      printTab?.close();
+      console.error('Bulk print failed:', err);
+      window.alert('Không thể tạo file in hàng loạt. Vui lòng thử lại.');
+    } finally {
+      setBulkProgress(null);
+    }
+  };
 
   useEffect(() => {
     if (!isActiveTab) return;
     document.title = `Danh Sách Tiếp Nhận | ${BRANCH_NAMES[branch]} - DYM Medical Center`;
-  }, [branch, isActiveTab]);
+    if (hasPendingRealtimeRefetch.current) {
+      hasPendingRealtimeRefetch.current = false;
+      void queryClient.invalidateQueries({
+        queryKey: ['registrationDetails', branch, date],
+      });
+    }
+  }, [branch, date, isActiveTab, queryClient]);
 
   useEffect(() => {
     const handleOnline = () => setConnectionState('connecting');
@@ -233,6 +333,20 @@ export function RegistrationsPage({
   useEffect(() => {
     if (!branchId) return;
 
+    const scheduleRegistrationsInvalidation = () => {
+      if (!isActiveTabRef.current) {
+        hasPendingRealtimeRefetch.current = true;
+        return;
+      }
+      if (realtimeRefetchTimer.current !== null) return;
+      realtimeRefetchTimer.current = window.setTimeout(() => {
+        realtimeRefetchTimer.current = null;
+        void queryClient.invalidateQueries({
+          queryKey: ['registrationDetails', branch, date],
+        });
+      }, REALTIME_REFETCH_DEBOUNCE_MS);
+    };
+
     const channel = supabase
       .channel(`registrations-page:${branchId}:${date}`)
       .on(
@@ -265,9 +379,7 @@ export function RegistrationsPage({
             }, NEW_REGISTRATION_NOTICE_MS);
           }
 
-          void queryClient.invalidateQueries({
-            queryKey: ['registrationDetails', branch, date],
-          });
+          scheduleRegistrationsInvalidation();
         },
       )
       .on(
@@ -280,9 +392,7 @@ export function RegistrationsPage({
           select: REALTIME_REGISTRATION_COLUMNS,
         },
         () => {
-          void queryClient.invalidateQueries({
-            queryKey: ['registrationDetails', branch, date],
-          });
+          scheduleRegistrationsInvalidation();
         },
       )
       .subscribe((status) => {
@@ -294,6 +404,10 @@ export function RegistrationsPage({
       });
 
     return () => {
+      if (realtimeRefetchTimer.current !== null) {
+        window.clearTimeout(realtimeRefetchTimer.current);
+        realtimeRefetchTimer.current = null;
+      }
       void supabase.removeChannel(channel);
     };
   }, [branch, branchId, date, queryClient]);
@@ -364,17 +478,20 @@ export function RegistrationsPage({
     );
   }, [companyFilterData.companies, companySearchQuery]);
 
-  const companyTriggerLabel = useMemo(() => {
+  const companyTriggerMeta = useMemo(() => {
     if (companyFilter === 'all') {
-      return `Đơn vị: Tất cả (${rows.length})`;
+      return { label: 'Đơn vị: Tất cả', count: rows.length };
     }
     if (companyFilter === '__individual__') {
-      return `Khách cá nhân (${companyFilterData.individualCount})`;
+      return {
+        label: 'Khách cá nhân',
+        count: companyFilterData.individualCount,
+      };
     }
     const found = companyFilterData.companies.find(
       (c) => c.name === companyFilter,
     );
-    return `${companyFilter} (${found?.count ?? 0})`;
+    return { label: companyFilter, count: found?.count ?? 0 };
   }, [companyFilter, companyFilterData, rows.length]);
 
   useEffect(() => {
@@ -382,25 +499,8 @@ export function RegistrationsPage({
     const timer = window.setTimeout(() => {
       companySearchInputRef.current?.focus();
     }, 20);
-    const handleMouseDown = (event: MouseEvent) => {
-      if (
-        companyFilterRef.current &&
-        !companyFilterRef.current.contains(event.target as Node)
-      ) {
-        setIsCompanyMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsCompanyMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKeyDown);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isCompanyMenuOpen]);
 
@@ -479,14 +579,7 @@ export function RegistrationsPage({
     setIsCompanyMenuOpen(false);
   }, [branch, date]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    clearRememberedStaffName();
-    window.location.assign('/?page=login');
-  };
-
   const availableBranches = Object.keys(BRANCH_NAMES) as BranchCode[];
-  const registrationCount = getCachedRegistrationCount(branch, date) ?? rows.length;
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
@@ -495,16 +588,16 @@ export function RegistrationsPage({
           activePage="registrations"
           branch={branch}
           date={date}
-          registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={authorizedIsAdmin}
+          staffRole={authorizedIsAdmin ? 'admin' : staffRole}
           themeMode={themeMode}
           isCollapsed={isSidebarCollapsed}
           onCollapsedChange={setIsSidebarCollapsed}
           onThemeToggle={() =>
             setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))
           }
-          onLogout={() => void handleLogout()}
+          onLogout={() => void signOutAdminSession()}
         />
 
         <div className="dym-admin-workspace">
@@ -527,9 +620,10 @@ export function RegistrationsPage({
             }}
             actions={
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
-                  className="dym-btn-action-secondary"
+                  variant="outline"
+                  size="sm"
                   disabled={isLoading || filteredRows.length === 0}
                   onClick={() =>
                     exportRegistrationsToExcel({
@@ -543,28 +637,31 @@ export function RegistrationsPage({
                       ? 'Không có dữ liệu để xuất Excel'
                       : `Xuất ${filteredRows.length} hồ sơ ra file Excel (.xlsx)`
                   }
+                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
                 >
                   <ArrowDownTrayIcon
-                    className="w-4 h-4 shrink-0"
+                    className="size-3.5 shrink-0"
                     aria-hidden="true"
                   />
                   <span>Xuất Excel</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
-                  className="dym-btn-action-secondary"
+                  variant="outline"
+                  size="sm"
                   aria-busy={isLoading}
                   disabled={isLoading}
                   onClick={() => void refetchRegistrations()}
                   title="Làm mới danh sách dữ liệu (F5)"
+                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
                 >
                   <ArrowPathIcon
-                    className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                    className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
                     aria-hidden="true"
                   />
                   <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-                </button>
+                </Button>
               </div>
             }
           />
@@ -575,30 +672,7 @@ export function RegistrationsPage({
           />
 
           <main className="dym-admin-content">
-            {/* Connection alert if offline or error */}
-            {(connectionState === 'offline' ||
-              connectionState === 'disconnected') && (
-              <div
-                className="dym-connection-alert"
-                data-state={connectionState}
-                role="status"
-                aria-live="polite"
-              >
-                <SignalSlashIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <div>
-                  <strong>
-                    {connectionState === 'offline'
-                      ? 'Thiết bị đang mất Internet'
-                      : 'Mất kết nối Supabase Realtime'}
-                  </strong>
-                  <span>
-                    {connectionState === 'offline'
-                      ? 'Dữ liệu sẽ tự đồng bộ lại khi có mạng.'
-                      : 'Hệ thống đang tự thử kết nối lại, không cần tải lại trang.'}
-                  </span>
-                </div>
-              </div>
-            )}
+            <RealtimeConnectionAlert state={connectionState} />
 
             {(error || identityError) && (
               <div className="dym-data-error" role="alert">
@@ -620,10 +694,7 @@ export function RegistrationsPage({
                   <strong className="dym-metric-summary-number">
                     {tabCounts.all}
                   </strong>
-                  <span className="dym-metric-summary-unit">bệnh nhân</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Toàn bộ hồ sơ trong ngày tại {BRANCH_NAMES[branch]}
+                  <span className="dym-metric-summary-unit">khách hàng</span>
                 </div>
               </div>
 
@@ -633,13 +704,10 @@ export function RegistrationsPage({
                   <ClockIcon className="dym-metric-summary-icon text-amber-500" aria-hidden="true" />
                 </div>
                 <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number text-amber-600 dark:text-amber-400">
+                  <strong className="dym-metric-summary-number">
                     {tabCounts.waiting}
                   </strong>
                   <span className="dym-metric-summary-unit">đang chờ</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Khách đang ngồi tại sảnh chưa gọi số
                 </div>
               </div>
 
@@ -649,13 +717,10 @@ export function RegistrationsPage({
                   <CheckCircleIcon className="dym-metric-summary-icon text-emerald-500" aria-hidden="true" />
                 </div>
                 <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number text-emerald-600 dark:text-emerald-400">
+                  <strong className="dym-metric-summary-number">
                     {tabCounts.called}
                   </strong>
                   <span className="dym-metric-summary-unit">lượt gọi</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Đã được bàn điều phối xử lý
                 </div>
               </div>
 
@@ -665,13 +730,10 @@ export function RegistrationsPage({
                   <ClipboardDocumentListIcon className="dym-metric-summary-icon text-sky-500" aria-hidden="true" />
                 </div>
                 <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number text-sky-600 dark:text-sky-400">
+                  <strong className="dym-metric-summary-number">
                     {completionRate}%
                   </strong>
                   <span className="dym-metric-summary-unit">tiến độ</span>
-                </div>
-                <div className="dym-metric-summary-footnote">
-                  Tỷ lệ tiếp nhận đạt mục tiêu trong ngày
                 </div>
               </div>
             </section>
@@ -681,228 +743,376 @@ export function RegistrationsPage({
               className="dym-registry-panel"
               aria-labelledby="registry-table-title"
             >
-              {/* Toolbar with Tabs and Search */}
-              <div className="dym-registry-toolbar">
+              {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
+              <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
                 <div className="dym-registry-title-block">
-                  <span className="dym-registry-kicker">HỒ SƠ KHÁM TIẾP NHẬN</span>
                   <h2 id="registry-table-title" className="dym-registry-title">
                     Danh Sách Chi Tiết Khách Hàng
                   </h2>
-                  <p className="dym-registry-desc">
-                    Tra cứu thông tin hành chính, bảo hiểm y tế và tiến độ tiếp đón bệnh nhân tại phòng khám.
-                  </p>
                 </div>
 
-                {/* Filter Tabs & Search Controls */}
-                <div className="dym-registry-controls">
-                  {/* Filter Tabs */}
-                  <div
-                    className="dym-tab-group"
-                    role="tablist"
-                    aria-label="Lọc hồ sơ theo trạng thái"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'all'}
-                      className={`dym-tab-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('all')}
-                    >
-                      <span>Tất cả</span>
-                      <span className="dym-tab-badge">{tabCounts.all}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'waiting'}
-                      className={`dym-tab-btn is-waiting ${statusFilter === 'waiting' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('waiting')}
-                    >
-                      <span className="dym-tab-dot-waiting" />
-                      <span>Chờ gọi</span>
-                      <span className="dym-tab-badge">{tabCounts.waiting}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={statusFilter === 'called'}
-                      className={`dym-tab-btn is-called ${statusFilter === 'called' ? 'is-active' : ''}`}
-                      onClick={() => setStatusFilter('called')}
-                    >
-                      <span className="dym-tab-dot-called" />
-                      <span>Đã gọi</span>
-                      <span className="dym-tab-badge">{tabCounts.called}</span>
-                    </button>
-                  </div>
-
-                  {/* Quick Filter by Print Status */}
-                  <select
-                    aria-label="Lọc theo trạng thái in"
-                    value={printFilter}
-                    onChange={(e) =>
-                      setPrintFilter(
-                        e.target.value as
-                          | 'all'
-                          | 'unprinted'
-                          | 'partial'
-                          | 'printed',
-                      )
+                {/* Full-width aligned shadcn/ui Filter & Search Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {/* Status Filter Tabs (shadcn Tabs + Badge) */}
+                  <Tabs
+                    value={statusFilter}
+                    onValueChange={(value) =>
+                      setStatusFilter(value as RegistrationStatusTab)
                     }
-                    className={`dym-registry-select ${printFilter !== 'all' ? 'is-filtered' : ''}`}
                   >
-                    <option value="all">Trạng thái in: Tất cả ({rows.length})</option>
-                    <option value="unprinted">
-                      Chưa in ({printCounts.unprinted})
-                    </option>
-                    <option value="partial">
-                      Đã in 1 phần ({printCounts.partial})
-                    </option>
-                    <option value="printed">
-                      Đã in đủ ({printCounts.printed})
-                    </option>
-                  </select>
-
-                  {/* Quick Filter by Company (Searchable Popover) */}
-                  <div className="dym-company-filter-wrap" ref={companyFilterRef}>
-                    <button
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded={isCompanyMenuOpen}
-                      onClick={() => setIsCompanyMenuOpen((prev) => !prev)}
-                      className={`dym-company-filter-trigger ${companyFilter !== 'all' ? 'is-filtered' : ''}`}
-                      title={companyTriggerLabel}
+                    <TabsList
+                      aria-label="Lọc hồ sơ theo trạng thái"
+                      className="h-9 bg-muted p-1"
                     >
-                      <span className="truncate">{companyTriggerLabel}</span>
-                      <ChevronDownIcon
-                        className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`}
-                        aria-hidden="true"
-                      />
-                    </button>
-
-                    {isCompanyMenuOpen && (
-                      <div
-                        className="dym-company-filter-menu"
-                        role="listbox"
-                        aria-label="Chọn đơn vị hoặc công ty"
+                      <TabsTrigger
+                        value="all"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
                       >
-                        <div className="dym-company-filter-search-box">
-                          <MagnifyingGlassIcon
-                            className="w-3.5 h-3.5 text-slate-400 absolute left-4 pointer-events-none"
+                        <span>Tất cả</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.all}
+                        </Badge>
+                      </TabsTrigger>
+
+                      <TabsTrigger
+                        value="waiting"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
+                      >
+                        <span
+                          className="size-1.5 rounded-full bg-amber-500"
+                          aria-hidden="true"
+                        />
+                        <span>Chờ gọi</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.waiting}
+                        </Badge>
+                      </TabsTrigger>
+
+                      <TabsTrigger
+                        value="called"
+                        className="h-7 gap-1.5 px-3 text-xs font-medium"
+                      >
+                        <span
+                          className="size-1.5 rounded-full bg-emerald-500"
+                          aria-hidden="true"
+                        />
+                        <span>Đã gọi</span>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                        >
+                          {tabCounts.called}
+                        </Badge>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+
+                  {/* Right Filter & Search Controls */}
+                  <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
+                    {/* Print Status Filter (shadcn Select + SelectGroup) */}
+                    <Select
+                      value={printFilter}
+                      onValueChange={(value) =>
+                        setPrintFilter(
+                          value as 'all' | 'unprinted' | 'partial' | 'printed',
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label="Lọc theo trạng thái in"
+                        className={cn(
+                          'h-9 w-[215px] bg-card px-3 text-xs font-medium shadow-sm',
+                          printFilter !== 'all' &&
+                            'border-ring bg-accent text-accent-foreground',
+                        )}
+                      >
+                        <div className="flex min-w-0 items-center gap-1.5 truncate">
+                          <Printer
+                            className="size-3.5 shrink-0 text-muted-foreground"
                             aria-hidden="true"
                           />
-                          <input
+                          <SelectValue placeholder="Trạng thái in" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent align="end" className="w-[215px]">
+                        <SelectGroup>
+                          <SelectItem value="all" className="text-xs tabular-nums">
+                            Trạng thái in: Tất cả ({rows.length})
+                          </SelectItem>
+                          <SelectItem
+                            value="unprinted"
+                            className="text-xs tabular-nums"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <span
+                                className="size-1.5 rounded-full bg-slate-400"
+                                aria-hidden="true"
+                              />
+                              <span>Chưa in ({printCounts.unprinted})</span>
+                            </span>
+                          </SelectItem>
+                          <SelectItem
+                            value="partial"
+                            className="text-xs tabular-nums"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <span
+                                className="size-1.5 rounded-full bg-sky-500"
+                                aria-hidden="true"
+                              />
+                              <span>Đã in 1 phần ({printCounts.partial})</span>
+                            </span>
+                          </SelectItem>
+                          <SelectItem
+                            value="printed"
+                            className="text-xs tabular-nums"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <span
+                                className="size-1.5 rounded-full bg-emerald-500"
+                                aria-hidden="true"
+                              />
+                              <span>Đã in đủ ({printCounts.printed})</span>
+                            </span>
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Company Filter (shadcn Popover + Button + Input) */}
+                    <Popover
+                      open={isCompanyMenuOpen}
+                      onOpenChange={setIsCompanyMenuOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={isCompanyMenuOpen}
+                          title={`${companyTriggerMeta.label} (${companyTriggerMeta.count})`}
+                          className={cn(
+                            'h-9 min-w-[190px] max-w-[260px] justify-between gap-2 bg-card px-3 text-xs font-medium shadow-sm',
+                            companyFilter !== 'all' &&
+                              'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
+                          )}
+                        >
+                          <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+                            <Building2
+                              className="size-3.5 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate">
+                              {companyTriggerMeta.label}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            <Badge
+                              variant="secondary"
+                              className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                            >
+                              {companyTriggerMeta.count}
+                            </Badge>
+                            <ChevronsUpDown
+                              className="size-3.5 shrink-0 opacity-50"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </Button>
+                      </PopoverTrigger>
+
+                      <PopoverContent align="end" className="w-72 p-0">
+                        <div className="relative flex items-center border-b border-border p-2">
+                          <Search
+                            className="pointer-events-none absolute left-4 size-3.5 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <Input
                             ref={companySearchInputRef}
                             type="text"
                             value={companySearchQuery}
                             onChange={(e) => setCompanySearchQuery(e.target.value)}
                             placeholder="Tìm tên công ty / đơn vị..."
-                            className="dym-company-filter-search-input"
+                            className="h-8 bg-background pl-8 pr-7 text-xs shadow-none"
                           />
                           {companySearchQuery && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setCompanySearchQuery('')}
-                              className="absolute right-3.5 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                               aria-label="Xóa tìm kiếm công ty"
+                              className="absolute right-3 size-6 text-muted-foreground hover:text-foreground"
                             >
-                              <XMarkIcon className="w-3.5 h-3.5" />
-                            </button>
+                              <X aria-hidden="true" />
+                            </Button>
                           )}
                         </div>
 
-                        <div className="dym-company-filter-list">
+                        <div
+                          role="listbox"
+                          aria-label="Chọn đơn vị hoặc công ty"
+                          className="flex max-h-60 flex-col gap-0.5 overflow-y-auto p-1.5"
+                        >
                           {!companySearchQuery.trim() && (
                             <>
                               <button
                                 type="button"
                                 role="option"
                                 aria-selected={companyFilter === 'all'}
-                                className={`dym-company-filter-option ${companyFilter === 'all' ? 'is-selected' : ''}`}
                                 onClick={() => {
                                   setCompanyFilter('all');
                                   setIsCompanyMenuOpen(false);
                                 }}
+                                className={cn(
+                                  'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                                  companyFilter === 'all' &&
+                                    'bg-accent font-medium text-accent-foreground',
+                                )}
                               >
-                                <span className="truncate">Đơn vị: Tất cả</span>
-                                <span className="dym-company-filter-count">
-                                  {rows.length}
+                                <span className="flex min-w-0 items-center gap-2 truncate">
+                                  <Check
+                                    className={cn(
+                                      'size-3.5 shrink-0 text-primary',
+                                      companyFilter === 'all'
+                                        ? 'opacity-100'
+                                        : 'opacity-0',
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="truncate">Đơn vị: Tất cả</span>
                                 </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                                >
+                                  {rows.length}
+                                </Badge>
                               </button>
 
                               <button
                                 type="button"
                                 role="option"
                                 aria-selected={companyFilter === '__individual__'}
-                                className={`dym-company-filter-option ${companyFilter === '__individual__' ? 'is-selected' : ''}`}
                                 onClick={() => {
                                   setCompanyFilter('__individual__');
                                   setIsCompanyMenuOpen(false);
                                 }}
+                                className={cn(
+                                  'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                                  companyFilter === '__individual__' &&
+                                    'bg-accent font-medium text-accent-foreground',
+                                )}
                               >
-                                <span className="truncate">Khách cá nhân</span>
-                                <span className="dym-company-filter-count">
-                                  {companyFilterData.individualCount}
+                                <span className="flex min-w-0 items-center gap-2 truncate">
+                                  <Check
+                                    className={cn(
+                                      'size-3.5 shrink-0 text-primary',
+                                      companyFilter === '__individual__'
+                                        ? 'opacity-100'
+                                        : 'opacity-0',
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="truncate">Khách cá nhân</span>
                                 </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                                >
+                                  {companyFilterData.individualCount}
+                                </Badge>
                               </button>
                             </>
                           )}
 
                           {filteredCompanyOptions.length > 0 ? (
-                            filteredCompanyOptions.map((c) => (
-                              <button
-                                key={c.name}
-                                type="button"
-                                role="option"
-                                aria-selected={companyFilter === c.name}
-                                className={`dym-company-filter-option ${companyFilter === c.name ? 'is-selected' : ''}`}
-                                onClick={() => {
-                                  setCompanyFilter(c.name);
-                                  setIsCompanyMenuOpen(false);
-                                }}
-                                title={c.name}
-                              >
-                                <span className="truncate">{c.name}</span>
-                                <span className="dym-company-filter-count">
-                                  {c.count}
-                                </span>
-                              </button>
-                            ))
+                            filteredCompanyOptions.map((c) => {
+                              const isSelected = companyFilter === c.name;
+                              return (
+                                <button
+                                  key={c.name}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={isSelected}
+                                  title={c.name}
+                                  onClick={() => {
+                                    setCompanyFilter(c.name);
+                                    setIsCompanyMenuOpen(false);
+                                  }}
+                                  className={cn(
+                                    'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                                    isSelected &&
+                                      'bg-accent font-medium text-accent-foreground',
+                                  )}
+                                >
+                                  <span className="flex min-w-0 items-center gap-2 truncate">
+                                    <Check
+                                      className={cn(
+                                        'size-3.5 shrink-0 text-primary',
+                                        isSelected ? 'opacity-100' : 'opacity-0',
+                                      )}
+                                      aria-hidden="true"
+                                    />
+                                    <span className="truncate">{c.name}</span>
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                                  >
+                                    {c.count}
+                                  </Badge>
+                                </button>
+                              );
+                            })
                           ) : companySearchQuery.trim() ? (
-                            <div className="px-3 py-3 text-center text-xs text-slate-400">
+                            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                               Không tìm thấy đơn vị phù hợp
                             </div>
                           ) : null}
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      </PopoverContent>
+                    </Popover>
 
-                  {/* Search Field */}
-                  <div className="dym-search-wrapper">
-                    <label htmlFor={searchInputId} className="sr-only">
-                      Tìm kiếm hồ sơ bệnh nhân
-                    </label>
-                    <div className="dym-search-input-box">
-                      <MagnifyingGlassIcon className="dym-search-icon" aria-hidden="true" />
-                      <input
+                    {/* Search Field (shadcn Input + Clear Button / Kbd) */}
+                    <div className="relative w-full sm:w-64 lg:w-72">
+                      <label htmlFor={searchInputId} className="sr-only">
+                        Tìm kiếm hồ sơ khách hàng
+                      </label>
+                      <Search
+                        className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <Input
                         id={searchInputId}
                         type="search"
-                        className="dym-search-field"
                         placeholder="Tìm tên, SĐT, CCCD, công ty..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
+                        className="h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
                       />
                       {query ? (
-                        <button
+                        <Button
                           type="button"
-                          className="dym-search-clear-btn"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setQuery('')}
                           aria-label="Xóa từ khóa tìm kiếm"
+                          className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
+                          <X aria-hidden="true" />
+                        </Button>
                       ) : (
-                        <kbd className="dym-search-shortcut" title="Phím tắt: /">
+                        <kbd
+                          className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                          title="Phím tắt: /"
+                        >
                           /
                         </kbd>
                       )}
@@ -913,12 +1123,71 @@ export function RegistrationsPage({
 
               {/* Data Table Content */}
               {isLoading ? (
-                <div className="dym-table-empty-box" aria-live="polite">
-                  <div className="page-loader-dots" aria-hidden="true" />
-                  <h3 className="dym-empty-title">Đang tải danh sách đăng ký</h3>
-                  <p className="dym-empty-desc">
-                    Hệ thống đang đồng bộ dữ liệu an toàn từ Supabase.
-                  </p>
+                <div
+                  className="dym-table-scroller"
+                  aria-busy="true"
+                  aria-live="polite"
+                  aria-label="Đang tải danh sách đăng ký"
+                >
+                  <table className="dym-table-precision">
+                    <thead>
+                      <tr>
+                        <th scope="col">Số Phiếu & Giờ</th>
+                        <th scope="col">Tên Khách Hàng</th>
+                        <th scope="col">Liên Hệ & Định Danh</th>
+                        <th scope="col">Đơn Vị & Địa Chỉ</th>
+                        <th scope="col">Trạng Thái</th>
+                        <th scope="col">Trạng Thái In</th>
+                        <th scope="col" className="text-right">Hồ Sơ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <tr key={index}>
+                          <td className="col-ticket">
+                            <div className="flex flex-col items-start gap-1.5">
+                              <Skeleton className="h-6 w-14 rounded-md" />
+                              <Skeleton className="h-3 w-11" />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-2">
+                                <Skeleton className="h-4 w-36" />
+                                <Skeleton className="h-4 w-9 rounded" />
+                              </div>
+                              <Skeleton className="h-3 w-28" />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex flex-col gap-1.5">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-3 w-28" />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex flex-col gap-1.5">
+                              <Skeleton className="h-4 w-44" />
+                              <Skeleton className="h-3 w-52" />
+                            </div>
+                          </td>
+                          <td>
+                            <Skeleton className="h-6 w-20 rounded-full" />
+                          </td>
+                          <td>
+                            <Skeleton className="h-6 w-20 rounded-full" />
+                          </td>
+                          <td className="text-right">
+                            <div className="dym-table-actions-group">
+                              <Skeleton className="h-7 w-16 rounded-md" />
+                              <Skeleton className="h-7 w-24 rounded-md" />
+                              <Skeleton className="h-7 w-16 rounded-md" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : filteredRows.length === 0 ? (
                 <div className="dym-table-empty-box">
@@ -927,7 +1196,7 @@ export function RegistrationsPage({
                   </div>
                   <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
                   <p className="dym-empty-desc">
-                    Không có bệnh nhân nào phù hợp với bộ lọc hiện tại. Hãy thử đổi ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
+                    Không có khách hàng nào phù hợp với bộ lọc hiện tại. Hãy thử đổi ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
                   </p>
                   {(query ||
                     statusFilter !== 'all' ||
@@ -948,9 +1217,92 @@ export function RegistrationsPage({
                   )}
                 </div>
               ) : (
+                <>
+                <div
+                  className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5 text-xs"
+                  role="toolbar"
+                  aria-label="In hàng loạt"
+                >
+                  <Printer className="size-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="font-medium">
+                    {checkedIds.size > 0
+                      ? `Đã chọn ${checkedIds.size} hồ sơ`
+                      : 'In hàng loạt'}
+                  </span>
+                  {checkedIds.size < filteredRows.length && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-7 px-1 text-xs"
+                      onClick={() => toggleChecked(filteredRows.map((r) => r.id), true)}
+                    >
+                      Chọn tất cả
+                    </Button>
+                  )}
+                  {checkedIds.size > 0 && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setCheckedIds(new Set())}
+                      >
+                        Bỏ chọn
+                      </Button>
+                      <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="size-3.5 accent-sky-600"
+                          checked={padForDuplex}
+                          onChange={(e) => setPadForDuplex(e.target.checked)}
+                        />
+                        In 2 mặt (chèn trang trắng)
+                      </label>
+                      {bulkProgress ? (
+                        <span className="font-medium text-sky-700 dark:text-sky-400" role="status">
+                          {bulkProgress}
+                        </span>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 bg-card px-3 text-xs"
+                            onClick={() => void handleBulkPrint('consent')}
+                          >
+                            In Đồng thuận
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 bg-card px-3 text-xs"
+                            onClick={() => void handleBulkPrint('tt25')}
+                          >
+                            In TT25
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => void handleBulkPrint('both')}
+                            title="Mỗi khách: phiếu Đồng thuận rồi phiếu TT25, theo thứ tự số phiếu"
+                          >
+                            In trọn bộ ({checkedIds.size})
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
                 <RegistrationsTable
                   rows={paginatedRows}
                   searchQuery={query}
+                  checkedIds={checkedIds}
+                  onToggleChecked={toggleChecked}
                   onSelectRow={(row) => setSelectedRow(row)}
                   onPrintRow={(row) => {
                     markRegistrationPrinted(row.id, 'tt25');
@@ -961,6 +1313,7 @@ export function RegistrationsPage({
                     setConsentModalRow(row);
                   }}
                 />
+                </>
               )}
 
               {/* Pagination Bar */}

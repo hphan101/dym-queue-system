@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -5,14 +6,16 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // Lắng nghe trên tất cả card mạng (0.0.0.0) để các máy trong mạng LAN truy cập được
-    allowedHosts: true, // Cho phép truy cập qua domain tunnel bên ngoài (Cloudflare, ngrok, localtunnel)
+    host: true, // Lắng nghe trên mạng LAN nội bộ khi chạy dev server
   },
   build: {
     // The lazy-loaded ward dataset and PDF libraries exceed the default limit.
     chunkSizeWarningLimit: 1200,
   },
   resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
     dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {

@@ -100,7 +100,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           }
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={handleFocus}
-          className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] focus:outline-none focus:ring-2 transition-all cursor-pointer ${
+          className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] focus:outline-none focus:ring-2 transition-[border-color,box-shadow] duration-150 cursor-pointer ${
             error
               ? "border-red-500 focus:ring-red-200"
               : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
@@ -108,15 +108,15 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-slate-400 pointer-events-none">
           <ChevronDown
-            className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            className={`w-4 h-4 transition-transform duration-200 ease-out-quint ${isOpen ? "rotate-180" : ""}`}
           />
         </div>
       </div>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-xl max-h-60 overflow-y-auto py-1">
+        <div className="absolute z-50 w-full mt-1 origin-top animate-popover-in overscroll-contain bg-white border border-slate-200 rounded-md shadow-xl max-h-60 overflow-y-auto py-1">
           {isLoadingOptions ? (
-            <div className="px-4 py-3 text-xs text-slate-400 text-center">
+            <div className="px-4 py-3 text-xs text-slate-500 text-center">
               {loadingMessage}
             </div>
           ) : filteredOptions.length > 0 ? (
@@ -135,7 +135,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               </button>
             ))
           ) : (
-            <div className="px-4 py-3 text-xs text-slate-400 text-center">
+            <div className="px-4 py-3 text-xs text-slate-500 text-center">
               {searchTerm ? "Không tìm thấy kết quả" : "Không có dữ liệu"}
             </div>
           )}

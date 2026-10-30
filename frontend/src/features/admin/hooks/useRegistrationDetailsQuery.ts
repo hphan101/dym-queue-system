@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
-import { rememberRegistrationCount } from '../registrationCountCache';
 import type { RegistrationDetails } from '../types';
 import { syncPrintStatusesFromServer } from './usePrintStatus';
 
@@ -38,7 +37,6 @@ export function useRegistrationDetailsQuery({
       }
 
       const rows = (data ?? []) as RegistrationDetails[];
-      rememberRegistrationCount(branch, date, rows.length);
       syncPrintStatusesFromServer(rows);
       return rows;
     },

@@ -1,9 +1,21 @@
-import { useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
-  BellAlertIcon,
-  BellSlashIcon,
-  CalendarDaysIcon,
-} from '@heroicons/react/24/outline';
+  BellOff,
+  BellRing,
+  Building2,
+  RotateCcw,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import type { BranchCode } from '../../../types/domain';
 import { getTodayInVietnam } from '../../../lib/date';
 import { formatDisplayDate } from '../utils/adminFormatters';
@@ -31,21 +43,8 @@ export function AdminHeader({
   onToggleNotificationSound,
   actions,
 }: AdminHeaderProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const today = getTodayInVietnam();
   const isToday = !date || date === today;
-
-  const handleOpenDatePicker = () => {
-    try {
-      if (dateInputRef.current && 'showPicker' in HTMLInputElement.prototype) {
-        dateInputRef.current.showPicker();
-      } else {
-        dateInputRef.current?.focus();
-      }
-    } catch {
-      dateInputRef.current?.focus();
-    }
-  };
 
   return (
     <header className="dym-admin-header-bar">
@@ -55,14 +54,16 @@ export function AdminHeader({
       </div>
 
       {/* Control Filter Bar */}
-      <div className="dym-header-controls" aria-label="Bộ lọc điều phối">
+      <div
+        className="flex flex-wrap items-center justify-end gap-2.5"
+        aria-label="Bộ lọc điều phối"
+      >
         {/* Sound Toggle (if configured) */}
         {isNotificationSoundEnabled !== undefined && onToggleNotificationSound && (
-          <button
+          <Button
             type="button"
-            className={`dym-btn-sound ${
-              isNotificationSoundEnabled ? 'is-enabled' : 'is-disabled'
-            }`}
+            variant="outline"
+            size="sm"
             aria-pressed={isNotificationSoundEnabled}
             onClick={onToggleNotificationSound}
             title={
@@ -70,98 +71,102 @@ export function AdminHeader({
                 ? 'Chuông âm báo đang bật khi có khách quét QR mới'
                 : 'Âm báo đang tắt. Bấm để bật chuông thông báo'
             }
+            className={cn(
+              'h-9 gap-2 bg-card px-3 text-xs font-medium shadow-sm',
+              isNotificationSoundEnabled &&
+                'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
+            )}
           >
             {isNotificationSoundEnabled ? (
-              <BellAlertIcon className="dym-sound-icon text-dym-blue-600" aria-hidden="true" />
+              <BellRing className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
             ) : (
-              <BellSlashIcon className="dym-sound-icon text-slate-400" aria-hidden="true" />
+              <BellOff
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
             )}
-            <span className="dym-sound-label">
+            <span>
               {isNotificationSoundEnabled ? 'Âm báo bật' : 'Bật âm báo'}
             </span>
             <span
-              className={`dym-sound-indicator-led ${
-                isNotificationSoundEnabled ? 'led-on' : 'led-off'
-              }`}
+              className={cn(
+                'size-2 rounded-full',
+                isNotificationSoundEnabled
+                  ? 'bg-emerald-500'
+                  : 'bg-muted-foreground/40',
+              )}
+              aria-hidden="true"
             />
-          </button>
+          </Button>
         )}
 
-        {/* Branch Selection Dropdown (if configured) */}
+        {/* Branch Selection Dropdown (shadcn Select) */}
         {branch && onBranchChange && branchOptions.length > 0 && (
-          <div className="dym-control-group">
-            <label htmlFor="branch-select" className="dym-control-label">
-              <span>Cơ sở phòng khám</span>
-            </label>
-            <div className="dym-select-wrapper">
-              <select
-                id="branch-select"
-                value={branch}
-                onChange={(e) => onBranchChange(e.target.value as BranchCode)}
-                className="dym-control-select"
-              >
+          <Select
+            value={branch}
+            onValueChange={(value) => onBranchChange(value as BranchCode)}
+          >
+            <SelectTrigger
+              id="branch-select"
+              aria-label="Cơ sở phòng khám"
+              className="h-9 w-[220px] bg-card px-3 text-xs font-medium shadow-sm"
+            >
+              <div className="flex min-w-0 items-center gap-1.5 truncate">
+                <Building2
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <SelectValue placeholder="Chọn cơ sở" />
+              </div>
+            </SelectTrigger>
+            <SelectContent align="end" className="w-[220px]">
+              <SelectGroup>
                 {branchOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="text-xs"
+                  >
                     {opt.label}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
-          </div>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         )}
 
         {/* Date Selection (if configured) */}
         {date !== undefined && onDateChange && (
-          <div className="dym-control-group">
-            <div className="flex items-center justify-between gap-2">
-              <label htmlFor="date-select-btn" className="dym-control-label">
-                <span>Ngày tiếp nhận</span>
-              </label>
-              {!isToday && (
-                <button
-                  type="button"
-                  className="dym-btn-today-link"
-                  onClick={() => onDateChange(today)}
-                  title="Quay về ngày hôm nay"
-                >
-                  Về hôm nay
-                </button>
-              )}
-            </div>
-            <div className="dym-date-wrapper">
-              <button
+          <div className="relative flex items-center gap-1.5">
+            <DatePicker
+              id="date-select-btn"
+              value={date}
+              onChange={onDateChange}
+              ariaLabel={`Ngày tiếp nhận: ${formatDisplayDate(date)}`}
+              highlightWhenNotToday
+              align="end"
+            />
+
+            {!isToday && (
+              <Button
                 type="button"
-                id="date-select-btn"
-                className="dym-control-date-btn"
-                onClick={handleOpenDatePicker}
-                title="Bấm để chọn ngày (Định dạng: Ngày/Tháng/Năm)"
-                aria-label={`Ngày tiếp nhận: ${formatDisplayDate(date)}`}
+                variant="ghost"
+                size="sm"
+                onClick={() => onDateChange(today)}
+                title="Quay về ngày hôm nay"
+                className="h-9 gap-1 px-2.5 text-xs font-medium text-primary hover:text-primary"
               >
-                <span className="dym-control-date-value">
-                  {formatDisplayDate(date)}
-                </span>
-                <CalendarDaysIcon className="dym-control-date-icon" aria-hidden="true" />
-              </button>
-              <input
-                ref={dateInputRef}
-                id="date-select"
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onDateChange(e.target.value);
-                  }
-                }}
-                className="dym-native-date-hidden"
-                tabIndex={-1}
-                aria-hidden="true"
-              />
-            </div>
+                <RotateCcw className="size-3.5 shrink-0" aria-hidden="true" />
+                <span>Hôm nay</span>
+              </Button>
+            )}
           </div>
         )}
 
         {/* Actions Slot */}
-        {actions && <div className="dym-header-actions-slot">{actions}</div>}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
     </header>
   );

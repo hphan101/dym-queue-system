@@ -149,34 +149,6 @@ export function markRegistrationPrinted(
   );
 }
 
-export function cycleRegistrationPrintStatus(
-  registrationId: string,
-  serverExtras?: TT25StoredExtras | null,
-): void {
-  if (!registrationId) return;
-  const currentMap = readStorage();
-  const existing = currentMap[registrationId];
-  const effectiveConsent =
-    existing !== undefined
-      ? existing.consent
-      : Boolean(serverExtras?.printedConsent);
-  const effectiveTt25 =
-    existing !== undefined
-      ? existing.tt25
-      : Boolean(serverExtras?.printedTT25);
-  const isBothPrinted = Boolean(effectiveConsent && effectiveTt25);
-
-  const nextValue = !isBothPrinted;
-  currentMap[registrationId] = {
-    consent: nextValue,
-    tt25: nextValue,
-    updatedAt: Date.now(),
-  };
-  writeStorage(currentMap);
-
-  void persistPrintStatusToSupabase(registrationId, nextValue, nextValue);
-}
-
 export function getPrintStatusDisplay(item?: PrintStatusItem): {
   label: string;
   cls: string;
@@ -190,7 +162,7 @@ export function getPrintStatusDisplay(item?: PrintStatusItem): {
       cls: 'badge-print-done',
       isPrinted: true,
       isFull: true,
-      title: 'Đã in đủ Đồng thuận & TT25 (Nhấn để đặt lại Chưa in)',
+      title: 'Đã in đủ phiếu Đồng thuận & phiếu khám TT25',
     };
   }
   if (item?.consent) {
@@ -199,7 +171,7 @@ export function getPrintStatusDisplay(item?: PrintStatusItem): {
       cls: 'badge-print-partial',
       isPrinted: true,
       isFull: false,
-      title: 'Đã in phiếu Đồng thuận — Chưa in TT25 (Nhấn để đánh dấu Đã in đủ)',
+      title: 'Đã in phiếu Đồng thuận — Chưa in phiếu TT25',
     };
   }
   if (item?.tt25) {
@@ -208,7 +180,7 @@ export function getPrintStatusDisplay(item?: PrintStatusItem): {
       cls: 'badge-print-partial',
       isPrinted: true,
       isFull: false,
-      title: 'Đã in phiếu TT25 — Chưa in Đồng thuận (Nhấn để đánh dấu Đã in đủ)',
+      title: 'Đã in phiếu TT25 — Chưa in phiếu Đồng thuận',
     };
   }
   return {
@@ -216,7 +188,7 @@ export function getPrintStatusDisplay(item?: PrintStatusItem): {
     cls: 'badge-print-pending',
     isPrinted: false,
     isFull: false,
-    title: 'Chưa in hồ sơ (Nhấn để đánh dấu Đã in)',
+    title: 'Chưa in hồ sơ',
   };
 }
 
@@ -247,13 +219,6 @@ export function usePrintStatus() {
     [],
   );
 
-  const togglePrintStatus = useCallback(
-    (registrationId: string, serverExtras?: TT25StoredExtras | null) => {
-      cycleRegistrationPrintStatus(registrationId, serverExtras);
-    },
-    [],
-  );
-
   const getStatus = useCallback(
     (registrationId: string, serverExtras?: TT25StoredExtras | null) => {
       const localItem = statusMap[registrationId];
@@ -280,6 +245,5 @@ export function usePrintStatus() {
     statusMap,
     getStatus,
     markPrinted,
-    togglePrintStatus,
   };
 }

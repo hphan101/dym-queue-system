@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import type { BranchCode } from '../../../types/domain';
 import type { RegistrationDetails, TT25StoredExtras } from '../types';
 
 export interface RegistrationEditableFields {
@@ -21,17 +20,27 @@ interface StoredOverride extends RegistrationEditableFields {
 }
 
 type OverrideMap = Record<string, StoredOverride>;
-type CustomerExtrasMap = Record<string, TT25StoredExtras & { updatedAt: number }>;
 
 const STORAGE_KEY = 'dym_registration_overrides_v1';
-const EXTRAS_STORAGE_KEY = 'dym_tt25_customer_extras_v1';
+const LEGACY_EXTRAS_STORAGE_KEY = 'dym_tt25_customer_extras_v1';
 const EVENT_NAME = 'dym-registration-override-change';
-const MAX_STORED_ITEMS = 1000;
+const MAX_STORED_ITEMS = 500;
+
+function purgeLegacyLocalStoragePii(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_EXTRAS_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 function readOverrides(): OverrideMap {
   if (typeof window === 'undefined') return {};
+  purgeLegacyLocalStoragePii();
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as OverrideMap;
     return parsed && typeof parsed === 'object' ? parsed : {};
@@ -49,51 +58,21 @@ function writeOverrides(map: OverrideMap): void {
       entries.sort((a, b) => (b[1]?.updatedAt ?? 0) - (a[1]?.updatedAt ?? 0));
       nextMap = Object.fromEntries(entries.slice(0, MAX_STORED_ITEMS));
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextMap));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextMap));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
   } catch (err) {
     console.warn('Could not persist registration override:', err);
   }
 }
 
-function makeExtrasKey(queueNumber: number | string, cccd: string): string {
-  const qNum = Number.parseInt(String(queueNumber), 10);
-  const cleanDoc = (cccd || '').trim().toUpperCase();
-  return `${Number.isFinite(qNum) ? qNum : queueNumber}:${cleanDoc}`;
-}
-
-function readCustomerExtras(): CustomerExtrasMap {
-  if (typeof window === 'undefined') return {};
+export function clearRegistrationOverrides(): void {
+  if (typeof window === 'undefined') return;
+  purgeLegacyLocalStoragePii();
   try {
-    const raw = window.localStorage.getItem(EXTRAS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as CustomerExtrasMap;
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent(EVENT_NAME));
   } catch {
-    return {};
-  }
-}
-
-export async function saveCustomerTT25Extras(
-  _branch: BranchCode,
-  queueNumber: number | string,
-  identityDocument: string,
-  extras: TT25StoredExtras,
-): Promise<void> {
-  const qNum = Number.parseInt(String(queueNumber), 10);
-  const cleanDoc = (identityDocument || '').trim().toUpperCase();
-
-  // Save locally for immediate access on same browser (Supabase persistence is handled by the register Edge Function)
-  if (typeof window !== 'undefined') {
-    try {
-      const map = readCustomerExtras();
-      const key = makeExtrasKey(qNum, cleanDoc);
-      map[key] = { ...extras, updatedAt: Date.now() };
-      window.localStorage.setItem(EXTRAS_STORAGE_KEY, JSON.stringify(map));
-      window.dispatchEvent(new CustomEvent(EVENT_NAME));
-    } catch {
-      // Ignore storage quota errors
-    }
+    // Ignore storage errors
   }
 }
 
@@ -123,7 +102,7 @@ export async function saveRegistrationEdit(
     tt25_data: fields.tt25_data,
   };
 
-  // 1. Save immediately in local override store for instant UI & print sync
+  // 1. Save in sessionStorage for instant UI & print sync during current staff session
   const currentMap = readOverrides();
   const prev = currentMap[id];
   currentMap[id] = {
@@ -136,7 +115,7 @@ export async function saveRegistrationEdit(
   };
   writeOverrides(currentMap);
 
-  // 2. Persist to Supabase via RPC if available
+  // 2. Persist to Supabase via RPC
   try {
     const { error } = await supabase.rpc('update_registration_details', {
       p_registration_id: id,
@@ -153,12 +132,12 @@ export async function saveRegistrationEdit(
     });
     if (error) {
       console.info(
-        'Saved registration edit locally (remote RPC notice):',
+        'Saved registration edit in session (remote RPC notice):',
         error.message,
       );
     }
   } catch (err) {
-    console.info('Saved registration edit locally:', err);
+    console.info('Saved registration edit in session:', err);
   }
 }
 
@@ -166,21 +145,13 @@ export function useRegistrationOverrides() {
   const [overrideMap, setOverrideMap] = useState<OverrideMap>(() =>
     readOverrides(),
   );
-  const [extrasMap, setExtrasMap] = useState<CustomerExtrasMap>(() =>
-    readCustomerExtras(),
-  );
 
   useEffect(() => {
     const sync = () => {
       setOverrideMap(readOverrides());
-      setExtrasMap(readCustomerExtras());
     };
     const handleStorage = (e: StorageEvent) => {
-      if (
-        e.key === STORAGE_KEY ||
-        e.key === EXTRAS_STORAGE_KEY ||
-        e.key === null
-      ) {
+      if (e.key === STORAGE_KEY || e.key === null) {
         sync();
       }
     };
@@ -195,15 +166,12 @@ export function useRegistrationOverrides() {
   const applyToDetails = useCallback(
     (row: RegistrationDetails): RegistrationDetails => {
       const ov = overrideMap[row.id];
-      const extKey = makeExtrasKey(row.queue_number, row.identity_document);
-      const localExt = extrasMap[extKey];
       const mergedTt25: TT25StoredExtras = {
-        ...(localExt ?? {}),
         ...(row.tt25_data ?? {}),
         ...(ov?.tt25_data ?? {}),
       };
 
-      if (!ov && !localExt && !row.tt25_data) return row;
+      if (!ov && !row.tt25_data) return row;
 
       return {
         ...row,
@@ -219,7 +187,7 @@ export function useRegistrationOverrides() {
         tt25_data: mergedTt25,
       };
     },
-    [overrideMap, extrasMap],
+    [overrideMap],
   );
 
   const applyToDetailsList = useCallback(

@@ -3,7 +3,6 @@ import { supabase } from '../../../lib/supabaseClient';
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import type { BranchCode } from '../../../types/domain';
 import type { RegistrationRow } from '../components/QueueTable';
-import { rememberRegistrationCount } from '../registrationCountCache';
 import type { TT25StoredExtras } from '../types';
 import { formatBirthDate } from '../utils/adminFormatters';
 import { syncPrintStatusesFromServer } from './usePrintStatus';
@@ -106,8 +105,6 @@ export function useDashboardQueueQuery({
           tt25_data: record.tt25_data ?? null,
         }),
       );
-
-      rememberRegistrationCount(branch, date, fetchedRows.length);
 
       const displayData = displayResult.data as DisplayStateRecord | null;
       let activeQueue = '—';

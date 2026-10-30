@@ -1,5 +1,13 @@
 import React from 'react';
-import { ExclamationTriangleIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { StaffAccount } from '../types';
 
 export interface StaffLockConfirmModalProps {
@@ -18,46 +26,54 @@ export const StaffLockConfirmModal: React.FC<StaffLockConfirmModalProps> = ({
   if (!account) return null;
 
   return (
-    <div className="dym-staff-dialog-backdrop" role="presentation">
-      <section
-        className="dym-staff-dialog dym-staff-confirm-dialog"
+    <Dialog
+      open={Boolean(account)}
+      onOpenChange={(open) => {
+        if (!open && !isPending) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        hideCloseButton
         role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="staff-lock-confirmation-title"
-        aria-describedby="staff-lock-confirmation-description"
+        className="sm:max-w-[425px] gap-5 p-6"
       >
-        <div className="dym-staff-confirm-icon" aria-hidden="true">
-          <ExclamationTriangleIcon />
-        </div>
-        <div>
-          <span className="dym-eyebrow">Xác nhận thao tác</span>
-          <h2 id="staff-lock-confirmation-title">Khóa tài khoản?</h2>
-          <p id="staff-lock-confirmation-description">
-            Bạn có chắc chắn muốn khóa tài khoản <strong>{account.displayName}</strong>?
-            Nhân viên này sẽ bị ngắt kết nối ngay lập tức và không thể đăng nhập cho đến khi được mở khóa lại.
-          </p>
-        </div>
-        <footer>
-          <button
+        <DialogHeader className="flex flex-col gap-1.5 text-left">
+          <DialogTitle>Khóa tài khoản?</DialogTitle>
+          <DialogDescription>
+            Bạn có chắc chắn muốn khóa tài khoản{' '}
+            <strong className="font-semibold text-foreground">
+              {account.displayName}
+            </strong>
+            ? Nhân viên này sẽ bị ngắt kết nối ngay lập tức và không thể đăng
+            nhập cho đến khi được mở khóa lại.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 pt-1">
+          <Button
             type="button"
-            className="dym-btn-action-secondary"
+            variant="outline"
+            size="sm"
             disabled={isPending}
             autoFocus
             onClick={onClose}
+            className="h-9 px-4 text-xs font-medium"
           >
             Hủy
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="dym-btn-action-primary !bg-red-600 hover:!bg-red-700"
+            variant="destructive"
+            size="sm"
             disabled={isPending}
             onClick={() => onConfirm(account)}
+            className="h-9 px-4 text-xs font-medium shadow-sm"
           >
-            <LockClosedIcon className="w-4 h-4 mr-1 inline-block" />
-            {isPending ? 'Đang khóa' : 'Xác nhận khóa'}
-          </button>
-        </footer>
-      </section>
-    </div>
+            {isPending ? 'Đang khóa…' : 'Xác nhận khóa'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import { usePrintStatus } from '../hooks/usePrintStatus';
 import type { RegistrationDetails } from '../types';
@@ -18,6 +19,8 @@ export interface RegistrationsTableProps {
   onSelectRow: (row: RegistrationDetails) => void;
   onPrintRow: (row: RegistrationDetails) => void;
   onPrintConsentRow?: (row: RegistrationDetails) => void;
+  checkedIds?: Set<string>;
+  onToggleChecked?: (ids: string[], checked: boolean) => void;
 }
 
 export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
@@ -26,16 +29,34 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
   onSelectRow,
   onPrintRow,
   onPrintConsentRow,
+  checkedIds,
+  onToggleChecked,
 }) => {
-  const { getStatus, togglePrintStatus } = usePrintStatus();
+  const { getStatus } = usePrintStatus();
+  const isSelectable = Boolean(checkedIds && onToggleChecked);
+  const allChecked =
+    isSelectable && rows.length > 0 && rows.every((r) => checkedIds!.has(r.id));
 
   return (
     <div className="dym-table-scroller">
       <table className="dym-table-precision">
         <thead>
           <tr>
+            {isSelectable && (
+              <th scope="col" className="w-10">
+                <input
+                  type="checkbox"
+                  className="size-4 cursor-pointer accent-sky-600 align-middle"
+                  checked={allChecked}
+                  onChange={(e) =>
+                    onToggleChecked!(rows.map((r) => r.id), e.target.checked)
+                  }
+                  aria-label="Chọn tất cả hồ sơ trên trang này"
+                />
+              </th>
+            )}
             <th scope="col">Số Phiếu & Giờ</th>
-            <th scope="col">Bệnh Nhân</th>
+            <th scope="col">Tên Khách Hàng</th>
             <th scope="col">Liên Hệ & Định Danh</th>
             <th scope="col">Đơn Vị & Địa Chỉ</th>
             <th scope="col">Trạng Thái</th>
@@ -54,6 +75,17 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
 
             return (
               <tr key={row.id}>
+                {isSelectable && (
+                  <td className="w-10">
+                    <input
+                      type="checkbox"
+                      className="size-4 cursor-pointer accent-sky-600 align-middle"
+                      checked={checkedIds!.has(row.id)}
+                      onChange={(e) => onToggleChecked!([row.id], e.target.checked)}
+                      aria-label={`Chọn hồ sơ ${row.full_name}`}
+                    />
+                  </td>
+                )}
                 {/* Ticket & Time */}
                 <td className="col-ticket">
                   <div className="flex flex-col gap-1 items-start">
@@ -173,46 +205,50 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
 
                 {/* Print Status */}
                 <td>
-                  <button
-                    type="button"
-                    onClick={() => togglePrintStatus(row.id, row.tt25_data)}
+                  <span
                     title={printStatus.title}
-                    className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
+                    className={`dym-status-badge ${printStatus.cls}`}
                   >
                     <span className="dym-status-indicator-dot" />
                     {printStatus.label}
-                  </button>
+                  </span>
                 </td>
 
                 {/* Action Button */}
                 <td className="text-right">
                   <div className="dym-table-actions-group">
-                    <button
+                    <Button
                       type="button"
-                      className="dym-btn-table-action action-view"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 bg-card px-3 text-xs"
                       onClick={() => onSelectRow(row)}
                       title="Xem hồ sơ chi tiết"
                     >
-                      <span>Chi tiết</span>
-                    </button>
+                      Chi tiết
+                    </Button>
                     {onPrintConsentRow && (
-                      <button
+                      <Button
                         type="button"
-                        className="dym-btn-table-action"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 bg-card px-3 text-xs"
                         onClick={() => onPrintConsentRow(row)}
                         title="In phiếu Đồng thuận khám sức khỏe"
                       >
-                        <span>In Đồng thuận</span>
-                      </button>
+                        In Đồng thuận
+                      </Button>
                     )}
-                    <button
+                    <Button
                       type="button"
-                      className="dym-btn-table-action"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 bg-card px-3 text-xs"
                       onClick={() => onPrintRow(row)}
                       title="In phiếu khám sức khỏe TT25"
                     >
-                      <span>In TT25</span>
-                    </button>
+                      In TT25
+                    </Button>
                   </div>
                 </td>
               </tr>

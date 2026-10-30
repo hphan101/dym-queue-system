@@ -33,33 +33,19 @@ function wildcardOriginMatches(origin: string, rule: string): boolean {
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
 
-  // 1. If explicit ALLOWED_ORIGINS are configured, enforce them first
+  // 1. If explicit ALLOWED_ORIGINS are configured, enforce them strictly
   const configured = configuredOrigins();
   if (configured.length > 0) {
-    if (configured.some((rule) => wildcardOriginMatches(origin, rule))) {
-      return true;
-    }
-    // Always allow localhost loopback for local Vite development
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
-      return true;
-    }
-    return false;
+    return configured.some((rule) => wildcardOriginMatches(origin, rule));
   }
 
-  // 2. Fallback when ALLOWED_ORIGINS is not set (local/dev environment)
+  // 2. Fallback when ALLOWED_ORIGINS is not set (local/dev environment only)
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
     return true;
   }
 
   if (
     /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/i
-      .test(origin)
-  ) {
-    return true;
-  }
-
-  if (
-    /^https?:\/\/([a-z0-9-]+\.)*(loca\.lt|trycloudflare\.com|ngrok-free\.app|ngrok\.io|vercel\.app)(:\d+)?$/i
       .test(origin)
   ) {
     return true;

@@ -14,10 +14,10 @@ import {
 } from "../_shared/supabase.ts";
 
 const MAX_REQUEST_BYTES = 4_096;
-const MAX_ACCOUNTS = 1_000;
 const RATE_WINDOW_MS = 10 * 60 * 1_000;
 const RATE_WINDOW_SECONDS = 600;
 const RATE_MAX_ATTEMPTS = 20;
+const RATE_MAX_IP_ATTEMPTS = 60;
 const attempts = new Map<string, { count: number; expiresAt: number }>();
 
 function cleanupExpiredAttempts(now: number) {
@@ -29,12 +29,15 @@ function cleanupExpiredAttempts(now: number) {
   }
 }
 
-function requestKey(request: Request, loginName: string) {
+function getRequestRateKeys(request: Request, loginName: string) {
   const clientIp = getClientIp(request) ?? "unknown";
-  return `${clientIp}:${loginName}`;
+  return {
+    ipKey: `ip:${clientIp}`,
+    accountKey: `${clientIp}:${loginName}`,
+  };
 }
 
-function mayAttemptInMemory(key: string): boolean {
+function mayAttemptInMemory(key: string, maxAttempts: number): boolean {
   const now = Date.now();
   cleanupExpiredAttempts(now);
   const entry = attempts.get(key);
@@ -42,7 +45,7 @@ function mayAttemptInMemory(key: string): boolean {
     attempts.set(key, { count: 1, expiresAt: now + RATE_WINDOW_MS });
     return true;
   }
-  if (entry.count >= RATE_MAX_ATTEMPTS) return false;
+  if (entry.count >= maxAttempts) return false;
   entry.count += 1;
   return true;
 }
@@ -60,6 +63,7 @@ async function sha256Hex(value: string): Promise<string> {
 async function checkPersistentLoginRateLimit(
   adminClient: SupabaseClient,
   key: string,
+  maxAttempts: number,
 ): Promise<boolean> {
   try {
     const keyHash = await sha256Hex(`login_rate_limit|${key}`);
@@ -67,17 +71,17 @@ async function checkPersistentLoginRateLimit(
       "consume_registration_ip_limit",
       {
         p_ip_hash: keyHash,
-        p_max_requests: RATE_MAX_ATTEMPTS,
+        p_max_requests: maxAttempts,
         p_window_seconds: RATE_WINDOW_SECONDS,
       },
     );
-    if (error) return true;
+    if (error) return false;
     const row = (Array.isArray(data) ? data[0] : data) as
       | { allowed?: boolean }
       | undefined;
-    return row ? Boolean(row.allowed) : true;
+    return row ? Boolean(row.allowed) : false;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -135,8 +139,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
   }
 
-  const rateKey = requestKey(request, loginName);
-  if (!mayAttemptInMemory(rateKey)) {
+  const { ipKey, accountKey } = getRequestRateKeys(request, loginName);
+  if (
+    !mayAttemptInMemory(ipKey, RATE_MAX_IP_ATTEMPTS) ||
+    !mayAttemptInMemory(accountKey, RATE_MAX_ATTEMPTS)
+  ) {
     return jsonResponse({ success: false, code: "OVER_REQUEST_RATE_LIMIT" }, 429, origin);
   }
 
@@ -150,11 +157,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   try {
     const adminClient = createAdminClient(supabaseUrl, secretKey);
-    const allowedPersistent = await checkPersistentLoginRateLimit(
-      adminClient,
-      rateKey,
-    );
-    if (!allowedPersistent) {
+    const [allowedIpPersistent, allowedAccountPersistent] = await Promise.all([
+      checkPersistentLoginRateLimit(adminClient, ipKey, RATE_MAX_IP_ATTEMPTS),
+      checkPersistentLoginRateLimit(adminClient, accountKey, RATE_MAX_ATTEMPTS),
+    ]);
+    if (!allowedIpPersistent || !allowedAccountPersistent) {
       return jsonResponse(
         { success: false, code: "OVER_REQUEST_RATE_LIMIT" },
         429,
@@ -166,7 +173,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Fast-path: Thử đăng nhập trực tiếp với email format chuẩn nội bộ
     const standardInternalEmail = `${loginName}@accounts.dym.internal`;
     const { data: directData, error: directError } =
       await authClient.auth.signInWithPassword({
@@ -174,70 +180,35 @@ Deno.serve(async (request: Request): Promise<Response> => {
         password,
       });
 
-    if (!directError && directData?.session && directData.user) {
-      const active = await isActiveStaffAccount(adminClient, directData.user.id);
-      if (!active) {
-        return jsonResponse(
-          { success: false, code: "INVALID_CREDENTIALS" },
-          401,
-          origin,
-        );
-      }
-
+    if (directError || !directData?.session || !directData.user) {
       return jsonResponse(
-        {
-          success: true,
-          session: {
-            access_token: directData.session.access_token,
-            refresh_token: directData.session.refresh_token,
-          },
-        },
-        200,
+        { success: false, code: "INVALID_CREDENTIALS" },
+        401,
         origin,
       );
     }
 
-    // Chỉ thực hiện fallback tìm kiếm email legacy đối với tài khoản quản trị khởi tạo ban đầu
-    if (loginName !== "admin") {
-      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
-    }
-
-    const { data: users, error: usersError } = await adminClient.auth.admin.listUsers({
-      page: 1,
-      perPage: MAX_ACCOUNTS,
-    });
-    if (usersError) throw usersError;
-
-    const account = users.users.find((user) => {
-      const storedName = user.user_metadata?.login_name;
-      const legacyName = user.email?.split("@")[0];
-      return String(storedName ?? legacyName ?? "").toLowerCase() === loginName;
-    });
-
-    if (!account?.email || account.email.toLowerCase() === standardInternalEmail) {
-      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
-    }
-
-    const { data, error } = await authClient.auth.signInWithPassword({
-      email: account.email,
-      password,
-    });
-    if (error || !data.session || !data.user) {
-      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
-    }
-
-    const active = await isActiveStaffAccount(adminClient, data.user.id);
+    const active = await isActiveStaffAccount(adminClient, directData.user.id);
     if (!active) {
-      return jsonResponse({ success: false, code: "INVALID_CREDENTIALS" }, 401, origin);
+      await authClient.auth.signOut().catch(() => undefined);
+      return jsonResponse(
+        { success: false, code: "INVALID_CREDENTIALS" },
+        401,
+        origin,
+      );
     }
 
-    return jsonResponse({
-      success: true,
-      session: {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
+    return jsonResponse(
+      {
+        success: true,
+        session: {
+          access_token: directData.session.access_token,
+          refresh_token: directData.session.refresh_token,
+        },
       },
-    }, 200, origin);
+      200,
+      origin,
+    );
   } catch (error) {
     console.error(JSON.stringify({
       code: "LOGIN_FAILED",

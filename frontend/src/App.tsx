@@ -1,377 +1,88 @@
-import {
-  startTransition,
-  useEffect,
-  useState,
-} from 'react';
-import { TT25RegistrationForm } from './features/registration/TT25RegistrationForm';
-import { SuccessView } from './features/registration/SuccessView';
-import { WelcomeScreen } from './features/registration/WelcomeScreen';
-import { CheckupReasonScreen } from './features/registration/CheckupReasonScreen';
-import { ConsentScreen } from './features/registration/ConsentScreen';
-import LoginPage from './features/auth/LoginPage';
-import AdminApplication from './features/admin/AdminApplication';
-import QueueDisplayPage from './features/display/QueueDisplayPage';
-import type {
-  TT25RegistrationData,
-  RegistrationResponse,
-} from './features/registration/types';
-import { BRANCH_NAMES, isBranchCode } from './config/branches';
-import type { BranchCode } from './types/domain';
-import { AlertCircle, Phone, Mail, MapPin, Clock } from 'lucide-react';
-import dymLogo from './assets/dym-logo.png';
-import dymLogoDark from './assets/dym-logo-dark.png';
-import { translations, type SupportedLanguage } from './locales';
-import { APP_NAVIGATION_EVENT } from './lib/navigation';
-import { formatQueueNumber } from './lib/queueNumber';
-import { saveCustomerTT25Extras } from './features/admin/hooks/useRegistrationOverrides';
-
+import { lazy, Suspense, startTransition, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from './lib/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import type { AdminDestination } from './features/admin/AdminApplication';
+import LoginPage from './features/auth/LoginPage';
+import { APP_NAVIGATION_EVENT } from './lib/navigation';
+import { queryClient } from './lib/queryClient';
 
-function getBranchFromUrl(): BranchCode | null {
-  const branch = new URLSearchParams(window.location.search).get('branch')?.toLowerCase();
-  return isBranchCode(branch) ? branch : null;
-}
+const AdminApplication = lazy(() => import('./features/admin/AdminApplication'));
+const QueueDisplayPage = lazy(() => import('./features/display/QueueDisplayPage'));
+const RegistrationFlowPage = lazy(() =>
+  import('./features/registration/RegistrationFlowPage').then((m) => ({
+    default: m.RegistrationFlowPage,
+  }))
+);
 
-function RegistrationApp() {
-  const branch = getBranchFromUrl();
-  const [lang, setLang] = useState<SupportedLanguage>(() => {
-    const saved = localStorage.getItem('dym_registration_lang');
-    return saved === 'en' ? saved : 'vi';
-  });
+type AppRoute =
+  | { kind: 'display' }
+  | { kind: 'login' }
+  | { kind: 'admin'; destination: AdminDestination }
+  | { kind: 'registration' };
 
-  const [step, setStep] = useState<'welcome' | 'reason' | 'consent' | 'form' | 'success'>(() => {
-    const savedStep = localStorage.getItem('dym_registration_step');
-    const savedQueue = localStorage.getItem('dym_registration_queue');
-    return savedStep === 'success' && savedQueue ? 'success' : 'welcome';
-  });
-  const [selectedReason, setSelectedReason] = useState<string>('');
-  const [consentAgreed, setConsentAgreed] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPageLoader, setShowPageLoader] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [registeredData, setRegisteredData] = useState<TT25RegistrationData | null>(null);
-  const [queueNumber, setQueueNumber] = useState<string>(() => {
-    const storedQueueNumber = localStorage.getItem('dym_registration_queue');
-    return storedQueueNumber ? formatQueueNumber(storedQueueNumber) : '';
-  });
+function resolveAppRoute(rawPathname: string, search: string): AppRoute {
+  const pathname = rawPathname.replace(/\/+$/, '') || '/';
+  const requestedPage = new URLSearchParams(search).get('page');
 
-  const registrationApiUrl = import.meta.env.VITE_REGISTRATION_API_URL;
+  if (pathname === '/display' || requestedPage === 'display') {
+    return { kind: 'display' };
+  }
+  if (pathname === '/login' || requestedPage === 'login') {
+    return { kind: 'login' };
+  }
+  if (
+    pathname === '/staff' ||
+    pathname.startsWith('/admin/staff') ||
+    requestedPage === 'staff'
+  ) {
+    return { kind: 'admin', destination: 'staff' };
+  }
+  if (
+    pathname === '/roster-personnel' ||
+    pathname.startsWith('/admin/roster-personnel') ||
+    requestedPage === 'roster-personnel'
+  ) {
+    return { kind: 'admin', destination: 'roster-personnel' };
+  }
+  if (
+    pathname === '/roster-onsite' ||
+    pathname.startsWith('/admin/roster-onsite') ||
+    requestedPage === 'roster-onsite'
+  ) {
+    return { kind: 'admin', destination: 'roster-onsite' };
+  }
+  if (
+    pathname === '/roster-insite' ||
+    pathname.startsWith('/admin/roster-insite') ||
+    requestedPage === 'roster-insite'
+  ) {
+    return { kind: 'admin', destination: 'roster-insite' };
+  }
+  if (
+    pathname === '/roster' ||
+    pathname === '/roster-dashboard' ||
+    pathname.startsWith('/admin/roster') ||
+    requestedPage === 'roster' ||
+    requestedPage === 'roster-dashboard'
+  ) {
+    return { kind: 'admin', destination: 'roster-dashboard' };
+  }
+  if (
+    pathname === '/registrations' ||
+    pathname.startsWith('/admin/registrations') ||
+    requestedPage === 'registrations'
+  ) {
+    return { kind: 'admin', destination: 'registrations' };
+  }
+  if (
+    pathname === '/admin' ||
+    pathname.startsWith('/admin') ||
+    requestedPage === 'admin'
+  ) {
+    return { kind: 'admin', destination: 'dashboard' };
+  }
 
-  // Remove PII saved by versions released before the Supabase migration.
-  useEffect(() => {
-    localStorage.removeItem('dym_registration_data');
-  }, []);
-
-  const handleSelectLanguage = (newLang: SupportedLanguage) => {
-    setLang(newLang);
-    localStorage.setItem('dym_registration_lang', newLang);
-    setError(null);
-    setStep('reason');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSelectReason = (reason: string) => {
-    setSelectedReason(reason);
-    setError(null);
-    setStep('consent');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSelectConsent = (agreed: boolean) => {
-    setConsentAgreed(agreed);
-    setError(null);
-    setStep('form');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleFormSubmit = async (formData: TT25RegistrationData) => {
-    setIsLoading(true);
-    setShowPageLoader(false);
-    setError(null);
-    const loaderTimer = window.setTimeout(() => setShowPageLoader(true), 500);
-    const finishLoading = () => {
-      window.clearTimeout(loaderTimer);
-      setShowPageLoader(false);
-      setIsLoading(false);
-    };
-
-    if (!registrationApiUrl) {
-      setError(translations[lang].errorUrl);
-      finishLoading();
-      return;
-    }
-
-    const requestController = new AbortController();
-    const requestTimeout = window.setTimeout(
-      () => requestController.abort(),
-      15_000,
-    );
-
-    const payload = {
-      ...formData,
-      companyName: formData.workplace || '',
-      consentAgreed,
-    };
-
-    try {
-      const response = await fetch(registrationApiUrl, {
-        method: 'POST',
-        mode: 'cors',
-        signal: requestController.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = (await response.json().catch(() => null)) as RegistrationResponse | null;
-
-      if (response.ok && result?.success && result.queueNumber) {
-        const formattedQueueNumber = formatQueueNumber(result.queueNumber);
-        await saveCustomerTT25Extras(
-          formData.branch,
-          result.queueNumber,
-          formData.cccd,
-          {
-            ethnicity: formData.ethnicity,
-            bloodGroup: formData.bloodGroup,
-            insuranceNumber: formData.insuranceNumber,
-            occupation: formData.occupation,
-            workplaceWard: formData.workplaceWard,
-            checkupReason: formData.checkupReason,
-            medicalHistory: formData.medicalHistory,
-            targetPayment: formData.targetPayment,
-            consentAgreed,
-          },
-        );
-        setQueueNumber(formattedQueueNumber);
-        setRegisteredData({
-          ...formData,
-          consentAgreed,
-          queueNumber: formattedQueueNumber,
-        });
-        setStep('success');
-        
-        // Patient details remain in memory; only the queue receipt persists.
-        localStorage.setItem('dym_registration_step', 'success');
-        localStorage.setItem('dym_registration_queue', formattedQueueNumber);
-        localStorage.setItem('dym_last_registration_time', Date.now().toString());
-      } else {
-        throw new Error(result?.error || translations[lang].saveError);
-      }
-    } catch (err: unknown) {
-      console.error('Lỗi khi gửi đăng ký:', err);
-      setError(
-        err instanceof DOMException && err.name === 'AbortError'
-          ? translations[lang].requestTimeout
-          : err instanceof Error
-            ? err.message
-            : translations[lang].networkError,
-      );
-    } finally {
-      window.clearTimeout(requestTimeout);
-      finishLoading();
-    }
-  };
-
-  const handleReset = () => {
-    setStep('welcome');
-    setSelectedReason('');
-    setConsentAgreed(true);
-    setRegisteredData(null);
-    setQueueNumber('');
-    setError(null);
-    
-    localStorage.removeItem('dym_registration_step');
-    localStorage.removeItem('dym_registration_data');
-    localStorage.removeItem('dym_registration_queue');
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f4f9fc] flex flex-col justify-between pt-6">
-      {showPageLoader && (
-        <div className="page-loader animate-fade-in">
-          <img
-            src={dymLogoDark}
-            alt="DYM Medical Center"
-            className="page-loader-logo object-contain"
-          />
-          <div className="page-loader-dots"></div>
-        </div>
-      )}
-
-      <main className="flex-grow max-w-md md:max-w-xl lg:max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-center transition-all duration-300">
-        <div className="bg-white rounded-md shadow-xl border border-slate-200/80 p-5 sm:p-8 medical-card">
-          {branch && step === 'form' && (
-            <div className="mb-6 text-center">
-              <span className="inline-block px-2.5 py-0.5 rounded bg-dym-blue-50 text-dym-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1.5">
-                {lang === 'vi'
-                  ? 'Thông tư 25/2026/TT-BYT (Mẫu 03)'
-                  : 'Circular 25/2026/TT-BYT (Form 03)'}
-              </span>
-              <h2 className="text-xl font-extrabold text-slate-800">
-                {lang === 'vi' ? 'Hồ Sơ Khám Sức Khỏe' : translations[lang].title}
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                {lang === 'vi'
-                  ? 'Vui lòng hoàn tất 12 mục hành chính và tiền sử y tế để in phiếu khám'
-                  : 'Please complete the 12 administrative items and medical history to print your checkup form'}
-              </p>
-              <p className="mt-2 inline-flex rounded bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                {BRANCH_NAMES[branch]}
-              </p>
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-5 p-3.5 rounded bg-red-50 border border-red-100 flex items-start gap-2.5 text-xs text-red-700 animate-shake">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">{translations[lang].failedTitle}</p>
-                <p className="mt-0.5 leading-relaxed">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {!branch && step !== 'success' ? (
-            <div className="py-4 text-center space-y-5">
-              <img
-                src={dymLogoDark}
-                alt="DYM Medical Center Vietnam"
-                className="h-12 sm:h-14 w-auto object-contain mx-auto"
-              />
-              <div className="rounded border border-red-100 bg-red-50 p-4 text-center text-sm text-red-700">
-                {translations[lang].noBranchError}
-              </div>
-            </div>
-          ) : step === 'welcome' ? (
-            <WelcomeScreen
-              branch={branch}
-              onSelectLanguage={handleSelectLanguage}
-            />
-          ) : step === 'reason' ? (
-            <CheckupReasonScreen
-              branch={branch}
-              lang={lang}
-              onSelectReason={handleSelectReason}
-              onBack={() => setStep('welcome')}
-            />
-          ) : step === 'consent' ? (
-            <ConsentScreen
-              branch={branch}
-              lang={lang}
-              onSelectConsent={handleSelectConsent}
-              onBack={() => setStep('reason')}
-            />
-          ) : step === 'form' ? (
-            <TT25RegistrationForm
-              onSubmit={handleFormSubmit}
-              isLoading={isLoading}
-              branch={branch!}
-              lang={lang}
-              initialCheckupReason={selectedReason}
-            />
-          ) : (
-            <SuccessView
-              queueNumber={queueNumber}
-              data={registeredData}
-              onReset={handleReset}
-              lang={lang}
-            />
-          )}
-        </div>
-      </main>
-
-      <footer className="bg-[#111833] text-slate-300 py-10 text-xs border-t border-slate-800/80">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-            <div className="space-y-4">
-              <div>
-                <img src={dymLogo} alt="DYM Medical Center Vietnam" className="h-10 w-auto object-contain" />
-              </div>
-              <div className="space-y-2.5 text-slate-300">
-                <div className="flex items-start gap-2.5">
-                  <Phone className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <p>
-                    <span className="font-semibold text-white">Hotline:</span>{' '}
-                    <a href="tel:1900292937" className="hover:text-white transition-colors">1900 29 29 37</a>
-                  </p>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <Mail className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <p>
-                    <span className="font-semibold text-white">Email:</span>{' '}
-                    <a href="mailto:info@dymmedicalcenter.com.vn" className="hover:text-[#63c4e8] transition-colors">info@dymmedicalcenter.com.vn</a>
-                  </p>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <Clock className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <p>
-                    <span className="font-semibold text-white">Thời gian hoạt động:</span> 8:00 - 18:00
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-white text-[13px] uppercase tracking-wider border-b border-slate-800 pb-1.5">
-                Cơ sở TP. Hồ Chí Minh
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-start gap-2.5">
-                  <MapPin className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <a
-                    href="https://www.google.com/maps/search/?api=1&query=DYM+Medical+Center+Sài+Gòn+mPlaza+Saigon"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-white hover:underline transition-all leading-relaxed"
-                  >
-                    <span className="font-semibold text-white">DYM mPlaza Quận 1:</span> Phòng B101–B103, Tầng hầm 1, tòa nhà mPlaza Saigon, số 39 Lê Duẩn, Phường Bến Nghé, Quận 1, TP Hồ Chí Minh.
-                  </a>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <MapPin className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <a
-                    href="https://www.google.com/maps/search/?api=1&query=DYM+Medical+Center+Phú+Mỹ+Hưng+The+Grace"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-white hover:underline transition-all leading-relaxed"
-                  >
-                    <span className="font-semibold text-white">DYM The Grace Quận 7:</span> Phòng 3A01, Tầng 3A, Tòa nhà The Grace, 71 Hoàng Văn Thái, Phường Tân Phú, Quận 7, TP Hồ Chí Minh.
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-white text-[13px] uppercase tracking-wider border-b border-slate-800 pb-1.5">
-                Cơ sở Hà Nội
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-start gap-2.5">
-                  <MapPin className="w-4 h-4 text-[#63c4e8] shrink-0 mt-0.5" />
-                  <a
-                    href="https://maps.app.goo.gl/hrh2TypSzWQJGnyq9"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-white hover:underline transition-all leading-relaxed"
-                  >
-                    <span className="font-semibold text-white">DYM Epic Tower Cầu Giấy:</span> Tầng Hầm B1, Toà Epic Tower, Ngõ 19 Duy Tân, Phường Cầu Giấy, TP Hà Nội.
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-800/60 mt-8 pt-4 text-center text-[10px] text-slate-500">
-            <p>&copy; 2026 DYM Medical Center. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+  return { kind: 'registration' };
 }
 
 function App() {
@@ -399,36 +110,19 @@ function App() {
     };
   }, []);
 
-  const pathname = location.pathname.replace(/\/+$/, '') || '/';
-  const requestedPage = new URLSearchParams(location.search).get('page');
-  const isLoginPage = pathname === '/login' || requestedPage === 'login';
-  const isAdminPage = pathname === '/admin' || requestedPage === 'admin';
-  const isRegistrationsPage =
-    pathname === '/registrations' || requestedPage === 'registrations';
-  const isStaffPage = pathname === '/staff' || requestedPage === 'staff';
-  const isQueueDisplayPage =
-    pathname === '/display' || requestedPage === 'display';
+  const route = resolveAppRoute(location.pathname, location.search);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-        {isQueueDisplayPage ? (
-          <QueueDisplayPage />
-        ) : isAdminPage || isRegistrationsPage || isStaffPage ? (
-          <AdminApplication
-            destination={
-              isStaffPage
-                ? 'staff'
-                : isRegistrationsPage
-                  ? 'registrations'
-                  : 'dashboard'
-            }
-          />
-        ) : isLoginPage ? (
-          <LoginPage />
-        ) : (
-          <RegistrationApp />
-        )}
+        <Suspense fallback={null}>
+          {route.kind === 'display' && <QueueDisplayPage />}
+          {route.kind === 'login' && <LoginPage />}
+          {route.kind === 'admin' && (
+            <AdminApplication destination={route.destination} />
+          )}
+          {route.kind === 'registration' && <RegistrationFlowPage />}
+        </Suspense>
       </ErrorBoundary>
     </QueryClientProvider>
   );

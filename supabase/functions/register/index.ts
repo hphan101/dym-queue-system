@@ -10,7 +10,7 @@ import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts"
 
 const MAX_REQUEST_BYTES = 16_384;
 const COOLDOWN_SECONDS = 600;
-const IP_RATE_LIMIT_REQUESTS = 250;
+const IP_RATE_LIMIT_REQUESTS = 600;
 const IP_RATE_LIMIT_WINDOW_SECONDS = 600;
 const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;
 const IDENTITY_PATTERN = /^([0-9]{12}|[A-Z][A-Z0-9]{6,12})$/;
@@ -63,6 +63,92 @@ function stringField(
   return typeof value === "string" ? value.trim().normalize("NFC") : null;
 }
 
+function sanitizeNestedText(value: unknown, maxLen: number): string {
+  if (typeof value !== "string") return "";
+  const cleaned = value
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    .trim()
+    .slice(0, maxLen);
+  return isSafeText(cleaned, 0, maxLen) ? cleaned : "";
+}
+
+function sanitizeMedicalHistory(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const familyRaw = isRecord(raw.familyHistory) ? raw.familyHistory : {};
+  const personalRaw = isRecord(raw.personalHistory) ? raw.personalHistory : {};
+  const treatmentRaw = isRecord(raw.currentTreatment)
+    ? raw.currentTreatment
+    : {};
+  const pregnancyRaw = isRecord(raw.pregnancyHistory)
+    ? raw.pregnancyHistory
+    : null;
+
+  const personalHistory: Record<string, boolean> = {};
+  for (let i = 1; i <= 22; i++) {
+    const key = String(i);
+    personalHistory[key] = Boolean(personalRaw[key]);
+  }
+
+  const result: Record<string, unknown> = {
+    familyHistory: {
+      hasDisease: Boolean(familyRaw.hasDisease),
+      diseaseDetails: sanitizeNestedText(familyRaw.diseaseDetails, 300),
+    },
+    personalHistory,
+    personalOtherDetails: sanitizeNestedText(raw.personalOtherDetails, 300),
+    currentTreatment: {
+      isTreating: Boolean(treatmentRaw.isTreating),
+      medications: sanitizeNestedText(treatmentRaw.medications, 300),
+    },
+    commitmentAgreed: Boolean(raw.commitmentAgreed),
+  };
+
+  if (pregnancyRaw) {
+    result.pregnancyHistory = {
+      hasHistory: Boolean(pregnancyRaw.hasHistory),
+      details: sanitizeNestedText(pregnancyRaw.details, 300),
+    };
+  }
+
+  return result;
+}
+
+function sanitizeTargetPayment(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const validGroups = new Set(["14", "15", "16", "other"]);
+  const validSources = new Set(["employer", "self", "other"]);
+  const validLocations = new Set([
+    "cs_kbcb",
+    "kham_luu_dong",
+    "tram_y_te",
+    "truong_hoc",
+    "ksk_tai_nha",
+  ]);
+
+  const targetGroup =
+    typeof raw.targetGroup === "string" && validGroups.has(raw.targetGroup)
+      ? raw.targetGroup
+      : "15";
+  const paymentSource =
+    typeof raw.paymentSource === "string" && validSources.has(raw.paymentSource)
+      ? raw.paymentSource
+      : "employer";
+  const examLocation =
+    typeof raw.examLocation === "string" && validLocations.has(raw.examLocation)
+      ? raw.examLocation
+      : "cs_kbcb";
+
+  return {
+    targetGroup,
+    targetOtherDetails: sanitizeNestedText(raw.targetOtherDetails, 200),
+    paymentSource,
+    paymentOtherDetails: sanitizeNestedText(raw.paymentOtherDetails, 200),
+    examLocation,
+  };
+}
+
 function parsePayload(value: unknown): RegistrationPayload | null {
   if (!isRecord(value)) return null;
 
@@ -113,10 +199,10 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   }
 
   if (isRecord(value.medicalHistory)) {
-    tt25Extras.medicalHistory = value.medicalHistory;
+    tt25Extras.medicalHistory = sanitizeMedicalHistory(value.medicalHistory);
   }
   if (isRecord(value.targetPayment)) {
-    tt25Extras.targetPayment = value.targetPayment;
+    tt25Extras.targetPayment = sanitizeTargetPayment(value.targetPayment);
   }
   if (typeof value.consentAgreed === "boolean") {
     tt25Extras.consentAgreed = value.consentAgreed;
@@ -360,58 +446,58 @@ Deno.serve(async (request: Request): Promise<Response> => {
     const supabase = createAdminClient(supabaseUrl, supabaseSecretKey);
 
     const clientIp = getClientIp(request);
-    if (clientIp) {
-      const ipHash = await createHmac(`ip|${clientIp}`, fingerprintSecret);
-      const { data: ipLimitData, error: ipLimitError } = await supabase.rpc(
-        "consume_registration_ip_limit",
-        {
-          p_ip_hash: ipHash,
-          p_max_requests: IP_RATE_LIMIT_REQUESTS,
-          p_window_seconds: IP_RATE_LIMIT_WINDOW_SECONDS,
-        },
+    const rateLimitIp = clientIp ?? "missing-client-ip";
+    const maxIpRequests = clientIp ? IP_RATE_LIMIT_REQUESTS : 30;
+    const ipHash = await createHmac(`ip|${rateLimitIp}`, fingerprintSecret);
+    const { data: ipLimitData, error: ipLimitError } = await supabase.rpc(
+      "consume_registration_ip_limit",
+      {
+        p_ip_hash: ipHash,
+        p_max_requests: maxIpRequests,
+        p_window_seconds: IP_RATE_LIMIT_WINDOW_SECONDS,
+      },
+    );
+
+    if (ipLimitError) {
+      console.error(
+        JSON.stringify({
+          requestId,
+          code: "IP_RATE_LIMIT_ERROR",
+          databaseCode: ipLimitError.code,
+        }),
       );
+      return jsonResponse(
+        {
+          success: false,
+          code: "SERVER_ERROR",
+          error: "Hệ thống đang bận. Vui lòng thử lại sau.",
+        },
+        503,
+        origin,
+      );
+    }
 
-      if (ipLimitError) {
-        console.error(
-          JSON.stringify({
-            requestId,
-            code: "IP_RATE_LIMIT_ERROR",
-            databaseCode: ipLimitError.code,
-          }),
-        );
-        return jsonResponse(
-          {
-            success: false,
-            code: "SERVER_ERROR",
-            error: "Hệ thống đang bận. Vui lòng thử lại sau.",
-          },
-          503,
-          origin,
-        );
-      }
+    const ipLimit = (
+      Array.isArray(ipLimitData) ? ipLimitData[0] : ipLimitData
+    ) as IpLimitResult | undefined;
 
-      const ipLimit = (
-        Array.isArray(ipLimitData) ? ipLimitData[0] : ipLimitData
-      ) as IpLimitResult | undefined;
-
-      if (ipLimit && !ipLimit.allowed) {
-        const retryAfter = Math.max(
-          1,
-          Number(ipLimit.retry_after_seconds) ||
-            IP_RATE_LIMIT_WINDOW_SECONDS,
-        );
-        return jsonResponse(
-          {
-            success: false,
-            code: "RATE_LIMITED",
-            error:
-              "Có quá nhiều yêu cầu từ mạng này. Vui lòng thử lại sau ít phút.",
-          },
-          429,
-          origin,
-          { "Retry-After": String(retryAfter) },
-        );
-      }
+    if (ipLimit && !ipLimit.allowed) {
+      const retryAfter = Math.max(
+        1,
+        Number(ipLimit.retry_after_seconds) ||
+          IP_RATE_LIMIT_WINDOW_SECONDS,
+      );
+      return jsonResponse(
+        {
+          success: false,
+          code: "RATE_LIMITED",
+          error:
+            "Có quá nhiều yêu cầu từ mạng này. Vui lòng thử lại sau ít phút.",
+        },
+        429,
+        origin,
+        { "Retry-After": String(retryAfter) },
+      );
     }
 
     const { data, error } = await supabase.rpc("issue_registration", {
@@ -427,6 +513,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       p_address_detail: payload.addressDetail,
       p_fingerprint: fingerprint,
       p_cooldown_seconds: COOLDOWN_SECONDS,
+      p_tt25_data: payload.tt25Extras,
     });
 
     if (error) {
@@ -446,7 +533,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
       if (
         errorText.includes("INVALID_DATA") ||
-        errorText.includes("INVALID_BRANCH")
+        errorText.includes("INVALID_BRANCH") ||
+        errorText.includes("PAYLOAD_TOO_LARGE")
       ) {
         return jsonResponse(
           {
@@ -484,31 +572,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
         500,
         origin,
       );
-    }
-
-    const parsedQueueInt = Number.parseInt(String(issued.queue_number), 10);
-    if (
-      Number.isFinite(parsedQueueInt) &&
-      Object.keys(payload.tt25Extras).length > 0
-    ) {
-      const { error: extrasError } = await supabase.rpc(
-        "save_registration_tt25_data",
-        {
-          p_branch_code: payload.branch,
-          p_queue_number: parsedQueueInt,
-          p_identity_document: payload.cccd,
-          p_tt25_data: payload.tt25Extras,
-        },
-      );
-      if (extrasError) {
-        console.warn(
-          JSON.stringify({
-            requestId,
-            code: "TT25_EXTRAS_SAVE_WARNING",
-            databaseCode: extrasError.code,
-          }),
-        );
-      }
     }
 
     return jsonResponse(

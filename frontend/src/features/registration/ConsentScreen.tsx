@@ -36,24 +36,24 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
           </span>
         )}
 
-        <div className="inline-flex items-center gap-1.5 text-dym-blue-700 text-xs font-bold uppercase tracking-wider mb-1">
+        <div className="inline-flex items-center gap-1.5 text-dym-blue-700 text-xs font-semibold mb-1">
           <ShieldCheck className="w-4 h-4" />
           <span>{isEn ? 'Step 3: Consent Form' : 'Bước 3: Đồng thuận khám'}</span>
         </div>
 
-        <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-800 uppercase">
-          {isEn ? 'CONSENT STATEMENT FOR HEALTH CHECK-UP' : 'ĐỒNG THUẬN KHÁM SỨC KHỎE'}
+        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-800">
+          {isEn ? 'Consent Statement for Health Check-up' : 'Đồng thuận khám sức khỏe'}
         </h1>
         <p className="text-xs font-semibold italic text-dym-blue-700 mt-0.5">
-          {isEn ? 'ĐỒNG THUẬN KHÁM SỨC KHỎE' : 'CONSENT STATEMENT FOR HEALTH CHECK-UP'}
+          {isEn ? 'Đồng thuận khám sức khỏe' : 'Consent Statement for Health Check-up'}
         </p>
       </div>
 
       {/* Scrollable Legal / Medical Consent Content */}
-      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4 max-h-[360px] overflow-y-auto space-y-3.5 text-xs leading-relaxed text-slate-700 shadow-inner">
+      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4 max-h-[360px] overflow-y-auto overscroll-contain space-y-3.5 text-xs leading-relaxed text-slate-700 shadow-inner">
         {/* Section 1 */}
         <div className="space-y-1.5">
-          <h2 className="font-bold text-slate-900 text-xs sm:text-[13px]">
+          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
             1. ĐỒNG Ý KHÁM /{' '}
             <span className="italic text-[#0070C0]">CONSENT TO EXAMINATION</span>
           </h2>
@@ -70,7 +70,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
 
         {/* Section 2 */}
         <div className="space-y-2 border-t border-slate-200/80 pt-3">
-          <h2 className="font-bold text-slate-900 text-xs sm:text-[13px]">
+          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
             2. ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN /{' '}
             <span className="italic text-[#0070C0]">
               CONSENT TO THE PROCESSING OF PERSONAL DATA
@@ -129,7 +129,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
           <button
             type="button"
             onClick={() => onSelectConsent(true)}
-            className="w-full py-3 px-4 rounded bg-dym-blue-500 hover:bg-dym-blue-600 active:scale-[0.99] text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 px-4 rounded bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] text-white font-bold text-sm shadow-md transition-[transform,background-color,box-shadow] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[2.5]" />
             <span>{isEn ? 'I agree (Tôi đồng ý)' : 'Tôi đồng ý'}</span>
@@ -138,7 +138,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
           <button
             type="button"
             onClick={() => onSelectConsent(false)}
-            className="w-full py-3 px-4 rounded border-2 border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/50 active:scale-[0.99] text-slate-700 hover:text-red-700 font-semibold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 px-4 rounded border-2 border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/50 active:scale-[0.97] text-slate-700 hover:text-red-700 font-semibold text-sm transition-[transform,border-color,background-color,color] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer"
           >
             <X className="w-4 h-4" />
             <span>{isEn ? 'I do not agree (Không đồng ý)' : 'Tôi không đồng ý'}</span>
@@ -151,7 +151,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-500 hover:text-dym-blue-700 hover:bg-slate-100/80 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-500 hover:text-dym-blue-700 hover:bg-slate-100/80 active:scale-[0.97] transition-[transform,color,background-color] duration-150 ease-out-quint cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
           <span>{isEn ? 'Back to checkup reason' : 'Quay lại chọn lý do khám'}</span>

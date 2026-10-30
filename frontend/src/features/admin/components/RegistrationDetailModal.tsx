@@ -57,7 +57,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   onPrintConsent,
   onUpdated,
 }) => {
-  const { getStatus, togglePrintStatus } = usePrintStatus();
+  const { getStatus } = usePrintStatus();
   const { applyToDetails, saveEdit } = useRegistrationOverrides();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -185,7 +185,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     effectiveRow.state,
     effectiveRow.first_called_at,
   );
-  const printStatus = getStatus(effectiveRow.id);
+  const printStatus = getStatus(effectiveRow.id, effectiveRow.tt25_data);
 
   const handleStartEdit = () => {
     setForm(buildInitialForm(effectiveRow));
@@ -264,9 +264,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           <div className="dym-clinical-drawer-top">
             <div className="dym-clinical-drawer-title-wrap">
               <div className="dym-clinical-drawer-meta-row">
-                <span className="dym-clinical-drawer-kicker">
-                  PHIẾU ĐĂNG KÝ TIẾP ĐÓN
-                </span>
                 <span className="dym-ticket-tag dym-drawer-ticket-tag">
                   #{formatQueueNumber(effectiveRow.queue_number)}
                 </span>
@@ -352,7 +349,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               <div className="dym-detail-grid">
                 <div className="dym-detail-item dym-detail-full-width">
                   <label className="dym-detail-label" htmlFor="edit-full-name">
-                    Họ và tên
+                    Tên khách hàng
                   </label>
                   <input
                     id="edit-full-name"
@@ -362,7 +359,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, full_name: e.target.value }))
                     }
-                    placeholder="Nhập họ và tên..."
+                    placeholder="Nhập tên khách hàng..."
                     required
                   />
                 </div>
@@ -440,7 +437,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             ) : (
               <div className="dym-detail-grid">
                 <div className="dym-detail-item">
-                  <span className="dym-detail-label">Họ và tên</span>
+                  <span className="dym-detail-label">Tên khách hàng</span>
                   <span className="dym-detail-value">{effectiveRow.full_name}</span>
                 </div>
                 <div className="dym-detail-item">
@@ -949,15 +946,13 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               <div className="dym-detail-item">
                 <span className="dym-detail-label">Trạng thái in</span>
                 <span className="dym-detail-value">
-                  <button
-                    type="button"
-                    onClick={() => togglePrintStatus(effectiveRow.id)}
+                  <span
                     title={printStatus.title}
-                    className={`dym-status-badge dym-print-status-btn ${printStatus.cls}`}
+                    className={`dym-status-badge ${printStatus.cls}`}
                   >
                     <span className="dym-status-indicator-dot" />
                     {printStatus.label}
-                  </button>
+                  </span>
                 </span>
               </div>
             </div>

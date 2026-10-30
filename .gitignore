@@ -23,3 +23,10 @@ supabase/.temp
 **/.vscode
 **/.idea
 **/Thumbs.db
+
+# Local AI skills & code graph artifacts
+.agents/
+agent-skills
+skills-lock.json
+graphify-out/
+.graphifyignore

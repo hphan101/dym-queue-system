@@ -141,7 +141,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
     onPrinted?.();
     const a = document.createElement('a');
     a.href = pdfUrl;
-    const cleanName = (data.fullName || 'BenhNhan').replace(/\s+/g, '_');
+    const cleanName = (data.fullName || 'KhachHang').replace(/\s+/g, '_');
     a.download = `Phieu_Kham_TT25_${cleanName}.pdf`;
     document.body.appendChild(a);
     a.click();
@@ -157,14 +157,14 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <FileText className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold flex items-center gap-2 text-white">
+            <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 text-white">
               Phiếu khám sức khỏe Thông tư 25/2026/TT-BYT
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 inline-flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Mẫu 03 (7 trang A4)
               </span>
             </h2>
             <p className="text-xs text-slate-400">
-              Bệnh nhân: <strong className="text-slate-100">{data.fullName}</strong>
+              Khách hàng: <strong className="text-slate-100">{data.fullName}</strong>
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('pdf')}
-              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer ${
                 viewMode === 'pdf'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -187,7 +187,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('web')}
-              className={`px-2.5 py-1 rounded-sm font-medium transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-sm font-medium transition-colors cursor-pointer flex items-center gap-1 ${
                 viewMode === 'web'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-300 hover:text-white'
@@ -202,7 +202,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded transition-colors cursor-pointer"
               title="Tải file PDF điền sẵn (7 trang A4)"
             >
               <Download className="w-4 h-4 text-slate-300" />
@@ -214,7 +214,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded shadow-md transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded shadow-md transition-colors cursor-pointer shrink-0"
               title="In phiếu khám trực tiếp ra máy in"
             >
               <Printer className="w-4 h-4" />
@@ -250,14 +250,14 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
                 <button
                   type="button"
                   onClick={loadPdf}
-                  className="text-xs bg-rose-800 hover:bg-rose-700 active:scale-95 text-white font-medium px-3.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  className="text-xs bg-rose-800 hover:bg-rose-700 active:scale-95 text-white font-medium px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors"
                 >
                   Thử lại
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('web')}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-white font-medium px-3.5 py-1.5 rounded-lg cursor-pointer border border-slate-600 transition-all"
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-white font-medium px-3.5 py-1.5 rounded-lg cursor-pointer border border-slate-600 transition-colors"
                 >
                   Xem bản in Web (Dự phòng)
                 </button>

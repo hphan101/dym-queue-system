@@ -74,7 +74,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
             key={item.value}
             type="button"
             onClick={() => onSelectReason(item.value)}
-            className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-all duration-200 hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
+            className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-150 ease-out-quint hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3.5 min-w-0">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-dym-blue-50 border border-dym-blue-100 text-xs font-extrabold text-dym-blue-800 group-hover:bg-dym-blue-500 group-hover:text-white group-hover:border-dym-blue-500 transition-colors">
@@ -84,7 +84,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
                 {isEn ? item.labelEn : item.labelVi}
               </span>
             </div>
-            <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-[transform,color] duration-150 ease-out-quint" />
           </button>
         ))}
       </div>
@@ -94,7 +94,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-500 hover:text-dym-blue-700 hover:bg-slate-100/80 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-500 hover:text-dym-blue-700 hover:bg-slate-100/80 active:scale-[0.97] transition-[transform,color,background-color] duration-150 ease-out-quint cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
           <span>{isEn ? 'Back to language selection' : 'Quay lại chọn ngôn ngữ'}</span>

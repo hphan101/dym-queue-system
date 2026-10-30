@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
+import { type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import {
   CONTROL_CHARACTERS,
   isOriginAllowed,
@@ -10,7 +10,6 @@ import {
 } from "../_shared/http.ts";
 import {
   createAdminClient,
-  getSupabasePublishableKey,
   getSupabaseSecretKey,
 } from "../_shared/supabase.ts";
 
@@ -18,9 +17,9 @@ const MAX_REQUEST_BYTES = 16_384;
 const MAX_STAFF_ACCOUNTS = 200;
 const USER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_BRANCH_CODES = new Set(["q1", "q7", "hn"]);
-const ALLOWED_ROLES = new Set(["admin", "receptionist"]);
+const ALLOWED_ROLES = new Set(["admin", "operator", "receptionist"]);
 
-type StaffRole = "admin" | "receptionist";
+type StaffRole = "admin" | "operator" | "receptionist";
 
 interface StaffInput {
   displayName: string;
@@ -52,7 +51,17 @@ interface ResetPasswordInput {
   password: string;
 }
 
-type StaffRequest = CreateStaffInput | UpdateStaffInput | SetActiveInput | ResetPasswordInput;
+interface DeleteStaffInput {
+  action: "delete";
+  userId: string;
+}
+
+type StaffRequest =
+  | CreateStaffInput
+  | UpdateStaffInput
+  | SetActiveInput
+  | ResetPasswordInput
+  | DeleteStaffInput;
 
 function parseStaffInput(value: Record<string, unknown>): StaffInput | null {
   const displayName = typeof value.displayName === "string"
@@ -68,7 +77,7 @@ function parseStaffInput(value: Record<string, unknown>): StaffInput | null {
     typeof role !== "string" ||
     !ALLOWED_ROLES.has(role) ||
     branchCodes.some((code) => !ALLOWED_BRANCH_CODES.has(code)) ||
-    (role === "receptionist" && branchCodes.length === 0)
+    ((role === "receptionist" || role === "operator") && branchCodes.length === 0)
   ) {
     return null;
   }
@@ -133,6 +142,14 @@ function parsePayload(value: unknown): StaffRequest | null {
     return { action: "reset-password", userId, password };
   }
 
+  if (value.action === "delete") {
+    const userId = typeof value.userId === "string" ? value.userId : "";
+    if (!USER_ID_PATTERN.test(userId)) {
+      return null;
+    }
+    return { action: "delete", userId };
+  }
+
   return null;
 }
 
@@ -163,19 +180,23 @@ function getBearerToken(request: Request) {
   return match?.[1] ?? null;
 }
 
+type ActorCheckResult =
+  | { ok: true; user: User }
+  | { ok: false; code: "AUTH_REQUIRED" | "ADMIN_REQUIRED"; status: 401 | 403 };
+
 async function getAdminActor(
-  userClient: SupabaseClient,
+  serviceClient: SupabaseClient,
   accessToken: string,
-) {
-  const { data: userData, error: userError } = await userClient.auth.getUser(
+): Promise<ActorCheckResult> {
+  const { data: userData, error: userError } = await serviceClient.auth.getUser(
     accessToken,
   );
   if (userError || !userData.user) {
     console.error(JSON.stringify({ code: "INVALID_USER_SESSION" }));
-    return null;
+    return { ok: false, code: "AUTH_REQUIRED", status: 401 };
   }
 
-  const { data: profile, error: profileError } = await userClient
+  const { data: profile, error: profileError } = await serviceClient
     .from("profiles")
     .select("role, is_active")
     .eq("user_id", userData.user.id)
@@ -186,10 +207,10 @@ async function getAdminActor(
       code: "ADMIN_PROFILE_REQUIRED",
       userId: userData.user.id,
     }));
-    return null;
+    return { ok: false, code: "ADMIN_REQUIRED", status: 403 };
   }
 
-  return userData.user;
+  return { ok: true, user: userData.user };
 }
 
 async function getBranchIds(
@@ -508,6 +529,10 @@ async function handleSetActive(
     throw profileUpdateError;
   }
 
+  if (!payload.isActive) {
+    await serviceClient.auth.admin.signOut(payload.userId, "global").catch(() => undefined);
+  }
+
   await recordAuditLog(
     serviceClient,
     actor.id,
@@ -539,7 +564,45 @@ async function handleResetPassword(
   );
   if (passwordError) throw passwordError;
 
+  await serviceClient.auth.admin.signOut(payload.userId, "global").catch(() => undefined);
+
   await recordAuditLog(serviceClient, actor.id, "staff.password_reset", payload.userId);
+
+  return jsonResponse({ success: true }, 200, origin);
+}
+
+async function handleDeleteStaff(
+  serviceClient: SupabaseClient,
+  actor: User,
+  payload: DeleteStaffInput,
+  origin: string | null,
+): Promise<Response> {
+  if (payload.userId === actor.id) {
+    return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
+  }
+
+  const { data: targetProfile } = await serviceClient
+    .from("profiles")
+    .select("user_id, display_name, role")
+    .eq("user_id", payload.userId)
+    .maybeSingle();
+  if (!targetProfile) {
+    return jsonResponse({ success: false, code: "STAFF_NOT_FOUND" }, 404, origin);
+  }
+
+  await serviceClient.from("queue_calls").delete().eq("called_by", payload.userId);
+  await serviceClient.from("staff_branch_access").delete().eq("user_id", payload.userId);
+  await serviceClient.from("profiles").delete().eq("user_id", payload.userId);
+
+  const { error: deleteUserError } = await serviceClient.auth.admin.deleteUser(
+    payload.userId,
+  );
+  if (deleteUserError) throw deleteUserError;
+
+  await recordAuditLog(serviceClient, actor.id, "staff.deleted", payload.userId, {
+    display_name: targetProfile.display_name,
+    role: targetProfile.role,
+  });
 
   return jsonResponse({ success: true }, 200, origin);
 }
@@ -576,27 +639,27 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseSecretKey = getSupabaseSecretKey();
-  const supabasePublishableKey = getSupabasePublishableKey();
-  if (!supabaseUrl || !supabaseSecretKey || !supabasePublishableKey) {
+  if (!supabaseUrl || !supabaseSecretKey) {
     console.error(JSON.stringify({ requestId, code: "SERVER_NOT_CONFIGURED" }));
     return jsonResponse({ success: false, code: "SERVER_ERROR" }, 500, origin);
   }
 
-  const userClient = createClient(supabaseUrl, supabasePublishableKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  });
   const serviceClient = createAdminClient(supabaseUrl, supabaseSecretKey);
 
-  const actor = await getAdminActor(userClient, accessToken);
-  if (!actor) {
-    return jsonResponse({ success: false, code: "ADMIN_REQUIRED" }, 403, origin);
+  const actorCheck = await getAdminActor(serviceClient, accessToken);
+  if (!actorCheck.ok) {
+    return jsonResponse(
+      { success: false, code: actorCheck.code },
+      actorCheck.status,
+      origin,
+    );
   }
+  const actor = actorCheck.user;
 
   try {
     if (request.method === "GET") {
       return jsonResponse(
-        { success: true, staff: await listStaff(serviceClient, userClient) },
+        { success: true, staff: await listStaff(serviceClient, serviceClient) },
         200,
         origin,
       );
@@ -633,6 +696,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
         return await handleSetActive(serviceClient, actor, payload, origin);
       case "reset-password":
         return await handleResetPassword(serviceClient, actor, payload, origin);
+      case "delete":
+        return await handleDeleteStaff(serviceClient, actor, payload, origin);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

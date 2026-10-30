@@ -41,7 +41,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         <p className="text-xs sm:text-sm text-slate-600 leading-relaxed text-balance">
           Vui lòng chọn ngôn ngữ để bắt đầu khai báo thông tin khám&nbsp;sức&nbsp;khỏe.
-          <span className="block text-slate-400 text-xs mt-1">
+          <span className="block text-slate-500 text-xs mt-1">
             Please select your preferred language to begin registration.
           </span>
         </p>
@@ -52,7 +52,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         <button
           type="button"
           onClick={() => onSelectLanguage('vi')}
-          className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-all duration-200 hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
+          className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-150 ease-out-quint hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
         >
           <div className="flex items-center gap-3.5 min-w-0">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-dym-blue-50 border border-dym-blue-100 text-xs font-extrabold tracking-wider text-dym-blue-800 group-hover:bg-dym-blue-500 group-hover:text-white group-hover:border-dym-blue-500 transition-colors">
@@ -62,13 +62,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               Tiếng Việt
             </span>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-all" />
+          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-[transform,color] duration-150 ease-out-quint" />
         </button>
 
         <button
           type="button"
           onClick={() => onSelectLanguage('en')}
-          className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-all duration-200 hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
+          className="group w-full flex items-center justify-between gap-4 rounded-md border-2 border-slate-200/90 bg-white px-4 py-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-150 ease-out-quint hover:border-dym-blue-500 hover:bg-dym-blue-50/40 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-dym-blue-500/30 cursor-pointer shadow-sm"
         >
           <div className="flex items-center gap-3.5 min-w-0">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-dym-blue-50 border border-dym-blue-100 text-xs font-extrabold tracking-wider text-dym-blue-800 group-hover:bg-dym-blue-500 group-hover:text-white group-hover:border-dym-blue-500 transition-colors">
@@ -78,7 +78,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               English
             </span>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-all" />
+          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-[transform,color] duration-150 ease-out-quint" />
         </button>
       </div>
     </div>

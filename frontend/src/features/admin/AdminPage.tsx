@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SignalSlashIcon } from '@heroicons/react/24/outline';
 import { Theme } from '@astryxdesign/core/theme';
 import '@astryxdesign/core/astryx.css';
 import { BRANCH_NAMES } from '../../config/branches';
@@ -8,8 +7,11 @@ import { formatQueueNumber } from '../../lib/queueNumber';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
 import { AdminSidebar } from './AdminSidebar';
-import { clearRememberedStaffName } from './adminIdentity';
-import { getCachedRegistrationCount } from './registrationCountCache';
+import { signOutAdminSession } from './adminIdentity';
+import {
+  REALTIME_REGISTRATION_COLUMNS,
+  type RealtimeConnectionState,
+} from './constants/queueConstants';
 import { dymAdminTheme } from './theme';
 import './admin.css';
 
@@ -35,13 +37,9 @@ import {
   QueueTable,
   type RegistrationRow,
 } from './components/QueueTable';
+import { RealtimeConnectionAlert } from './components/RealtimeConnectionAlert';
 
 type PendingQueueAction = 'next' | 'recall' | null;
-type RealtimeConnectionState =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'offline';
 
 interface QueueActionResult {
   registration_id: string;
@@ -58,6 +56,7 @@ interface UndoQueueResult {
 
 const DASHBOARD_PAGE_SIZE = 20;
 const CUSTOMER_NOTIFICATION_DURATION_MS = 8_000;
+const REALTIME_REFETCH_DEBOUNCE_MS = 700;
 
 export function AdminPage({
   authorizedIsAdmin,
@@ -69,7 +68,8 @@ export function AdminPage({
   const queryClient = useQueryClient();
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
-  const { staffName, branchIds, identityError } = useStaffIdentity();
+  const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
+    useStaffIdentity();
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [rows, setRows] = useState<RegistrationRow[]>([]);
@@ -94,6 +94,8 @@ export function AdminPage({
     useState(false);
 
   const notificationTimer = useRef<number | null>(null);
+  const realtimeRefetchTimer = useRef<number | null>(null);
+  const hasPendingRealtimeRefetch = useRef(false);
   const notificationSoundEnabledRef = useRef(false);
   const isActiveTabRef = useRef(isActiveTab);
   isActiveTabRef.current = isActiveTab;
@@ -103,7 +105,8 @@ export function AdminPage({
 
   const {
     data: dashboardData,
-    isLoading: isDataLoading,
+    isPending: isQueryPending,
+    isFetching: isQueryFetching,
     error: queryError,
     refetch: refetchDashboard,
   } = useDashboardQueueQuery({
@@ -112,21 +115,49 @@ export function AdminPage({
     date,
   });
 
-  useEffect(() => {
+  const [syncedDashboardData, setSyncedDashboardData] = useState<
+    typeof dashboardData
+  >(undefined);
+  if (dashboardData !== syncedDashboardData) {
+    setSyncedDashboardData(dashboardData);
     if (dashboardData) {
       setRows(dashboardData.rows);
       setCurrentQueue(dashboardData.activeQueue);
       setCurrentPatient(dashboardData.activePatient);
       setAnnouncement(dashboardData.announcement);
     }
-  }, [dashboardData]);
+  }
+
+  const hasAvailableBranches = Object.keys(branchIds).length > 0;
+  const isWaitingForBranchSync = hasAvailableBranches && !branchId;
+  const isDataLoading =
+    isLoadingIdentity ||
+    isWaitingForBranchSync ||
+    (Boolean(branchId) &&
+      !identityError &&
+      !queryError &&
+      (isQueryPending || (isQueryFetching && !dashboardData)));
 
   const dataError = actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
 
   useEffect(() => {
+    if (!actionError) return;
+    const timer = window.setTimeout(() => {
+      setActionError(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [actionError]);
+
+  useEffect(() => {
     if (!isActiveTab) return;
     document.title = 'Tiếp nhận | DYM Medical Center';
-  }, [isActiveTab]);
+    if (hasPendingRealtimeRefetch.current) {
+      hasPendingRealtimeRefetch.current = false;
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
+    }
+  }, [branch, date, isActiveTab, queryClient]);
 
   // Sync branch selection if initial branch is not in allowed list
   useEffect(() => {
@@ -195,6 +226,20 @@ export function AdminPage({
       setConnectionState('offline');
     }
 
+    const scheduleDashboardInvalidation = () => {
+      if (!isActiveTabRef.current) {
+        hasPendingRealtimeRefetch.current = true;
+        return;
+      }
+      if (realtimeRefetchTimer.current !== null) return;
+      realtimeRefetchTimer.current = window.setTimeout(() => {
+        realtimeRefetchTimer.current = null;
+        void queryClient.invalidateQueries({
+          queryKey: ['dashboardQueue', branch, date],
+        });
+      }, REALTIME_REFETCH_DEBOUNCE_MS);
+    };
+
     const channel = supabase
       .channel(`admin:${branchId}:${date}`)
       .on(
@@ -204,19 +249,7 @@ export function AdminPage({
           schema: 'public',
           table: 'registrations',
           filter: `branch_id=eq.${branchId}`,
-          select: [
-            'id',
-            'branch_id',
-            'queue_date',
-            'queue_number',
-            'full_name',
-            'phone_number',
-            'state',
-            'registered_at',
-            'first_called_at',
-            'last_called_at',
-            'updated_at',
-          ],
+          select: REALTIME_REGISTRATION_COLUMNS,
         },
         (payload) => {
           if (
@@ -226,9 +259,7 @@ export function AdminPage({
           ) {
             showCustomerNotification(payload.new);
           }
-          void queryClient.invalidateQueries({
-            queryKey: ['dashboardQueue', branch, date],
-          });
+          scheduleDashboardInvalidation();
         },
       )
       .on(
@@ -240,6 +271,10 @@ export function AdminPage({
           filter: `branch_id=eq.${branchId}`,
         },
         () => {
+          if (!isActiveTabRef.current) {
+            hasPendingRealtimeRefetch.current = true;
+            return;
+          }
           void queryClient.invalidateQueries({
             queryKey: ['dashboardQueue', branch, date],
           });
@@ -269,6 +304,10 @@ export function AdminPage({
       isCurrentChannel = false;
       if (notificationTimer.current !== null) {
         window.clearTimeout(notificationTimer.current);
+      }
+      if (realtimeRefetchTimer.current !== null) {
+        window.clearTimeout(realtimeRefetchTimer.current);
+        realtimeRefetchTimer.current = null;
       }
       void channel.unsubscribe();
     };
@@ -516,12 +555,6 @@ export function AdminPage({
     setQuery('');
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    clearRememberedStaffName();
-    window.location.assign('/?page=login');
-  };
-
   const branchOptions = useMemo(
     () =>
       (Object.keys(branchIds) as BranchCode[]).map((code) => ({
@@ -531,9 +564,6 @@ export function AdminPage({
     [branchIds],
   );
 
-  const registrationCount =
-    getCachedRegistrationCount(branch, date) ?? rowsForDay.length;
-
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
       <div className="dym-admin-shell" data-color-mode={themeMode}>
@@ -541,9 +571,9 @@ export function AdminPage({
           activePage="dashboard"
           branch={branch}
           date={date}
-          registrationCount={registrationCount}
           staffName={staffName}
           isAdmin={authorizedIsAdmin}
+          staffRole={authorizedIsAdmin ? 'admin' : staffRole}
           themeMode={themeMode}
           isCollapsed={isSidebarCollapsed}
           onCollapsedChange={setIsSidebarCollapsed}
@@ -552,7 +582,7 @@ export function AdminPage({
               current === 'dark' ? 'light' : 'dark',
             )
           }
-          onLogout={() => void handleLogout()}
+          onLogout={() => void signOutAdminSession()}
         />
 
         <div className="dym-admin-workspace">
@@ -572,29 +602,7 @@ export function AdminPage({
           />
 
           <main id="overview" className="dym-admin-content">
-            {(connectionState === 'offline' ||
-              connectionState === 'disconnected') && (
-              <div
-                className="dym-connection-alert"
-                data-state={connectionState}
-                role="status"
-                aria-live="polite"
-              >
-                <SignalSlashIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <div>
-                  <strong>
-                    {connectionState === 'offline'
-                      ? 'Thiết bị đang mất Internet'
-                      : 'Mất kết nối Supabase Realtime'}
-                  </strong>
-                  <span>
-                    {connectionState === 'offline'
-                      ? 'Dữ liệu sẽ tự đồng bộ lại khi có mạng.'
-                      : 'Hệ thống đang tự thử kết nối lại, không cần tải lại trang.'}
-                  </span>
-                </div>
-              </div>
-            )}
+            <RealtimeConnectionAlert state={connectionState} />
             {(dataError || identityError) && (
               <div className="dym-data-error" role="alert" aria-live="polite">
                 {dataError || identityError}

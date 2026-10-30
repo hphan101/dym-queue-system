@@ -1,0 +1,586 @@
+/* ==========================================================================
+   DYM Medical Roster, Insite Room Scheduling (D1/D7) & Campaign Cost Module
+   Framed-Sheet Clinical Ledger (design-taste-frontend + frontend-ui-engineering)
+   ========================================================================== */
+
+/* 1. Scope & Filter Toolbar (contextual per dedicated screen) */
+.dym-roster-scope-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-panel);
+  background: var(--color-paper-2);
+}
+
+.dym-roster-scope-left,
+.dym-roster-scope-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dym-roster-scope-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.dym-roster-scope-field strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 2. Form Inputs & Controls */
+.dym-roster-month-input,
+.dym-roster-date-input,
+.dym-roster-select,
+.dym-roster-input {
+  min-height: 36px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background: var(--color-paper-raised);
+  font: 500 0.875rem / 1.2 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 150ms var(--ease-out),
+    box-shadow 150ms var(--ease-out);
+}
+
+.dym-roster-month-input:focus-visible,
+.dym-roster-date-input:focus-visible,
+.dym-roster-select:focus-visible,
+.dym-roster-input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.dym-roster-num-input {
+  text-align: right;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5. Panels & Grids (align-items: start to prevent panel-void) */
+.dym-roster-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.dym-roster-split-layout {
+  display: grid;
+  grid-template-columns: 21rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.dym-roster-panel {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-panel);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  overflow: clip;
+}
+
+.dym-roster-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-paper-raised);
+}
+
+.dym-roster-panel-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dym-roster-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+
+.dym-roster-panel-subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.dym-roster-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 6. Tabular Ledger Tables (sentence-case headers, no zebra, right-aligned numbers) */
+.dym-roster-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dym-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.dym-roster-table th {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.825rem;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dym-roster-table th.is-right,
+.dym-roster-table td.is-right {
+  text-align: right;
+}
+
+.dym-roster-table th.is-center,
+.dym-roster-table td.is-center {
+  text-align: center;
+}
+
+.dym-roster-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: middle;
+  color: var(--color-ink);
+}
+
+.dym-roster-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dym-roster-table tbody tr:hover {
+    background: var(--color-overlay-hover-soft);
+  }
+}
+
+.dym-roster-table tfoot td {
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--color-rule-2);
+  background: var(--color-paper-3);
+  font-weight: 600;
+}
+
+/* Proportional 2px bar under ranked money amounts (references/app-screens.md §7 + animation-performance composite scaleX) */
+.dym-roster-thin-bar-track {
+  width: 100%;
+  height: 2px;
+  margin-top: 0.3rem;
+  background: var(--color-rule);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.dym-roster-thin-bar-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--color-muted);
+  border-radius: 1px;
+  transform-origin: left center;
+  transition: transform 240ms var(--ease-out);
+}
+
+.dym-roster-thin-bar-fill.is-top {
+  background: var(--color-brand-accent);
+}
+
+/* 7. Badges & Tabular Numbers */
+.dym-roster-tabular {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.dym-roster-code-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.48rem;
+  border: 1px solid var(--color-rule-2);
+  border-radius: 0.25rem;
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  font: 600 0.75rem / 1.2 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.dym-roster-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.52rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.dym-roster-role-badge.role-doctor {
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.dym-admin-shell[data-color-mode='dark'] .dym-roster-role-badge.role-doctor {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.dym-roster-role-badge.role-nurse {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.dym-admin-shell[data-color-mode='dark'] .dym-roster-role-badge.role-nurse {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.14);
+}
+
+.dym-roster-role-badge.role-technician {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.dym-admin-shell[data-color-mode='dark'] .dym-roster-role-badge.role-technician {
+  color: #c4b5fd;
+  background: rgba(167, 139, 250, 0.14);
+}
+
+.dym-roster-role-badge.role-ctv {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.dym-admin-shell[data-color-mode='dark'] .dym-roster-role-badge.role-ctv {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.dym-roster-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.48rem;
+  border: 1px solid var(--color-rule-2);
+  border-radius: 0.25rem;
+  font: 600 0.75rem / 1.2 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  background: var(--color-paper-raised);
+}
+
+/* 8. Campaign List Sidebar Cards */
+.dym-roster-campaign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  max-height: 680px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dym-roster-campaign-card {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  cursor: pointer;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.dym-roster-campaign-card:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dym-roster-campaign-card:hover:not(.is-selected) {
+    border-color: var(--color-rule-2);
+    background: var(--color-overlay-hover-soft);
+  }
+}
+
+.dym-roster-campaign-card.is-selected {
+  border-color: var(--color-brand-accent);
+  background: color-mix(in srgb, var(--color-brand-accent) 8%, var(--color-paper-raised));
+}
+
+.dym-roster-campaign-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dym-roster-campaign-company {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-ink);
+  line-height: 1.3;
+}
+
+.dym-roster-campaign-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+/* 9. Room Catalog Manager Bar & Collapsible Sections */
+.dym-roster-room-catalog-drawer {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-paper-3);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.dym-roster-collapsible-enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.dym-roster-room-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dym-roster-room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.65rem;
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-control);
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.dym-roster-room-chip-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 140ms var(--ease-out),
+    color 140ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+/* Expand touch target to >=34px without changing visual chip density */
+.dym-roster-room-chip-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.dym-roster-room-chip-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dym-roster-room-chip-btn:hover {
+    color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  }
+}
+
+/* 10. Quick Assignment Form Bar */
+.dym-roster-assign-bar {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.1fr) minmax(13rem, 1.5fr) 8.5rem 9.5rem 9.5rem minmax(9rem, 1fr) auto;
+  gap: 0.625rem;
+  align-items: end;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-paper-3);
+}
+
+.dym-roster-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.dym-roster-field label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dym-roster-icon-btn {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-control);
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  font-size: 0.775rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
+    color 150ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.dym-roster-icon-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.dym-roster-icon-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dym-roster-icon-btn:hover:not(:disabled) {
+    border-color: var(--color-brand-accent);
+    background: var(--color-overlay-hover-soft);
+  }
+  .dym-roster-icon-btn.is-danger:hover:not(:disabled) {
+    border-color: var(--color-error);
+    color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  }
+}
+
+/* Dashed Empty Slot Frame (references/app-screens.md §11) */
+.dym-roster-empty-slot {
+  padding: 2.5rem 1.5rem;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.dym-roster-empty-slot strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1280px) {
+  .dym-roster-assign-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dym-roster-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .dym-roster-split-layout {
+    grid-template-columns: 1fr;
+  }
+  .dym-roster-assign-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .dym-roster-assign-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dym-roster-campaign-card,
+  .dym-roster-icon-btn,
+  .dym-roster-room-chip-btn,
+  .dym-roster-room-catalog-drawer,
+  .dym-roster-collapsible-enter,
+  .dym-roster-thin-bar-fill {
+    transition-duration: 0.01ms !important;
+  }
+}

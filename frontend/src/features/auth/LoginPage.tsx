@@ -1,29 +1,8 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
-import { LockClosedIcon } from '@heroicons/react/24/outline';
-import { VStack } from '@astryxdesign/core/Layout';
-import { Center } from '@astryxdesign/core/Center';
-import { Text, Heading } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
-import { Link } from '@astryxdesign/core/Link';
-import { Icon } from '@astryxdesign/core/Icon';
-import { Theme } from '@astryxdesign/core/theme';
-import '@astryxdesign/core/astryx.css';
+import { useState, type FormEvent } from 'react';
+import { ShieldCheck } from 'lucide-react';
+import { LoginForm } from '@/components/login-form';
 import dymLogo from '../../assets/dym-logo-dark.png';
 import { supabase } from '../../lib/supabaseClient';
-import { dymAdminTheme } from '../admin/theme';
-import './login.css';
-
-const pageStyle: CSSProperties = {
-  minHeight: '100dvh',
-  padding: '24px 16px',
-};
-
-const contentStyle: CSSProperties = {
-  width: '100%',
-  maxWidth: 420,
-};
 
 function getLoginErrorMessage(code?: string): string {
   switch (code) {
@@ -104,7 +83,11 @@ export default function LoginPage() {
 
       window.location.assign('/?page=admin');
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.');
+      setError(
+        loginError instanceof Error
+          ? loginError.message
+          : 'Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -116,95 +99,40 @@ export default function LoginPage() {
   };
 
   return (
-    <Theme theme={dymAdminTheme} mode="light">
-      <div className="dym-admin-theme">
-        <Center axis="both" style={pageStyle}>
-          <VStack gap={6} hAlign="center" style={contentStyle}>
-          <img src={dymLogo} alt="DYM Medical Center Vietnam" className="dym-admin-logo" />
+    <div className="flex min-h-svh w-full flex-col items-center justify-center bg-muted/40 p-6 md:p-10 font-sans antialiased">
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <div className="flex flex-col items-center gap-2">
+          <img
+            src={dymLogo}
+            alt="DYM Medical Center Vietnam"
+            className="h-auto w-44 object-contain"
+          />
+        </div>
 
-          <Card padding={8} width="100%" elevation="high" className="dym-admin-card">
-            <VStack gap={5} hAlign="stretch">
-              <VStack gap={1} hAlign="center">
-                <Heading level={2}>Đăng nhập hệ thống</Heading>
-                <Text type="body" color="secondary" size="sm" justify="center">
-                  Dành cho nhân viên lễ tân và quản trị DYM
-                </Text>
-              </VStack>
+        <LoginForm
+          loginName={loginName}
+          password={password}
+          error={error}
+          isLoading={isLoading}
+          onLoginNameChange={(value) => {
+            setLoginName(value);
+            setError(null);
+          }}
+          onPasswordChange={(value) => {
+            setPassword(value);
+            setError(null);
+          }}
+          onForgotPassword={() =>
+            setError('Vui lòng liên hệ quản trị viên DYM để đặt lại mật khẩu.')
+          }
+          onFormSubmit={handleSubmit}
+        />
 
-              {error && (
-                <div className="dym-admin-error" role="alert" aria-live="polite">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} noValidate>
-                <VStack gap={4} hAlign="stretch">
-                  <TextInput
-                    label="Tài khoản"
-                    type="text"
-                    placeholder="Nhập tài khoản"
-                    value={loginName}
-                    onChange={(value) => {
-                      setLoginName(value);
-                      setError(null);
-                    }}
-                    width="100%"
-                    size="lg"
-                    isDisabled={isLoading}
-                    htmlName="username"
-                  />
-
-                  <VStack gap={2} hAlign="stretch">
-                    <TextInput
-                      label="Mật khẩu"
-                      type="password"
-                      placeholder="Nhập mật khẩu"
-                      value={password}
-                      onChange={(value) => {
-                        setPassword(value);
-                        setError(null);
-                      }}
-                      width="100%"
-                      size="lg"
-                      isDisabled={isLoading}
-                      htmlName="password"
-                      status={error ? { type: 'error' } : undefined}
-                    />
-                    <VStack hAlign="end">
-                      <Link
-                        size="sm"
-                        color="accent"
-                        type="supporting"
-                        onClick={() => setError('Vui lòng liên hệ quản trị viên DYM để đặt lại mật khẩu.')}
-                      >
-                        Quên mật khẩu?
-                      </Link>
-                    </VStack>
-                  </VStack>
-
-                  <Button
-                    label="Đăng nhập"
-                    variant="primary"
-                    size="lg"
-                    type="submit"
-                    width="100%"
-                    isLoading={isLoading}
-                  />
-                </VStack>
-              </form>
-
-            </VStack>
-          </Card>
-
-          <div className="dym-admin-note">
-            <Icon icon={LockClosedIcon} size="sm" color="accent" />
-            <Text type="supporting" color="secondary" justify="center">
-              Chỉ dành cho nhân viên được DYM cấp quyền.
-            </Text>
-          </div>
-          </VStack>
-        </Center>
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <ShieldCheck className="size-3.5" aria-hidden="true" />
+          <span>Chỉ dành cho nhân viên được DYM cấp quyền.</span>
+        </p>
       </div>
-    </Theme>
+    </div>
   );
 }
