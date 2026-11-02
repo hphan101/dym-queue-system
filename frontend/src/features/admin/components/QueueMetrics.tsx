@@ -99,7 +99,6 @@ export function QueueMetrics({
               isCallingActive ? 'is-active' : 'is-idle'
             }`}
           >
-            <div className="dym-number-glow" aria-hidden="true" />
             <strong
               className="dym-display-digits"
               aria-label={`Đang gọi số ${currentQueue}`}

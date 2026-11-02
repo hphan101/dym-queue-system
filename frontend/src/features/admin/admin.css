@@ -21,7 +21,6 @@ body {
   width: 100%;
   min-height: 100dvh;
   display: flex;
-  overflow-x: clip;
   color: var(--color-ink);
   background: var(--color-paper);
   font-family: var(--font-body);
@@ -194,7 +193,6 @@ body {
 @media (min-width: 64rem) {
   .dym-admin-shell {
     height: 100dvh;
-    overflow: hidden;
   }
 
   .dym-admin-workspace {
@@ -218,6 +216,12 @@ body {
     animation-iteration-count: 1;
     transition-duration: 0.01ms;
   }
+}
+
+/* Fix layout property animation: prevent animating padding on toast wrapper */
+.xjshnde:not(#\#):not(#\#):not(#\#),
+.xjshnde {
+  transition-property: grid-template-rows !important;
 }
 
 /* ==========================================================================
@@ -300,7 +304,7 @@ body {
 @media (hover: hover) {
   .dym-btn-action-primary:hover:not(:disabled) {
     background: #0369a1;
-    box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.3);
+    box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.16);
   }
 }
 
@@ -334,12 +338,12 @@ body {
 }
 
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-action-primary {
-  background: #0284c7;
+  background: #2563eb;
 }
 
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-action-primary:hover:not(:disabled) {
-  background: #38bdf8;
-  color: #0f172a;
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 /* --- Clinical Terminal (Hero Section) --- */
@@ -365,14 +369,15 @@ body {
   border-radius: 0.375rem;
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
+.dark .dym-terminal-hero,
+[data-color-mode="dark"] .dym-terminal-hero,
 .dym-admin-shell[data-color-mode="dark"] .dym-terminal-hero {
-  background: linear-gradient(145deg, #0f1d33 0%, #0a1424 100%);
-  border-color: rgba(56, 189, 248, 0.2);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  background: var(--color-paper-2);
+  border-color: var(--color-rule);
+  box-shadow: none;
 }
 
 .dym-terminal-header {
@@ -389,31 +394,17 @@ body {
 }
 
 .dym-radar-pulse {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 9999px;
   background: #10b981;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  animation: dymPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
-}
-
-@keyframes dymPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
 }
 
 .dym-terminal-pill {
   font-size: 0.6875rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: #0284c7;
+  color: var(--color-muted);
 }
 
 .dym-terminal-branch {
@@ -441,7 +432,7 @@ body {
 .dym-clock-icon {
   width: 0.875rem;
   height: 0.875rem;
-  color: #0284c7;
+  color: var(--color-muted);
 }
 
 /* Central Digital Display Card */
@@ -466,26 +457,22 @@ body {
   position: relative;
   width: 100%;
   max-width: 24rem;
-  padding: 1.75rem 1.5rem;
-  border-radius: 0.375rem;
-  background: var(--color-paper);
-  border: 1px solid var(--color-rule-2);
-  transition:
-    background-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1),
-    border-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1),
-    box-shadow 200ms cubic-bezier(0.165, 0.84, 0.44, 1);
+  padding: 1.25rem 1rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .dym-display-number-card.is-active {
-  border-color: rgba(2, 132, 199, 0.4);
-  background: linear-gradient(180deg, var(--color-paper) 0%, rgba(2, 132, 199, 0.04) 100%);
-  box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.1);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .dym-admin-shell[data-color-mode="dark"] .dym-display-number-card.is-active {
-  background: linear-gradient(180deg, #13243d 0%, #0d1a2d 100%);
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 10px 30px rgba(2, 132, 199, 0.25);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .dym-number-ticket-header {
@@ -508,13 +495,13 @@ body {
 }
 
 .dym-display-number-card.is-active .dym-display-digits {
-  color: #0284c7;
-  text-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
+  color: var(--color-ink);
+  text-shadow: none;
 }
 
 .dym-admin-shell[data-color-mode="dark"] .dym-display-number-card.is-active .dym-display-digits {
-  color: #38bdf8;
-  text-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
+  color: var(--color-ink);
+  text-shadow: none;
 }
 
 .dym-display-patient-name {
@@ -568,7 +555,7 @@ body {
 .dym-speaker-icon {
   width: 1rem;
   height: 1rem;
-  color: #0284c7;
+  color: var(--color-muted);
   flex-shrink: 0;
 }
 
@@ -600,13 +587,14 @@ body {
   padding: 0.75rem 1.25rem;
   border-radius: 0.375rem;
   border: none;
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  background: #0284c7;
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition:
     box-shadow 180ms cubic-bezier(0.165, 0.84, 0.44, 1),
     transform 120ms cubic-bezier(0.165, 0.84, 0.44, 1),
+    background-color 150ms ease,
     opacity 150ms ease;
   box-sizing: border-box;
   user-select: none;
@@ -614,8 +602,8 @@ body {
 
 @media (hover: hover) {
   .dym-btn-call-next:hover:not(:disabled) {
-    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
-    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+    background: #0369a1;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
   }
 }
 
@@ -710,7 +698,7 @@ body {
 @media (hover: hover) {
   .dym-btn-recall:hover:not(:disabled) {
     background: var(--color-paper-3);
-    border-color: #0284c7;
+    border-color: var(--color-rule-2);
   }
 }
 
@@ -726,7 +714,7 @@ body {
 .dym-recall-icon {
   width: 1.125rem;
   height: 1.125rem;
-  color: #0284c7;
+  color: currentColor;
   flex-shrink: 0;
 }
 
@@ -827,7 +815,7 @@ body {
 .dym-progress-value {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #0284c7;
+  color: var(--color-ink);
 }
 
 .dym-progress-track {
@@ -842,7 +830,7 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 0.1875rem;
-  background: linear-gradient(90deg, #0284c7, #10b981);
+  background: #2563eb;
   transform-origin: left;
   transition: transform 0.4s ease;
 }
@@ -861,14 +849,6 @@ body {
   border: 1px solid var(--color-rule);
   display: flex;
   flex-direction: column;
-}
-
-.dym-status-item.item-waiting {
-  border-left: 3px solid #f59e0b;
-}
-
-.dym-status-item.item-called {
-  border-left: 3px solid #10b981;
 }
 
 .dym-status-item-header {
@@ -926,7 +906,6 @@ body {
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   overflow: visible;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
 }
 
 .dym-registry-title-block {
@@ -985,9 +964,10 @@ body {
 
 .dym-table-precision th {
   padding: 0.75rem 1.25rem;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-muted);
   white-space: nowrap;
 }
@@ -999,11 +979,13 @@ body {
 
 @media (hover: hover) and (pointer: fine) {
   .dym-table-precision tbody tr:hover {
-    background: rgba(2, 132, 199, 0.025);
+    background: rgba(0, 0, 0, 0.02);
   }
 
+  .dark .dym-table-precision tbody tr:hover,
+  [data-color-mode="dark"] .dym-table-precision tbody tr:hover,
   .dym-admin-shell[data-color-mode="dark"] .dym-table-precision tbody tr:hover {
-    background: rgba(56, 189, 248, 0.045);
+    background: rgba(255, 255, 255, 0.03);
   }
 }
 
@@ -1023,16 +1005,18 @@ body {
   font-variant-numeric: tabular-nums;
   padding: 0.25rem 0.625rem;
   border-radius: 0.25rem;
-  background: rgba(2, 132, 199, 0.08);
-  border: 1px solid rgba(2, 132, 199, 0.2);
-  color: #0284c7;
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  color: var(--color-ink);
   letter-spacing: -0.02em;
 }
 
+.dark .dym-ticket-tag,
+[data-color-mode="dark"] .dym-ticket-tag,
 .dym-admin-shell[data-color-mode="dark"] .dym-ticket-tag {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.3);
-  color: #38bdf8;
+  background: var(--color-paper-2);
+  border-color: var(--color-rule);
+  color: var(--color-ink);
 }
 
 /* Time Cell */
@@ -1105,8 +1089,8 @@ body {
 }
 
 .dym-address-line {
-  font-size: 0.6875rem;
-  line-height: 1.375;
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--color-ink-2);
 }
 
@@ -1199,18 +1183,24 @@ body {
   color: #f87171;
 }
 
+.dark .dym-status-badge.badge-print-pending,
+[data-color-mode="dark"] .dym-status-badge.badge-print-pending,
 .dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-pending {
   background: rgba(148, 163, 184, 0.12);
   border-color: rgba(148, 163, 184, 0.28);
   color: #94a3b8;
 }
 
+.dark .dym-status-badge.badge-print-partial,
+[data-color-mode="dark"] .dym-status-badge.badge-print-partial,
 .dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-partial {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.32);
-  color: #38bdf8;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.32);
+  color: #60a5fa;
 }
 
+.dark .dym-status-badge.badge-print-done,
+[data-color-mode="dark"] .dym-status-badge.badge-print-done,
 .dym-admin-shell[data-color-mode="dark"] .dym-status-badge.badge-print-done {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(52, 211, 153, 0.32);
@@ -1248,8 +1238,8 @@ body {
 @media (hover: hover) {
   .dym-btn-undo:hover:not(:disabled) {
     background: var(--color-paper-3);
-    border-color: #0284c7;
-    color: #0284c7;
+    border-color: var(--color-rule-2);
+    color: var(--color-ink);
   }
 }
 
@@ -1355,24 +1345,32 @@ body {
 }
 
 /* Dark mode overrides for table row actions */
+.dark .dym-btn-table-action,
+[data-color-mode="dark"] .dym-btn-table-action,
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action {
   background: var(--color-paper-2);
   border-color: var(--color-rule-2);
   color: var(--color-ink);
 }
 
+.dark .dym-btn-table-action.action-edit:hover:not(:disabled),
+[data-color-mode="dark"] .dym-btn-table-action.action-edit:hover:not(:disabled),
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-edit:hover:not(:disabled) {
-  background: rgba(2, 132, 199, 0.15);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #60a5fa;
+  color: #60a5fa;
 }
 
+.dark .dym-btn-table-action.action-key:hover:not(:disabled),
+[data-color-mode="dark"] .dym-btn-table-action.action-key:hover:not(:disabled),
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-key:hover:not(:disabled) {
   background: rgba(217, 119, 6, 0.15);
   border-color: #fbbf24;
   color: #fbbf24;
 }
 
+.dark .dym-btn-table-action.action-lock:hover:not(:disabled),
+[data-color-mode="dark"] .dym-btn-table-action.action-lock:hover:not(:disabled),
 .dym-admin-shell[data-color-mode="dark"] .dym-btn-table-action.action-lock:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.15);
   border-color: #f87171;
@@ -1409,6 +1407,12 @@ body {
   color: var(--color-ink-2);
 }
 
+.dym-pagination-summary strong,
+.dym-pagination-summary b {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
 .dym-pagination-pager {
   display: flex;
   align-items: center;
@@ -1436,8 +1440,8 @@ body {
 
 @media (hover: hover) {
   .dym-page-btn:hover:not(:disabled) {
-    border-color: #0284c7;
-    color: #0284c7;
+    border-color: var(--color-rule-2);
+    color: var(--color-ink);
   }
 }
 
@@ -1498,7 +1502,7 @@ body {
   border-radius: 0.25rem;
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper);
-  color: #0284c7;
+  color: var(--color-ink);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -1528,8 +1532,8 @@ body {
 
 @media (hover: hover) {
   .dym-metric-summary-card:hover {
-    border-color: rgba(2, 132, 199, 0.3);
-    box-shadow: 0 4px 16px -2px rgba(2, 132, 199, 0.08);
+    border-color: var(--color-rule-2);
+    box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -1551,7 +1555,7 @@ body {
 .dym-metric-summary-icon {
   width: 1.25rem;
   height: 1.25rem;
-  color: #0284c7;
+  color: var(--color-muted);
   opacity: 0.85;
 }
 
@@ -1593,22 +1597,12 @@ body {
   letter-spacing: 0.02em;
 }
 
-.dym-role-badge.role-admin {
-  background: rgba(124, 58, 237, 0.1);
-  color: #8b5cf6;
-  border: 1px solid rgba(124, 58, 237, 0.2);
-}
-
-.dym-role-badge.role-operator {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
+.dym-role-badge.role-admin,
+.dym-role-badge.role-operator,
 .dym-role-badge.role-receptionist {
-  background: rgba(2, 132, 199, 0.1);
-  color: #0284c7;
-  border: 1px solid rgba(2, 132, 199, 0.2);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule-2);
 }
 
 .dym-branch-chip {
@@ -1616,7 +1610,8 @@ body {
   align-items: center;
   padding: 0.15rem 0.4375rem;
   border-radius: 0.25rem;
-  font-size: 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
   font-weight: 700;
   background: var(--color-paper-3);
   border: 1px solid var(--color-rule-2);
@@ -1727,7 +1722,7 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #0284c7;
+  color: var(--color-muted);
 }
 
 .dym-drawer-ticket-tag {
@@ -1803,9 +1798,9 @@ body {
 
 @media (hover: hover) {
   .dym-clinical-drawer-edit-btn:hover {
-    background: rgba(2, 132, 199, 0.08);
-    border-color: #0284c7;
-    color: #0284c7;
+    background: var(--color-paper-3);
+    border-color: var(--color-rule-2);
+    color: var(--color-ink);
   }
 }
 
@@ -1909,7 +1904,7 @@ body {
   font-weight: 700;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 2px 6px -1px rgba(5, 150, 105, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   transition:
     background-color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
     box-shadow 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
@@ -1986,13 +1981,13 @@ body {
   background: #0284c7;
   border: 1px solid #0369a1;
   color: #ffffff;
-  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
 @media (hover: hover) {
   .dym-drawer-action-btn.is-tt25:hover {
     background: #0369a1;
-    box-shadow: 0 4px 10px -2px rgba(2, 132, 199, 0.45);
+    box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.16);
   }
 }
 
@@ -2000,15 +1995,19 @@ body {
   transform: scale(0.98);
 }
 
+.dark .dym-drawer-action-btn.is-consent,
+[data-color-mode="dark"] .dym-drawer-action-btn.is-consent,
 .dym-admin-shell[data-color-mode="dark"] .dym-drawer-action-btn.is-consent {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.32);
-  color: #38bdf8;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.32);
+  color: #60a5fa;
 }
 
+.dark .dym-drawer-action-btn.is-consent:hover,
+[data-color-mode="dark"] .dym-drawer-action-btn.is-consent:hover,
 .dym-admin-shell[data-color-mode="dark"] .dym-drawer-action-btn.is-consent:hover {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #60a5fa;
 }
 
 .dym-clinical-drawer-body {
@@ -2031,7 +2030,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #0284c7;
+  color: var(--color-ink);
   margin-bottom: 0.875rem;
   display: flex;
   align-items: center;

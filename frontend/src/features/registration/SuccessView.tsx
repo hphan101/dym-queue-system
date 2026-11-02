@@ -13,9 +13,10 @@ interface SuccessViewProps {
   data: TT25RegistrationData | null;
   onReset: () => void;
   lang: SupportedLanguage;
+  assisted?: boolean;
 }
 
-export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang }) => {
+export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang, assisted = false }) => {
   const t = translations[lang];
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -30,6 +31,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
   }, []);
 
   React.useEffect(() => {
+    if (assisted) { setCooldownRemaining(0); return; }
     const checkCooldown = () => {
       const lastTime = localStorage.getItem("dym_last_registration_time");
       if (lastTime) {
@@ -46,7 +48,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
     checkCooldown();
     const interval = setInterval(checkCooldown, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [assisted]);
 
   const formatCooldownTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60).toString().padStart(2, "0");

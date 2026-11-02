@@ -40,11 +40,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-import {
-  type TT25RegistrationData,
-  createDefaultTT25Data,
-  getDefaultTargetPaymentByReason,
-} from '../registration/tt25Types';
+import { type TT25RegistrationData } from '../registration/tt25Types';
+import { buildPrintData } from './utils/buildPrintData';
 
 const TT25PrintModal = lazy(() => import('../registration/TT25PrintModal'));
 const ConsentPrintModal = lazy(
@@ -74,7 +71,6 @@ import {
   markRegistrationPrinted,
   usePrintStatus,
 } from './hooks/usePrintStatus';
-import { useRegistrationOverrides } from './hooks/useRegistrationOverrides';
 import { normalizeSearch } from './utils/adminFormatters';
 import { exportRegistrationsToExcel } from './utils/exportRegistrationsExcel';
 import { AdminHeader } from './components/AdminHeader';
@@ -93,52 +89,6 @@ export type { RegistrationDetails };
 const PAGE_SIZE = 15;
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
 const REALTIME_REFETCH_DEBOUNCE_MS = 700;
-
-function buildPrintData(
-  targetRow: RegistrationDetails,
-  branch: BranchCode,
-): TT25RegistrationData {
-  const extras = targetRow.tt25_data ?? {};
-  const defaultReason = targetRow.company_name?.trim()
-    ? 'Khám sức khỏe định kỳ theo công ty'
-    : 'Khám sức khỏe cá nhân tự nguyện';
-  const resolvedReason =
-    extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
-      ? extras.checkupReason
-      : defaultReason;
-
-  const wpWard = extras.workplaceWard || '';
-  const wpProv = extras.workplaceProvince || '';
-  const resolvedWorkplaceWard =
-    wpProv && !wpWard.includes(wpProv)
-      ? [wpWard, wpProv].filter(Boolean).join(', ')
-      : wpWard;
-
-  return createDefaultTT25Data({
-    branch,
-    fullName: targetRow.full_name,
-    gender: (targetRow.gender as 'Nam' | 'Nữ') || 'Nam',
-    birthDate: targetRow.birth_date,
-    ethnicity: extras.ethnicity || 'Kinh',
-    bloodGroup: extras.bloodGroup || 'Chưa rõ',
-    cccd: targetRow.identity_document,
-    insuranceNumber: extras.insuranceNumber || '',
-    province: targetRow.province,
-    ward: targetRow.ward,
-    addressDetail: targetRow.address_detail,
-    occupation: extras.occupation || '',
-    workplace: targetRow.company_name || '',
-    workplaceWard: resolvedWorkplaceWard,
-    phoneNumber: targetRow.phone_number,
-    checkupReason: resolvedReason,
-    medicalHistory: extras.medicalHistory,
-    targetPayment:
-      extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
-    consentAgreed: extras.consentAgreed ?? true,
-    queueNumber: formatQueueNumber(targetRow.queue_number),
-    checkupDate: targetRow.queue_date,
-  });
-}
 
 export function RegistrationsPage({
   authorizedIsAdmin,
@@ -166,6 +116,7 @@ export function RegistrationsPage({
   const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(null);
   const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
   const [consentModalRow, setConsentModalRow] = useState<RegistrationDetails | null>(null);
+  const [bulkPrintError, setBulkPrintError] = useState<string | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
       navigator.onLine ? 'connected' : 'offline',
@@ -211,19 +162,18 @@ export function RegistrationsPage({
       !queryError &&
       (isQueryPending || (isQueryFetching && !fetchedRows)));
 
-  const { applyToDetails, applyToDetailsList } = useRegistrationOverrides();
   const { getStatus } = usePrintStatus();
   const rows = useMemo(
-    () => applyToDetailsList(fetchedRows ?? []),
-    [applyToDetailsList, fetchedRows],
+    () => fetchedRows ?? [],
+    [fetchedRows],
   );
   const error = queryError ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.' : null;
 
   const printModalData = useMemo<TT25RegistrationData | null>(() => {
     const rawTarget = printModalRow || consentModalRow;
     if (!rawTarget) return null;
-    return buildPrintData(applyToDetails(rawTarget), branch);
-  }, [applyToDetails, branch, printModalRow, consentModalRow]);
+    return buildPrintData(rawTarget, branch);
+  }, [branch, printModalRow, consentModalRow]);
 
   // Bulk print (Consent / TT25 merged into one PDF)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
@@ -251,10 +201,11 @@ export function RegistrationsPage({
     // Open the tab synchronously so the popup blocker allows it after the async work.
     const printTab = window.open('', '_blank');
     setBulkProgress(`Đang tạo 0/${targets.length}...`);
+    setBulkPrintError(null);
     try {
       const { generateBulkPrintPdf } = await import('../registration/bulkPrintPdf');
       const url = await generateBulkPrintPdf(
-        targets.map((row) => buildPrintData(applyToDetails(row), branch)),
+        targets.map((row) => buildPrintData(row, branch)),
         mode,
         padForDuplex,
         (done, total) => setBulkProgress(`Đang tạo ${done}/${total}...`),
@@ -269,9 +220,10 @@ export function RegistrationsPage({
       }
       window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
 
-      for (const row of targets) {
-        if (mode !== 'tt25') markRegistrationPrinted(row.id, 'consent');
-        if (mode !== 'consent') markRegistrationPrinted(row.id, 'tt25');
+      try {
+        await Promise.all(targets.map((row) => markRegistrationPrinted(row.id, mode)));
+      } catch {
+        setBulkPrintError('Đã mở file in nhưng chưa lưu đủ trạng thái in. Vui lòng kiểm tra kết nối và bấm In lại để thử lại.');
       }
       setCheckedIds(new Set());
     } catch (err) {
@@ -727,7 +679,7 @@ export function RegistrationsPage({
               <div className="dym-metric-summary-card">
                 <div className="dym-metric-summary-header">
                   <span className="dym-metric-summary-label">Tỷ lệ hoàn thành</span>
-                  <ClipboardDocumentListIcon className="dym-metric-summary-icon text-sky-500" aria-hidden="true" />
+                  <ClipboardDocumentListIcon className="dym-metric-summary-icon text-muted-foreground" aria-hidden="true" />
                 </div>
                 <div className="dym-metric-summary-value-row">
                   <strong className="dym-metric-summary-number">
@@ -744,7 +696,7 @@ export function RegistrationsPage({
               aria-labelledby="registry-table-title"
             >
               {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
-              <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
                 <div className="dym-registry-title-block">
                   <h2 id="registry-table-title" className="dym-registry-title">
                     Danh Sách Chi Tiết Khách Hàng
@@ -1192,7 +1144,7 @@ export function RegistrationsPage({
               ) : filteredRows.length === 0 ? (
                 <div className="dym-table-empty-box">
                   <div className="dym-empty-icon-wrap">
-                    <UserGroupIcon className="w-7 h-7 text-sky-600" aria-hidden="true" />
+                    <UserGroupIcon className="w-7 h-7 text-muted-foreground" aria-hidden="true" />
                   </div>
                   <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
                   <p className="dym-empty-desc">
@@ -1254,14 +1206,14 @@ export function RegistrationsPage({
                       <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
                         <input
                           type="checkbox"
-                          className="size-3.5 accent-sky-600"
+                          className="size-3.5 accent-primary"
                           checked={padForDuplex}
                           onChange={(e) => setPadForDuplex(e.target.checked)}
                         />
                         In 2 mặt (chèn trang trắng)
                       </label>
                       {bulkProgress ? (
-                        <span className="font-medium text-sky-700 dark:text-sky-400" role="status">
+                        <span className="font-medium text-foreground" role="status">
                           {bulkProgress}
                         </span>
                       ) : (
@@ -1298,6 +1250,9 @@ export function RegistrationsPage({
                     </>
                   )}
                 </div>
+                {bulkPrintError && (
+                  <p role="alert" className="p-4 text-sm text-red-600">{bulkPrintError}</p>
+                )}
                 <RegistrationsTable
                   rows={paginatedRows}
                   searchQuery={query}
@@ -1305,11 +1260,9 @@ export function RegistrationsPage({
                   onToggleChecked={toggleChecked}
                   onSelectRow={(row) => setSelectedRow(row)}
                   onPrintRow={(row) => {
-                    markRegistrationPrinted(row.id, 'tt25');
                     setPrintModalRow(row);
                   }}
                   onPrintConsentRow={(row) => {
-                    markRegistrationPrinted(row.id, 'consent');
                     setConsentModalRow(row);
                   }}
                 />
@@ -1353,21 +1306,23 @@ export function RegistrationsPage({
 
             {/* Patient Detail Drawer */}
             <RegistrationDetailModal
-              selectedRow={selectedRow}
+              selectedRow={rows.find((row) => row.id === selectedRow?.id) ?? null}
               branch={branch}
               onClose={() => setSelectedRow(null)}
               onUpdated={(updated) => {
-                setSelectedRow(updated);
+                queryClient.setQueryData<RegistrationDetails[]>(
+                  ['registrationDetails', branch, date],
+                  (current) => current?.map((row) => row.id === updated.id ? updated : row),
+                );
+                void queryClient.invalidateQueries({ queryKey: ['dashboardQueue', branch, date] });
                 void queryClient.invalidateQueries({
                   queryKey: ['registrationDetails', branch, date],
                 });
               }}
               onPrint={(row) => {
-                markRegistrationPrinted(row.id, 'tt25');
                 setPrintModalRow(row);
               }}
               onPrintConsent={(row) => {
-                markRegistrationPrinted(row.id, 'consent');
                 setConsentModalRow(row);
               }}
             />
@@ -1376,6 +1331,7 @@ export function RegistrationsPage({
             {printModalRow && printModalData && (
               <Suspense fallback={null}>
                 <TT25PrintModal
+                  key={printModalRow.id}
                   isOpen={Boolean(printModalRow)}
                   onClose={() => setPrintModalRow(null)}
                   data={printModalData}
@@ -1388,6 +1344,7 @@ export function RegistrationsPage({
             {consentModalRow && printModalData && (
               <Suspense fallback={null}>
                 <ConsentPrintModal
+                  key={consentModalRow.id}
                   isOpen={Boolean(consentModalRow)}
                   onClose={() => setConsentModalRow(null)}
                   data={printModalData}

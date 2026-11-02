@@ -45,6 +45,8 @@ export interface TT25StoredExtras {
   consentAgreed?: boolean;
   printedConsent?: boolean;
   printedTT25?: boolean;
+  language?: 'vi' | 'en';
+  email?: string;
 }
 
 export interface RegistrationDetails {

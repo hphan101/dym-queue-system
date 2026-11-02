@@ -1238,7 +1238,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               <h3 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wide">
                 {isEn ? '3. Examination Location' : '3. Địa điểm khám'}
               </h3>
-              <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
                 {isEn ? 'Auto-selected: CS KBCB' : 'Mặc định: CS KBCB'}
               </span>
             </div>
@@ -1390,7 +1390,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     <p className="font-semibold">
                       {isEn ? 'Medical history conditions recorded.' : 'Có ghi nhận tiền sử bệnh lý.'}
                     </p>
-                    <p className="text-[10px] text-amber-700">
+                    <p className="text-[11px] text-amber-700">
                       {isEn
                         ? 'Your selected items have been saved for your doctor examination form.'
                         : 'Hệ thống đã lưu đầy đủ các mục bạn chọn để điền vào phiếu khám nộp Bác sĩ.'}

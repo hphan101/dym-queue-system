@@ -44,6 +44,41 @@ Publishable key được phép xuất hiện ở frontend. Không đặt service
 - Danh sách đăng ký: `/registrations`
 - Quản lý nhân viên: `/staff` (chỉ quản trị viên)
 - Màn hình chờ: `/display?branch=q1`
+- Màn hình QR tại quầy: `/registration-qr?branch=q1` (yêu cầu nhân viên đăng nhập)
+
+## QR đăng ký tại phòng khám
+
+Nhân viên mở mục **QR đăng ký tại quầy** trong thanh điều hướng. Mục này mở trong
+cùng tab, dùng phiên lễ tân/admin đang đăng nhập và chi nhánh đang chọn, không yêu
+cầu đăng nhập lại. Tài khoản chỉ thấy các chi nhánh được cấp quyền; tài khoản có
+một chi nhánh được chọn tự động. Thiết bị chưa có phiên nhân viên vẫn cần đăng nhập.
+Nút **Tiếp nhận** quay lại màn hình quản trị. Có thể dùng nút
+toàn màn hình cho tablet/TV. Nút **Khóa** đăng xuất phiên nhân viên trên thiết bị.
+
+QR tự đổi mỗi 60 giây và có hiệu lực tối đa 90 giây. Khách quét hợp lệ được
+20 phút điền form; QR thay đổi không làm hết hạn phiên đang điền. Tải lại trang
+trong cùng tab khôi phục phiên, không lưu hồ sơ khách vào bộ nhớ trình duyệt.
+Mỗi phiên chỉ cấp một số; gửi lại cùng nội dung sau lỗi mạng trả lại số đã cấp.
+Màn hình `/display` công khai không hiển thị hoặc cấp QR mới.
+
+Đường dẫn đăng ký cũ `/?branch=q1` vẫn mở được, nhưng phải quét QR hợp lệ tại quầy
+để bắt đầu. API cũng kiểm tra phiên; sửa URL hoặc gọi API trực tiếp không bỏ qua
+được bước QR. Ảnh được chia sẻ và mở ngay trong thời gian mã còn hạn vẫn có thể
+dùng được: tính năng hạn chế chia sẻ, không xác minh vị trí tuyệt đối.
+
+### Đưa tính năng QR lên môi trường thật
+
+Phối hợp triển khai backend và frontend trong cùng đợt vì API mới bắt buộc phiên QR:
+
+1. `npm run db:push` — áp dụng migration phiên đăng ký mới.
+2. `npm run deploy:registration-access` — deploy API cấp QR/phiên.
+3. `npm run deploy:register` — deploy API đăng ký bắt buộc phiên.
+4. Build/deploy frontend từ `frontend/`, rồi kiểm tra quét QR tại từng chi nhánh.
+
+API QR dùng secret server `REGISTRATION_FINGERPRINT_SECRET` và `ALLOWED_ORIGINS`
+đã dùng cho API đăng ký. Không thêm secret vào biến `VITE_*`.
+Phiên chỉ lưu hash token trong database; khách không thể đọc bảng phiên.
+Chi tiết phạm vi và kiểm tra: [docs/registration-qr.md](docs/registration-qr.md).
 
 Mã chi nhánh:
 

@@ -10,7 +10,7 @@ interface TT25PrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: TT25RegistrationData;
-  onPrinted?: () => void;
+  onPrinted?: () => Promise<void>;
   allowPrint?: boolean;
 }
 
@@ -25,6 +25,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'pdf' | 'web'>('pdf');
+  const [printStatusError, setPrintStatusError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const pdfUrlRef = useRef<string | null>(null);
   const hasLoadedRef = useRef<boolean>(false);
@@ -103,7 +104,11 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    onPrinted?.();
+    if (!allowPrint || (viewMode === 'pdf' && (isLoading || !pdfUrl || error))) return;
+    setPrintStatusError(null);
+    void onPrinted?.().catch(() => {
+      setPrintStatusError('Chưa lưu được trạng thái in. Vui lòng kiểm tra kết nối và bấm In để thử lại.');
+    });
     const isMobile =
       typeof window !== 'undefined' &&
       (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
@@ -138,7 +143,6 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
 
   const handleDownload = () => {
     if (!pdfUrl) return;
-    onPrinted?.();
     const a = document.createElement('a');
     a.href = pdfUrl;
     const cleanName = (data.fullName || 'KhachHang').replace(/\s+/g, '_');
@@ -170,7 +174,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
           {/* Mode Switcher */}
           <div className="hidden sm:inline-flex bg-slate-800/90 p-0.5 rounded border border-slate-700/80 mr-1 text-xs">
             <button
@@ -214,6 +218,7 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
+              disabled={viewMode === 'pdf' && (isLoading || Boolean(error))}
               className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs px-3 sm:px-4 py-2 rounded shadow-md transition-colors cursor-pointer shrink-0"
               title="In phiếu khám trực tiếp ra máy in"
             >
@@ -232,6 +237,10 @@ export const TT25PrintModal: React.FC<TT25PrintModalProps> = ({
           </button>
         </div>
       </div>
+
+      {printStatusError && (
+        <p role="alert" className="no-print bg-red-950 px-4 py-2 text-sm text-red-200">{printStatusError}</p>
+      )}
 
       {/* Main Viewport */}
       {viewMode === 'pdf' ? (

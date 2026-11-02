@@ -8,6 +8,7 @@ import { queryClient } from './lib/queryClient';
 
 const AdminApplication = lazy(() => import('./features/admin/AdminApplication'));
 const QueueDisplayPage = lazy(() => import('./features/display/QueueDisplayPage'));
+const RegistrationQrPage = lazy(() => import('./features/registration/RegistrationQrPage'));
 const RegistrationFlowPage = lazy(() =>
   import('./features/registration/RegistrationFlowPage').then((m) => ({
     default: m.RegistrationFlowPage,
@@ -15,6 +16,7 @@ const RegistrationFlowPage = lazy(() =>
 );
 
 type AppRoute =
+  | { kind: 'registration-qr' }
   | { kind: 'display' }
   | { kind: 'login' }
   | { kind: 'admin'; destination: AdminDestination }
@@ -23,6 +25,10 @@ type AppRoute =
 function resolveAppRoute(rawPathname: string, search: string): AppRoute {
   const pathname = rawPathname.replace(/\/+$/, '') || '/';
   const requestedPage = new URLSearchParams(search).get('page');
+
+  if (pathname === '/registration-qr' || requestedPage === 'registration-qr') {
+    return { kind: 'registration-qr' };
+  }
 
   if (pathname === '/display' || requestedPage === 'display') {
     return { kind: 'display' };
@@ -117,6 +123,7 @@ function App() {
       <ErrorBoundary>
         <Suspense fallback={null}>
           {route.kind === 'display' && <QueueDisplayPage />}
+          {route.kind === 'registration-qr' && <RegistrationQrPage />}
           {route.kind === 'login' && <LoginPage />}
           {route.kind === 'admin' && (
             <AdminApplication destination={route.destination} />

@@ -925,8 +925,8 @@ export function RosterOnsitePage({
                           className={cn(
                             'inline-flex items-center text-[11px] font-semibold leading-none',
                             isBloodDraw
-                              ? 'text-rose-700 dark:text-rose-300'
-                              : 'text-sky-700 dark:text-sky-300',
+                              ? 'text-rose-700 dark:text-rose-400'
+                              : 'text-blue-700 dark:text-blue-400',
                           )}
                         >
                           {isBloodDraw ? 'Lấy máu' : 'Khám Onsite'}
@@ -1016,8 +1016,8 @@ export function RosterOnsitePage({
                       className={cn(
                         'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold',
                         selectedCampaign.schedule_type === 'blood_draw'
-                          ? 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-                          : 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+                          ? 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                          : 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400',
                       )}
                     >
                       {selectedCampaign.schedule_type === 'blood_draw'

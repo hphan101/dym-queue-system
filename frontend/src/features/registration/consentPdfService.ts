@@ -1,191 +1,117 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { getTodayInVietnam } from '../../lib/date';
+import layouts from './consentTemplateFields.json';
 import type { TT25RegistrationData } from './tt25Types';
 
-let cachedConsentTemplateBytes: ArrayBuffer | null = null;
-let cachedFontArialBldBytes: ArrayBuffer | null = null;
-let cachedFontArialItaBytes: ArrayBuffer | null = null;
-let cachedFontArialBldItaBytes: ArrayBuffer | null = null;
+export type ConsentFormLanguage = 'vi' | 'bilingual';
+export type ConsentPageOption = 'all' | 'consent' | 'refusal';
 
-function fetchBinaryWithXHR(url: string): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'arraybuffer';
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
-        resolve(xhr.response as ArrayBuffer);
-      } else {
-        reject(new Error(`XHR failed: status ${xhr.status} for ${url}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error(`XHR network error for ${url}`));
-    xhr.send();
-  });
+const assets = new Map<string, Promise<ArrayBuffer>>();
+const ASSET_VERSION = '20261101-restored-table-borders';
+
+function loadAsset(path: string): Promise<ArrayBuffer> {
+  let pending = assets.get(path);
+  if (!pending) {
+    pending = fetch(`${path}?v=${ASSET_VERSION}`).then(async (response) => {
+      if (!response.ok) throw new Error('Không thể tải mẫu đồng thuận gốc hoặc phông chữ.');
+      const bytes = await response.arrayBuffer();
+      if (!bytes.byteLength) throw new Error('File mẫu đồng thuận không có dữ liệu.');
+      return bytes;
+    }).catch((error) => { assets.delete(path); throw error; });
+    assets.set(path, pending);
+  }
+  return pending;
 }
 
-async function fetchAssetBuffer(url: string, description: string): Promise<ArrayBuffer> {
-  const fetchUrl = `${url}?t=${Date.now()}`;
-  try {
-    const xhrBuf = await fetchBinaryWithXHR(fetchUrl);
-    if (xhrBuf && xhrBuf.byteLength > 0) {
-      return xhrBuf;
-    }
-  } catch (xhrErr) {
-    console.warn(`[ConsentPDF] XHR attempt failed for ${description}, trying fetch:`, xhrErr);
-  }
-
-  const res = await fetch(fetchUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${description}: status ${res.status} ${res.statusText}`);
-  }
-  const buf = await res.arrayBuffer();
-  if (!buf || buf.byteLength === 0) {
-    throw new Error(`Fetched ${description} is empty (0 bytes)`);
-  }
-  return buf;
+export function getConsentFormLanguage(data: Pick<TT25RegistrationData, 'language'>): ConsentFormLanguage {
+  return data.language === 'en' ? 'bilingual' : 'vi';
 }
 
-async function loadConsentAssets() {
-  if (!cachedConsentTemplateBytes) {
-    cachedConsentTemplateBytes = await fetchAssetBuffer(
-      '/templates/dong-thuan-kham.pdf',
-      'Consent PDF template',
-    );
-  }
-  if (!cachedFontArialBldBytes) {
-    cachedFontArialBldBytes = await fetchAssetBuffer('/fonts/arialbd.ttf', 'Arial Bold font');
-  }
-  if (!cachedFontArialItaBytes) {
-    cachedFontArialItaBytes = await fetchAssetBuffer('/fonts/ariali.ttf', 'Arial Italic font');
-  }
-  if (!cachedFontArialBldItaBytes) {
-    cachedFontArialBldItaBytes = await fetchAssetBuffer(
-      '/fonts/arialbi.ttf',
-      'Arial Bold Italic font',
-    );
-  }
-  return {
-    templateBytes: cachedConsentTemplateBytes,
-    fontBldBytes: cachedFontArialBldBytes,
-    fontItaBytes: cachedFontArialItaBytes,
-    fontBldItaBytes: cachedFontArialBldItaBytes,
-  };
+export function getConsentPageIndices(language: ConsentFormLanguage, option: ConsentPageOption): number[] {
+  const layout = layouts[language];
+  return option === 'consent' ? layout.consentPages : option === 'refusal' ? layout.refusalPages
+    : Array.from({ length: layout.pageCount }, (_, index) => index);
 }
 
-export function formatConsentDate(dateStr?: string): string {
-  if (dateStr) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const [y, m, d] = dateStr.split('-');
-      return `${d}/${m}/${y}`;
-    }
-    return dateStr;
-  }
-  const now = new Date();
-  const d = String(now.getDate()).padStart(2, '0');
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const y = now.getFullYear();
-  return `${d}/${m}/${y}`;
+export function formatConsentDate(value?: string): string {
+  if (!value) return '';
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : /^\d{2}\/\d{2}\/\d{4}$/.test(value) ? value : '';
 }
-
-export type ConsentStatementMode = 'agree' | 'disagree' | 'blank';
 
 export async function generateConsentPdf(
   data: TT25RegistrationData,
-  statementMode: ConsentStatementMode = data.consentAgreed === false ? 'disagree' : 'agree',
+  pageOption: ConsentPageOption = 'all',
 ): Promise<{ blob: Blob; url: string }> {
-  const { templateBytes, fontBldBytes, fontItaBytes, fontBldItaBytes } = await loadConsentAssets();
-
-  const templateUint8 = new Uint8Array(templateBytes.slice(0));
-  const fontBldUint8 = new Uint8Array(fontBldBytes.slice(0));
-  const fontItaUint8 = new Uint8Array(fontItaBytes.slice(0));
-  const fontBldItaUint8 = new Uint8Array(fontBldItaBytes.slice(0));
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fk = (fontkit as any)?.default || fontkit;
-
-  const pdfDoc = await PDFDocument.load(templateUint8);
-  pdfDoc.registerFontkit(fk);
-
-  const page = pdfDoc.getPages()[0];
-  const fontBld = await pdfDoc.embedFont(fontBldUint8);
-  const fontIta = await pdfDoc.embedFont(fontItaUint8);
-  const fontBldIta = await pdfDoc.embedFont(fontBldItaUint8);
-
-  const black = rgb(0, 0, 0);
-  const dymBlue = rgb(0, 0.439, 0.753); // #0070C0
-  const dateBlue = rgb(0.18, 0.455, 0.71); // #2E74B5
-
-  // 1. Số thứ tự / Order (top right under "Số thứ tự / Order" in Header)
-  const queueText = (data.queueNumber || '').trim();
-  if (queueText) {
-    const qSize = 11;
-    const qWidth = fontBld.widthOfTextAtSize(queueText, qSize);
-    page.drawText(queueText, {
-      x: 559.3 - qWidth,
-      y: 789.5,
-      size: qSize,
-      font: fontBld,
-      color: black,
+  const language = getConsentFormLanguage(data);
+  const layout = layouts[language];
+  const [template, regular, bold, italic, boldItalic] = await Promise.all([
+    loadAsset(`/templates/${layout.template}`), loadAsset('/fonts/arial.ttf'),
+    loadAsset('/fonts/arialbd.ttf'), loadAsset('/fonts/ariali.ttf'), loadAsset('/fonts/arialbi.ttf'),
+  ]);
+  const pdf = await PDFDocument.load(template.slice(0));
+  if (pdf.getPageCount() !== layout.pageCount) throw new Error('Số trang mẫu đồng thuận không đúng với mẫu gốc.');
+  pdf.registerFontkit(fontkit);
+  const fontBytes = { regular, bold, italic, boldItalic };
+  const fonts: Record<string, PDFFont> = {};
+  await Promise.all(Object.entries(fontBytes).map(async ([name, bytes]) => {
+    fonts[name] = await pdf.embedFont(bytes.slice(0), { subset: true });
+  }));
+  const checkupDate = formatConsentDate(data.checkupDate || getTodayInVietnam());
+  const [checkupDay = '', checkupMonth = '', checkupYear = ''] = checkupDate.split('/');
+  const values: Record<string, string> = {
+    fullName: (data.fullName || '').trim().toUpperCase(),
+    birthDate: formatConsentDate(data.birthDate), identityDocument: (data.cccd || '').trim(),
+    phoneNumber: (data.phoneNumber || '').trim(), email: (data.email || '').trim(),
+    workplace: (data.workplace || '').trim(), checkupDate, checkupDay, checkupMonth, checkupYear,
+  };
+  const pages = pdf.getPages();
+  const queueNumber = (data.queueNumber || '').trim();
+  if (queueNumber) {
+    const label = 'Số thứ tự';
+    const english = language === 'bilingual' ? ' / Order' : '';
+    const labelSize = 11;
+    const labelWidth = fonts.bold.widthOfTextAtSize(label, labelSize);
+    const englishWidth = fonts.boldItalic.widthOfTextAtSize(english, labelSize);
+    const centerX = 478;
+    const labelX = centerX - (labelWidth + englishWidth) / 2;
+    const numberSize = Math.min(28, 140 / fonts.bold.widthOfTextAtSize(queueNumber, 1));
+    for (const index of [layout.consentPages[0], layout.refusalPages[0]]) {
+      pages[index].drawText(label, { x: labelX, y: 802, size: labelSize, font: fonts.bold, color: rgb(.4, .4, .4) });
+      if (english) pages[index].drawText(english, { x: labelX + labelWidth, y: 802, size: labelSize, font: fonts.boldItalic, color: rgb(.35, .48, .6) });
+      pages[index].drawText(queueNumber, {
+        x: centerX - fonts.bold.widthOfTextAtSize(queueNumber, numberSize) / 2,
+        y: 770, size: numberSize, font: fonts.bold, color: rgb(0, 0, 0),
+      });
+    }
+  }
+  for (const field of layout.fields) {
+    const value = values[field.field];
+    if (!value) continue;
+    const font = fonts[field.font];
+    const size = Math.min(field.size, field.width / font.widthOfTextAtSize(value, 1));
+    const width = font.widthOfTextAtSize(value, size);
+    pages[field.page].drawText(value, {
+      x: field.align === 'center' ? field.x - width / 2 : field.x,
+      y: field.y, size, font, color: rgb(0, 0, 0),
+    });
+  }
+  const mark = layout.genderMarks[data.gender];
+  if (mark) {
+    for (const slope of [-1, 1]) pages[0].drawLine({
+      start: { x: mark.x - 2, y: mark.y - 2 * slope },
+      end: { x: mark.x + 2, y: mark.y + 2 * slope }, thickness: .7, color: rgb(0, 0, 0),
     });
   }
 
-  // 2. Ý kiến của Khách hàng / Customer's statement:
-  if (statementMode !== 'blank') {
-    const statementText =
-      statementMode === 'agree'
-        ? 'Tôi đồng ý / I agree'
-        : 'Tôi không đồng ý / I do not agree';
-    page.drawText(statementText, {
-      x: 272,
-      y: 143.06,
-      size: 9.96,
-      font: fontBld,
-      color: black,
-    });
+  let output = pdf;
+  if (pageOption !== 'all') {
+    output = await PDFDocument.create();
+    const selected = await output.copyPages(pdf, getConsentPageIndices(language, pageOption));
+    selected.forEach((page) => output.addPage(page));
   }
-
-  // 3. Ngày / Date: [Chèn ngày khách khám]
-  const checkupDateFormatted = formatConsentDate(data.checkupDate);
-  page.drawText(checkupDateFormatted, {
-    x: 115.94,
-    y: 130.58,
-    size: 9.96,
-    font: fontIta,
-    color: dateBlue,
-  });
-
-  // 4. KHÁCH HÀNG / CUSTOMER: [CHÈN TÊN KHÁCH]
-  const customerName = (data.fullName || '').trim().toUpperCase();
-  if (customerName) {
-    page.drawText(customerName, {
-      x: 199.5,
-      y: 118.22,
-      size: 9.96,
-      font: fontBldIta,
-      color: dymBlue,
-    });
-  }
-
-  // 5. Số CCCD/mã định danh/Số Passport: [Chèn số CCCD/Số hộ chiếu của khách]
-  const cccdText = (data.cccd || '').trim();
-  if (cccdText) {
-    page.drawText(cccdText, {
-      x: 227.69,
-      y: 105.86,
-      size: 9.96,
-      font: fontBldIta,
-      color: dymBlue,
-    });
-  }
-
-  const pdfBytes = await pdfDoc.save();
-  const safeArrayBuffer = pdfBytes.buffer.slice(
-    pdfBytes.byteOffset,
-    pdfBytes.byteOffset + pdfBytes.byteLength,
-  ) as ArrayBuffer;
-  const blob = new Blob([safeArrayBuffer], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-
-  return { blob, url };
+  const bytes = await output.save();
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
+  return { blob, url: URL.createObjectURL(blob) };
 }

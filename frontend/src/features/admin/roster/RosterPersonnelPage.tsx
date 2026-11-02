@@ -669,7 +669,7 @@ export function RosterPersonnelPage({
         aria-label="Danh mục định mức nhân sự"
       >
         {/* Single clean toolbar: Role Tabs with counts on left, Inactive toggle + Search on right */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card/40 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <Tabs
             value={roleFilter}
             onValueChange={(value) =>
@@ -795,7 +795,7 @@ export function RosterPersonnelPage({
               {inactiveCount > 0 && (
                 <Badge
                   variant="secondary"
-                  className="h-4.5 px-1.5 text-[10px] font-semibold tabular-nums"
+                  className="h-4.5 px-1.5 text-[11px] font-semibold tabular-nums"
                 >
                   {inactiveCount}
                 </Badge>
@@ -916,7 +916,7 @@ export function RosterPersonnelPage({
           <div className="dym-table-empty-box">
             <div className="dym-empty-icon-wrap">
               <UserGroupIcon
-                className="size-7 text-sky-600"
+                className="size-7 text-muted-foreground"
                 aria-hidden="true"
               />
             </div>

@@ -58,11 +58,7 @@ async function persistPrintStatusToSupabase(
       p_printed_consent: consent,
       p_printed_tt25: tt25,
     });
-    if (error) {
-      console.warn('Could not sync print status to Supabase:', error);
-    }
-  } catch (err) {
-    console.warn('Error syncing print status to Supabase:', err);
+    if (error) throw new Error('Không thể lưu trạng thái in.');
   } finally {
     inFlightIds.delete(registrationId);
   }
@@ -122,12 +118,16 @@ export function syncPrintStatusesFromServer(
   }
 }
 
-export function markRegistrationPrinted(
+export async function markRegistrationPrinted(
   registrationId: string,
-  docType: 'consent' | 'tt25',
-  printed = true,
-): void {
+  docType: 'consent' | 'tt25' | 'both',
+): Promise<void> {
   if (!registrationId) return;
+  await persistPrintStatusToSupabase(
+    registrationId,
+    docType !== 'tt25' ? true : null,
+    docType !== 'consent' ? true : null,
+  );
   const currentMap = readStorage();
   const existing = currentMap[registrationId] ?? {
     consent: false,
@@ -136,17 +136,12 @@ export function markRegistrationPrinted(
   };
   const nextItem: PrintStatusItem = {
     ...existing,
-    [docType]: printed,
+    consent: docType !== 'tt25' || existing.consent,
+    tt25: docType !== 'consent' || existing.tt25,
     updatedAt: Date.now(),
   };
   currentMap[registrationId] = nextItem;
   writeStorage(currentMap);
-
-  void persistPrintStatusToSupabase(
-    registrationId,
-    docType === 'consent' ? printed : null,
-    docType === 'tt25' ? printed : null,
-  );
 }
 
 export function getPrintStatusDisplay(item?: PrintStatusItem): {
@@ -213,8 +208,8 @@ export function usePrintStatus() {
   }, []);
 
   const markPrinted = useCallback(
-    (registrationId: string, docType: 'consent' | 'tt25', printed = true) => {
-      markRegistrationPrinted(registrationId, docType, printed);
+    (registrationId: string, docType: 'consent' | 'tt25') => {
+      return markRegistrationPrinted(registrationId, docType);
     },
     [],
   );

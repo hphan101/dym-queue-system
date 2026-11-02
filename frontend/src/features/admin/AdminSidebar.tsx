@@ -9,6 +9,7 @@ import {
   LogOut,
   Moon,
   PieChart,
+  QrCode,
   Settings2,
   ShieldCheck,
   Sun,
@@ -189,6 +190,17 @@ export function AdminSidebar({
 
           <SidebarMenu>
             <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Mở màn hình QR đăng ký">
+                <a
+                  href={`/registration-qr?branch=${branch}`}
+                  onClick={(event) => handleInternalLinkClick(event, `/registration-qr?branch=${branch}`)}
+                >
+                  <QrCode aria-hidden="true" />
+                  <span>QR đăng ký tại quầy</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 tooltip={`Mở màn hình chờ — ${BRANCH_NAMES[branch]}`}
@@ -200,10 +212,10 @@ export function AdminSidebar({
                   rel="noopener noreferrer"
                   aria-label={`Mở màn hình chờ ${BRANCH_NAMES[branch]}`}
                 >
-                  <Tv className="size-4 text-sidebar-primary" aria-hidden="true" />
+                  <Tv className="size-4 text-sidebar-foreground/70" aria-hidden="true" />
                   <span className="flex-1 truncate">Màn hình chờ TV</span>
                   <span
-                    className="size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981] group-data-[collapsible=icon]:hidden"
+                    className="size-1.5 shrink-0 rounded-full bg-emerald-500 group-data-[collapsible=icon]:hidden"
                     aria-hidden="true"
                   />
                   <ArrowUpRight

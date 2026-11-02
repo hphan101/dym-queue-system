@@ -83,6 +83,7 @@ export interface TT25RegistrationData {
   workplace: string;
   workplaceWard: string;
   phoneNumber: string;
+  email?: string;
   checkupReason: string; // Lý do khám sức khỏe
   
   // Tien su benh ly
@@ -95,6 +96,7 @@ export interface TT25RegistrationData {
   consentAgreed?: boolean;
   queueNumber?: string;
   checkupDate?: string;
+  language?: 'vi' | 'en';
   
   honeypot?: string;
 }
@@ -195,12 +197,14 @@ export function createDefaultTT25Data(
     workplace: fields.workplace ?? '',
     workplaceWard: fields.workplaceWard ?? '',
     phoneNumber: fields.phoneNumber ?? '',
+    email: fields.email ?? '',
     checkupReason: fields.checkupReason ?? 'Khám sức khỏe định kỳ / đi làm / đi học',
     medicalHistory: fields.medicalHistory ?? INITIAL_TT25_MEDICAL_HISTORY,
     targetPayment: fields.targetPayment ?? defaultTargetPayment,
     consentAgreed: fields.consentAgreed ?? true,
     queueNumber: fields.queueNumber,
     checkupDate: fields.checkupDate,
+    language: fields.language,
     honeypot: fields.honeypot,
   };
 }

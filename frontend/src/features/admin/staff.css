@@ -1,3 +1,43 @@
+.dym-staff-page .dym-staff-delete-button {
+  color: #b42323;
+}
+
+.dym-staff-page .dym-staff-delete-button:hover {
+  color: #b42323;
+  background-color: #fef2f2;
+}
+
+.dym-staff-page[data-color-mode="dark"] .dym-staff-delete-button {
+  color: #f28b82;
+}
+
+.dym-staff-page[data-color-mode="dark"] .dym-staff-delete-button:hover {
+  color: #f28b82;
+  background-color: #3a2428;
+}
+
+.dym-staff-page .dym-staff-avatar > div > div {
+  color: #334155;
+  background-color: #e2e8f0;
+}
+
+.dym-staff-page[data-color-mode="dark"] .dym-staff-avatar > div > div {
+  color: #e2e8f0;
+  background-color: #334155;
+}
+
+.dym-staff-page .dym-status-led-badge.is-active {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.dym-staff-page .dym-status-led-badge.is-locked {
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+  border-color: hsl(var(--border));
+}
+
 .dym-staff-success {
   display: flex;
   align-items: center;

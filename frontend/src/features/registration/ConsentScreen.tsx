@@ -62,9 +62,14 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
               Tôi xác nhận và đồng ý cho phép Bác sĩ, Nhân viên y tế được DYM phân công và/hoặc các đơn vị liên kết/hợp tác với DYM đối với các hạng mục dịch vụ mà DYM không trực tiếp cung cấp (nếu có), tiến hành các hoạt động thăm khám, xét nghiệm, cận lâm sàng và đánh giá sức khỏe trong phạm vi gói dịch vụ đã đăng ký.
             </p>
           ) : (
-            <p className="text-justify italic text-[#0070C0]">
-              I hereby acknowledge and agree to allow the Doctors and/or Medical Staff assigned by DYM, as well as DYM’s affiliated/cooperating partners for service items not directly provided by DYM (if any), to conduct medical examinations, tests, paraclinical procedures, and health assessments within the scope of the registered service package.
-            </p>
+            <div className="space-y-1">
+              <p className="text-justify">
+                Tôi xác nhận và đồng ý cho phép Bác sĩ, Nhân viên y tế được DYM phân công và/hoặc các đơn vị liên kết/hợp tác với DYM đối với các hạng mục dịch vụ mà DYM không trực tiếp cung cấp (nếu có), tiến hành các hoạt động thăm khám, xét nghiệm, cận lâm sàng và đánh giá sức khỏe trong phạm vi gói dịch vụ đã đăng ký.
+              </p>
+              <p className="text-justify italic text-[#0070C0]">
+                I confirm and consent to the physicians and medical staff assigned by DYM and/or DYM’s affiliated/partner units, for service items not directly provided by DYM (if any), carrying out examinations, laboratory tests, paraclinical tests and health assessments within the scope of the registered service package.
+              </p>
+            </div>
           )}
         </div>
 
@@ -73,33 +78,62 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
           <h2 className="font-bold text-slate-900 text-sm sm:text-base">
             2. ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN /{' '}
             <span className="italic text-[#0070C0]">
-              CONSENT TO THE PROCESSING OF PERSONAL DATA
+              CONSENT TO PERSONAL DATA PROCESSING
             </span>
           </h2>
           {!isEn ? (
             <>
               <p className="text-justify">
-                Tôi xác nhận và đồng ý cho phép DYM thu thập, sử dụng, tổng hợp và lưu trữ dữ liệu cá nhân của tôi, bao gồm thông tin y tế, nhằm phục vụ cho việc thăm khám, chẩn đoán, điều trị, tư vấn, theo dõi sức khỏe, quản lý hồ sơ y tế và cung cấp các dịch vụ y tế cho tôi. Tôi cũng đồng ý cho phép DYM liên hệ và gửi đến tôi các thông tin truyền thông liên quan đến dịch vụ y tế, chương trình chăm sóc sức khỏe, sự kiện và các chương trình ưu đãi của DYM, trên cơ sở tuân thủ các quy định của pháp luật hiện hành về bảo vệ dữ liệu cá nhân và các quy định pháp luật có liên quan.
+                Tôi xác nhận và đồng ý cho phép DYM thu thập, sử dụng, tổng hợp và lưu trữ dữ liệu cá nhân của tôi, bao gồm thông tin y tế, nhằm phục vụ cho việc thăm khám, chẩn đoán, điều trị, tư vấn, theo dõi sức khỏe, quản lý hồ sơ y tế và cung cấp các dịch vụ y tế cho tôi.
               </p>
               <p className="text-justify">
-                Tôi xác nhận và đồng ý cho phép DYM cung cấp báo cáo y tế của tôi cho tôi và/hoặc đơn vị chủ quản đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có), trong phạm vi cần thiết và phù hợp với mục đích khám sức khỏe, nội dung dịch vụ đã đăng ký và thỏa thuận được ký kết giữa đơn vị chủ quản và DYM, trên cơ sở tuân thủ quy định của Luật An toàn, Vệ sinh Lao động số 84/2015/QH13, Luật Khám bệnh, Chữa bệnh số 15/2023/QH15, Luật Bảo vệ Dữ liệu Cá nhân số 91/2025/QH15 và các quy định pháp luật có liên quan.
+                Tôi xác nhận và đồng ý cho phép DYM liên hệ và gửi đến tôi các thông tin truyền thông liên quan đến dịch vụ y tế, chương trình chăm sóc sức khỏe, sự kiện và các chương trình ưu đãi của DYM, trên cơ sở tuân thủ các quy định của pháp luật hiện hành về bảo vệ dữ liệu cá nhân và các quy định pháp luật có liên quan.
               </p>
               <p className="text-justify">
-                Việc cung cấp, chia sẻ hoặc tiết lộ dữ liệu cá nhân và thông tin y tế của tôi cho bất kỳ bên thứ ba nào khác chỉ được thực hiện khi có sự đồng ý hoặc chỉ định bằng văn bản của tôi, trừ trường hợp pháp luật có quy định khác hoặc cơ quan nhà nước có thẩm quyền yêu cầu theo quy định của pháp luật.
+                Tôi xác nhận và đồng ý cho phép DYM cung cấp báo cáo y tế của tôi cho tôi và/hoặc đơn vị chủ quản đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có), trong phạm vi cần thiết và phù hợp với mục đích khám sức khỏe, nội dung dịch vụ đã đăng ký và thỏa thuận được ký kết giữa đơn vị chủ quản và DYM, trên cơ sở tuân thủ quy định của Luật An toàn, Vệ sinh Lao động số 84/2015/QH13, Luật Khám bệnh, Chữa bệnh số 15/2023/QH15, Luật Bảo vệ Dữ liệu Cá nhân số 91/2025/QH15 và các quy định pháp luật có liên quan. Việc cung cấp, chia sẻ hoặc tiết lộ dữ liệu cá nhân và thông tin y tế của tôi cho bất kỳ bên thứ ba nào khác chỉ được thực hiện khi có sự đồng ý hoặc chỉ định bằng văn bản của tôi, trừ trường hợp pháp luật có quy định khác hoặc cơ quan nhà nước có thẩm quyền yêu cầu theo quy định của pháp luật.
+              </p>
+              <p className="text-justify">
+                Tôi đã đọc, hiểu toàn bộ nội dung của Bản Đồng thuận này. Tôi hiểu rằng, việc không đồng ý có thể dẫn đến việc DYM không thể cung cấp dịch vụ y tế cho tôi.
               </p>
             </>
           ) : (
-            <>
-              <p className="text-justify italic text-[#0070C0]">
-                I acknowledge and consent to DYM collecting, using, consolidating, and retaining my personal data, including my health information, for the purposes of medical examination, diagnosis, treatment, consultation, health monitoring, medical record management, and the provision of healthcare services. I also consent to DYM contacting me and sending communications regarding healthcare services, health promotion programs, events, and promotional offers provided by DYM, in compliance with applicable laws on personal data protection and other relevant legal requirements.
-              </p>
-              <p className="text-justify italic text-[#0070C0]">
-                I acknowledge and consent to DYM providing my medical report to me and/or the organization that registered the health check-up service on my behalf (if any), to the extent necessary and appropriate for the purpose of the health examination, the registered service scope, and the agreement entered into between such organization and DYM, in compliance with the Law on Occupational Safety and Hygiene No. 84/2015/QH13, the Law on Medical Examination and Treatment No. 15/2023/QH15, the Personal Data Protection Law No. 91/2025/QH15, and other applicable laws.
-              </p>
-              <p className="text-justify italic text-[#0070C0]">
-                The disclosure, sharing, or transfer of my personal data and medical information to any other third party shall only be carried out with my prior written consent or written instruction, unless otherwise required by applicable laws or requested by a competent authority in accordance with the law.
-              </p>
-            </>
+            <div className="space-y-2">
+              <div>
+                <p className="text-justify">
+                  Tôi xác nhận và đồng ý cho phép DYM thu thập, sử dụng, tổng hợp và lưu trữ dữ liệu cá nhân của tôi, bao gồm thông tin y tế, nhằm phục vụ cho việc thăm khám, chẩn đoán, điều trị, tư vấn, theo dõi sức khỏe, quản lý hồ sơ y tế và cung cấp các dịch vụ y tế cho tôi. Tôi đồng ý cho phép DYM chuyển dữ liệu khám sức khỏe của tôi lên Cổng thông tin khám sức khỏe của Sở Y tế/Bộ Y tế theo quy định về liên thông dữ liệu khám sức khỏe.
+                </p>
+                <p className="text-justify italic text-[#0070C0] mt-0.5">
+                  I confirm and consent to DYM collecting, using, aggregating and storing my personal data, including medical information, for the purposes of examination, diagnosis, treatment, consultation, health monitoring, medical records management and the provision of medical services to me. I consent to DYM transferring my health check data to the health check portal of the Department of Health/Ministry of Health in accordance with the regulations on health check data interconnection.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-justify">
+                  Tôi xác nhận và đồng ý cho phép DYM liên hệ và gửi đến tôi các thông tin truyền thông liên quan đến dịch vụ y tế, chương trình chăm sóc sức khỏe, sự kiện và các chương trình ưu đãi của DYM, trên cơ sở tuân thủ các quy định của pháp luật hiện hành về bảo vệ dữ liệu cá nhân và các quy định pháp luật có liên quan.
+                </p>
+                <p className="text-justify italic text-[#0070C0] mt-0.5">
+                  I confirm and consent to DYM contacting me and sending me communications relating to DYM’s medical services, healthcare programs, events and promotional programs, in compliance with the prevailing laws on personal data protection and other relevant laws.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-justify">
+                  Tôi xác nhận và đồng ý cho phép DYM cung cấp báo cáo y tế của tôi cho tôi và/hoặc đơn vị sử dụng lao động đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có), trong phạm vi cần thiết và phù hợp với mục đích khám sức khỏe, nội dung dịch vụ đã đăng ký và thỏa thuận được ký kết giữa đơn vị sử dụng lao động và DYM, trên cơ sở tuân thủ quy định của Luật An toàn, Vệ sinh Lao động số 84/2015/QH13, Luật Khám bệnh, Chữa bệnh số 15/2023/QH15, Luật Bảo vệ Dữ liệu Cá nhân số 91/2025/QH15 và các quy định pháp luật có liên quan. Việc cung cấp, chia sẻ hoặc tiết lộ dữ liệu cá nhân và thông tin y tế của tôi cho bất kỳ bên thứ ba nào khác chỉ được thực hiện khi có sự đồng ý hoặc chỉ định bằng văn bản của tôi, trừ trường hợp pháp luật có quy định khác hoặc cơ quan nhà nước có thẩm quyền yêu cầu theo quy định của pháp luật.
+                </p>
+                <p className="text-justify italic text-[#0070C0] mt-0.5">
+                  I confirm and consent to DYM providing my medical report to me and/or the employing organization that registered the health examination service for me (if any), to the extent necessary and appropriate for the purpose of the health examination, the registered services and the agreement signed between the employing organization and DYM, in compliance with the Law on Occupational Safety and Health No. 84/2015/QH13, the Law on Medical Examination and Treatment No. 15/2023/QH15, the Law on Personal Data Protection No. 91/2025/QH15 and other relevant laws. My personal data and medical information shall be provided, shared or disclosed to any other third party only with my written consent or instruction, unless otherwise provided by law or requested by a competent state authority in accordance with the law.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-justify">
+                  Tôi đã đọc, hiểu toàn bộ nội dung của Phiếu đồng thuận này. Tôi hiểu rằng, việc không đồng ý có thể dẫn đến việc DYM không thể cung cấp dịch vụ y tế cho tôi.
+                </p>
+                <p className="text-justify italic text-[#0070C0] mt-0.5">
+                  I have read and fully understood the contents of this Consent Form. I understand that not giving my consent may result in DYM being unable to provide medical services to me.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -110,8 +144,8 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({
               Quý Anh/Chị đã đọc, hiểu toàn bộ nội dung của Bản Đồng thuận này. Quý Anh/Chị hiểu rằng, việc không đồng ý có thể dẫn đến việc DYM không thể cung cấp dịch vụ y tế cho Quý Anh/Chị.
             </p>
           ) : (
-            <p className="font-medium italic leading-relaxed">
-              You have read and fully understood the contents of this Consent Form. You acknowledge and understand that if you do not provide your consent, DYM will be unable to provide medical services to you.
+            <p className="font-medium leading-relaxed">
+              Tôi đã đọc, hiểu toàn bộ nội dung của Phiếu đồng thuận này. / <span className="italic">I have read and fully understood the contents of this Consent Form.</span>
             </p>
           )}
         </div>

@@ -5,6 +5,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fix layout property animation: prevent animating padding on toast wrapper */
+.xjshnde:not(#\#):not(#\#):not(#\#),
+.xjshnde {
+  transition-property: grid-template-rows !important;
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -256,16 +262,16 @@ input[type="search"]::-webkit-search-results-decoration {
     --destructive-foreground: 0 0% 98%;
     --border: 214 30% 82%;
     --input: 214 30% 82%;
-    --ring: 196 75% 45%;
+    --ring: 217 91% 60%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 228 50% 10%;
-    --sidebar-primary: 196 75% 45%;
+    --sidebar-primary: 228 50% 14%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 196 86% 95%;
+    --sidebar-accent: 210 40% 96%;
     --sidebar-accent-foreground: 228 50% 10%;
-    --sidebar-border: 197 38% 86%;
-    --sidebar-ring: 196 75% 45%;
+    --sidebar-border: 214 30% 86%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   .dark,
@@ -277,7 +283,7 @@ input[type="search"]::-webkit-search-results-decoration {
     --card-foreground: 210 40% 94%;
     --popover: 216 36% 11%;
     --popover-foreground: 210 40% 94%;
-    --primary: 196 75% 65%;
+    --primary: 210 40% 98%;
     --primary-foreground: 222 47% 11%;
     --secondary: 217 33% 15%;
     --secondary-foreground: 210 40% 94%;
@@ -289,16 +295,16 @@ input[type="search"]::-webkit-search-results-decoration {
     --destructive-foreground: 0 0% 98%;
     --border: 215 28% 25%;
     --input: 215 28% 25%;
-    --ring: 196 75% 65%;
+    --ring: 217 91% 60%;
 
     --sidebar-background: 216 36% 11%;
     --sidebar-foreground: 210 40% 94%;
-    --sidebar-primary: 196 75% 65%;
+    --sidebar-primary: 210 40% 98%;
     --sidebar-primary-foreground: 222 47% 11%;
     --sidebar-accent: 217 33% 16%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 215 28% 22%;
-    --sidebar-ring: 196 75% 65%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   html[data-color-mode="light"],
@@ -321,15 +327,15 @@ input[type="search"]::-webkit-search-results-decoration {
     --destructive-foreground: 0 0% 98%;
     --border: 214 30% 82%;
     --input: 214 30% 82%;
-    --ring: 196 75% 45%;
+    --ring: 217 91% 60%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 228 50% 10%;
-    --sidebar-primary: 196 75% 45%;
+    --sidebar-primary: 228 50% 14%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 196 86% 95%;
+    --sidebar-accent: 210 40% 96%;
     --sidebar-accent-foreground: 228 50% 10%;
-    --sidebar-border: 197 38% 86%;
-    --sidebar-ring: 196 75% 45%;
+    --sidebar-border: 214 30% 86%;
+    --sidebar-ring: 217 91% 60%;
   }
 }

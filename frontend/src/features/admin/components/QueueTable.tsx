@@ -14,16 +14,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { BranchCode } from '../../../types/domain';
 import { STATUS_META, type QueueStatus } from '../constants/queueConstants';
 import { usePrintStatus } from '../hooks/usePrintStatus';
-import { useRegistrationOverrides } from '../hooks/useRegistrationOverrides';
-import { calculateAge, formatBirthDate, formatPhone } from '../utils/adminFormatters';
+import { calculateAge, formatPhone } from '../utils/adminFormatters';
 import { supabase } from '../../../lib/supabaseClient';
 import type { RegistrationDetails } from '../hooks/useRegistrationDetailsQuery';
 import type { TT25StoredExtras } from '../types';
-import {
-  type TT25RegistrationData,
-  createDefaultTT25Data,
-  getDefaultTargetPaymentByReason,
-} from '../../registration/tt25Types';
+import type { TT25RegistrationData } from '../../registration/tt25Types';
+import { buildPrintData } from '../utils/buildPrintData';
 import { HighlightText } from './HighlightText';
 
 const TT25PrintModal = lazy(() => import('../../registration/TT25PrintModal'));
@@ -91,79 +87,8 @@ export function QueueTable({
   const [consentModalData, setConsentModalData] = useState<TT25RegistrationData | null>(null);
   const [activePrintRowId, setActivePrintRowId] = useState<string | null>(null);
   const [loadingPrintId, setLoadingPrintId] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   const { getStatus, markPrinted } = usePrintStatus();
-  const { overrideMap, applyToDetails } = useRegistrationOverrides();
-
-  const createPrintDataFromRow = (
-    row: RegistrationRow,
-    details?: RegistrationDetails | null,
-  ): TT25RegistrationData => {
-    const mergedDetails = details ? applyToDetails(details) : null;
-    const ov = overrideMap[row.id];
-    const extras = {
-      ...(mergedDetails?.tt25_data ?? {}),
-      ...(ov?.tt25_data ?? {}),
-    };
-
-    const workplaceVal =
-      ov?.company_name !== undefined
-        ? ov.company_name
-        : mergedDetails?.company_name && mergedDetails.company_name !== '—'
-          ? mergedDetails.company_name
-          : row.companyName !== '—'
-            ? row.companyName
-            : '';
-
-    const parsedBirthDate =
-      ov?.birth_date ||
-      mergedDetails?.birth_date ||
-      (row.birthDate.includes('/')
-        ? row.birthDate.split('/').reverse().join('-')
-        : row.birthDate);
-
-    const defaultReason = workplaceVal.trim()
-      ? 'Khám sức khỏe định kỳ theo công ty'
-      : 'Khám sức khỏe cá nhân tự nguyện';
-    const resolvedReason =
-      extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
-        ? extras.checkupReason
-        : defaultReason;
-
-    const wpWard = extras.workplaceWard || '';
-    const wpProv = extras.workplaceProvince || '';
-    const resolvedWorkplaceWard =
-      wpProv && !wpWard.includes(wpProv)
-        ? [wpWard, wpProv].filter(Boolean).join(', ')
-        : wpWard;
-
-    return createDefaultTT25Data({
-      branch: row.branch,
-      fullName: ov?.full_name || mergedDetails?.full_name || row.fullName,
-      gender: ((ov?.gender || mergedDetails?.gender || row.gender) as 'Nam' | 'Nữ') || 'Nam',
-      birthDate: parsedBirthDate,
-      ethnicity: extras.ethnicity || 'Kinh',
-      bloodGroup: extras.bloodGroup || 'Chưa rõ',
-      cccd: ov?.identity_document ?? mergedDetails?.identity_document ?? '',
-      insuranceNumber: extras.insuranceNumber || '',
-      province: ov?.province ?? mergedDetails?.province ?? '',
-      ward: ov?.ward ?? mergedDetails?.ward ?? '',
-      addressDetail: ov?.address_detail ?? mergedDetails?.address_detail ?? '',
-      occupation: extras.occupation || '',
-      workplace: workplaceVal,
-      workplaceWard: resolvedWorkplaceWard,
-      phoneNumber:
-        ov?.phone_number ||
-        mergedDetails?.phone_number ||
-        (row.phone !== '—' ? row.phone : ''),
-      checkupReason: resolvedReason,
-      medicalHistory: extras.medicalHistory,
-      targetPayment:
-        extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
-      consentAgreed: extras.consentAgreed ?? true,
-      queueNumber: row.queueNumber,
-      checkupDate: mergedDetails?.queue_date || row.date,
-    });
-  };
 
   const fetchRowPrintData = async (row: RegistrationRow): Promise<TT25RegistrationData> => {
     try {
@@ -175,28 +100,29 @@ export function QueueTable({
         },
       );
 
-      if (error) {
-        console.warn('Could not fetch registration details via RPC:', error);
-      }
+      if (error) throw error;
 
       const match = (detailsList as RegistrationDetails[] | null)?.find(
         (r) => r.id === row.id,
       );
 
-      return createPrintDataFromRow(row, match);
+      if (!match) throw new Error('REGISTRATION_NOT_FOUND');
+      return buildPrintData(match, row.branch);
     } catch (err) {
       console.error('Error getting print details:', err);
-      return createPrintDataFromRow(row, null);
+      throw new Error('Không thể tải hồ sơ mới nhất để in. Vui lòng thử lại.');
     }
   };
 
   const handlePrintClick = async (row: RegistrationRow) => {
     setLoadingPrintId(`tt25:${row.id}`);
+    setPrintError(null);
     try {
       const data = await fetchRowPrintData(row);
       setActivePrintRowId(row.id);
-      markPrinted(row.id, 'tt25');
       setPrintModalData(data);
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Không thể tải hồ sơ để in.');
     } finally {
       setLoadingPrintId(null);
     }
@@ -204,11 +130,13 @@ export function QueueTable({
 
   const handlePrintConsentClick = async (row: RegistrationRow) => {
     setLoadingPrintId(`consent:${row.id}`);
+    setPrintError(null);
     try {
       const data = await fetchRowPrintData(row);
       setActivePrintRowId(row.id);
-      markPrinted(row.id, 'consent');
       setConsentModalData(data);
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Không thể tải hồ sơ để in.');
     } finally {
       setLoadingPrintId(null);
     }
@@ -233,24 +161,14 @@ export function QueueTable({
       statusFilter === 'all'
         ? paginatedRows
         : paginatedRows.filter((r) => r.status === statusFilter);
-    return baseRows.map((r) => {
-      const ov = overrideMap[r.id];
-      if (!ov) return r;
-      return {
-        ...r,
-        fullName: ov.full_name || r.fullName,
-        gender: ov.gender || r.gender,
-        birthDate: ov.birth_date ? formatBirthDate(ov.birth_date) : r.birthDate,
-        phone: ov.phone_number || r.phone,
-        companyName: ov.company_name || '—',
-      };
-    });
-  }, [overrideMap, paginatedRows, statusFilter]);
+    return baseRows;
+  }, [paginatedRows, statusFilter]);
 
   return (
     <section className="dym-registry-panel" aria-labelledby="registry-ledger-title">
+      {printError && <p role="alert" className="p-4 text-sm text-red-600">{printError}</p>}
       {/* Top Toolbar */}
-      <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
+      <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
         <div className="dym-registry-title-block">
           <h2 id="registry-ledger-title" className="dym-registry-title">
             Danh Sách Khám Tại {branchName}
@@ -610,8 +528,8 @@ export function QueueTable({
             aria-label="Phân trang danh sách tại bàn tiếp nhận"
           >
             <div className="dym-pagination-summary">
-              Hiển thị <span className="font-semibold text-slate-800">{firstVisibleRow}–{lastVisibleRow}</span> trong tổng số{' '}
-              <span className="font-semibold text-slate-800">{filteredRows.length}</span> lượt khám
+              Hiển thị <strong className="font-semibold text-foreground">{firstVisibleRow}–{lastVisibleRow}</strong> trong tổng số{' '}
+              <strong className="font-semibold text-foreground">{filteredRows.length}</strong> lượt khám
             </div>
 
             <div className="dym-pagination-pager">
@@ -652,9 +570,10 @@ export function QueueTable({
             isOpen={Boolean(printModalData)}
             onClose={() => setPrintModalData(null)}
             data={printModalData}
-            onPrinted={() => {
+            key={activePrintRowId}
+            onPrinted={async () => {
               if (activePrintRowId) {
-                markPrinted(activePrintRowId, 'tt25');
+                await markPrinted(activePrintRowId, 'tt25');
               }
             }}
           />
@@ -668,9 +587,10 @@ export function QueueTable({
             isOpen={Boolean(consentModalData)}
             onClose={() => setConsentModalData(null)}
             data={consentModalData}
-            onPrinted={() => {
+            key={activePrintRowId}
+            onPrinted={async () => {
               if (activePrintRowId) {
-                markPrinted(activePrintRowId, 'consent');
+                await markPrinted(activePrintRowId, 'consent');
               }
             }}
           />

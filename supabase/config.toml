@@ -385,6 +385,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/register/index.ts"
 
+[functions.registration-access]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/registration-access/index.ts"
+
 [functions.manage-staff]
 enabled = true
 verify_jwt = false

@@ -29,8 +29,8 @@ import {
 import { usePrintStatus } from '../hooks/usePrintStatus';
 import {
   type RegistrationEditableFields,
-  useRegistrationOverrides,
-} from '../hooks/useRegistrationOverrides';
+  saveRegistrationEdit,
+} from '../registrationEdits';
 import type { RegistrationDetails } from '../types';
 import {
   calculateAge,
@@ -58,7 +58,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   onUpdated,
 }) => {
   const { getStatus } = usePrintStatus();
-  const { applyToDetails, saveEdit } = useRegistrationOverrides();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +69,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const [workplaceWards, setWorkplaceWards] = useState<Ward[]>([]);
   const [occupations, setOccupations] = useState<string[]>([]);
 
-  const effectiveRow = selectedRow ? applyToDetails(selectedRow) : null;
+  const effectiveRow = selectedRow;
 
   const buildInitialForm = (row: RegistrationDetails): RegistrationEditableFields => {
     const ext = row.tt25_data ?? {};
@@ -221,13 +220,13 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     setIsSaving(true);
     setFormError(null);
     try {
-      await saveEdit(effectiveRow.id, form);
+      await saveRegistrationEdit(effectiveRow.id, form);
       const nextRow: RegistrationDetails = {
         ...effectiveRow,
         full_name: form.full_name.trim(),
         gender: form.gender,
         birth_date: form.birth_date.trim() || effectiveRow.birth_date,
-        phone_number: form.phone_number.replace(/\s+/g, '').trim(),
+        phone_number: form.phone_number.replace(/[^0-9]/g, ''),
         identity_document: form.identity_document.trim().toUpperCase(),
         company_name: form.company_name.trim(),
         province: form.province.trim(),
@@ -242,6 +241,8 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
       setIsEditing(false);
       setSaveSuccess(true);
       window.setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Không thể lưu hồ sơ. Vui lòng thử lại.');
     } finally {
       setIsSaving(false);
     }

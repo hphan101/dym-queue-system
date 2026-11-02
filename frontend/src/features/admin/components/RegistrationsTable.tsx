@@ -46,7 +46,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
               <th scope="col" className="w-10">
                 <input
                   type="checkbox"
-                  className="size-4 cursor-pointer accent-sky-600 align-middle"
+                  className="size-4 cursor-pointer accent-primary align-middle"
                   checked={allChecked}
                   onChange={(e) =>
                     onToggleChecked!(rows.map((r) => r.id), e.target.checked)
@@ -79,7 +79,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                   <td className="w-10">
                     <input
                       type="checkbox"
-                      className="size-4 cursor-pointer accent-sky-600 align-middle"
+                      className="size-4 cursor-pointer accent-primary align-middle"
                       checked={checkedIds!.has(row.id)}
                       onChange={(e) => onToggleChecked!([row.id], e.target.checked)}
                       aria-label={`Chọn hồ sơ ${row.full_name}`}
@@ -112,10 +112,10 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                         />
                       </strong>
                       <span
-                        className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                        className={`inline-flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
                           row.gender === 'Nữ'
-                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                            : 'bg-sky-100 text-sky-700 border border-sky-200'
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900'
+                            : 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'
                         }`}
                       >
                         {row.gender}

@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { LoginForm } from '@/components/login-form';
 import dymLogo from '../../assets/dym-logo-dark.png';
 import { supabase } from '../../lib/supabaseClient';
+import { isBranchCode } from '../../config/branches';
 
 function getLoginErrorMessage(code?: string): string {
   switch (code) {
@@ -81,7 +82,11 @@ export default function LoginPage() {
         throw new Error('Tài khoản chưa được cấp quyền hoặc đã bị khóa.');
       }
 
-      window.location.assign('/?page=admin');
+      const params = new URLSearchParams(window.location.search);
+      const branch = params.get('branch') ?? '';
+      window.location.assign(params.get('next') === 'registration-qr'
+        ? `/registration-qr?branch=${isBranchCode(branch) ? branch : 'q1'}`
+        : '/?page=admin');
     } catch (loginError) {
       setError(
         loginError instanceof Error

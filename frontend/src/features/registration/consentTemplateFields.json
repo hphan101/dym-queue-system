@@ -1,0 +1,348 @@
+{
+  "vi": {
+    "template": "dong-thuan-vnm.pdf",
+    "pageCount": 2,
+    "consentPages": [
+      0
+    ],
+    "refusalPages": [
+      1
+    ],
+    "fields": [
+      {
+        "page": 0,
+        "field": "fullName",
+        "x": 130.1,
+        "y": 699.82,
+        "width": 413.9,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "birthDate",
+        "x": 192.17,
+        "y": 655.66,
+        "width": 351.83,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "identityDocument",
+        "x": 274.25,
+        "y": 633.58,
+        "width": 269.75,
+        "size": 12,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "phoneNumber",
+        "x": 175.46,
+        "y": 614.5,
+        "width": 368.54,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "email",
+        "x": 108.74,
+        "y": 598.66,
+        "width": 435.26,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "workplace",
+        "x": 191.33,
+        "y": 579.82,
+        "width": 352.67,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "checkupDate",
+        "x": 99.744,
+        "y": 114.5,
+        "width": 444.256,
+        "size": 12.0,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "fullName",
+        "x": 123.14,
+        "y": 100.7,
+        "width": 420.86,
+        "size": 12.0,
+        "font": "bold",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "identityDocument",
+        "x": 265.13,
+        "y": 86.904,
+        "width": 278.87,
+        "size": 12,
+        "font": "boldItalic",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "fullName",
+        "x": 125.3,
+        "y": 685.54,
+        "width": 158.15,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "birthDate",
+        "x": 345.43,
+        "y": 685.54,
+        "width": 198.57,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "identityDocument",
+        "x": 242.69,
+        "y": 669.94,
+        "width": 301.31,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "fullName",
+        "x": 410.294,
+        "y": 40.344,
+        "width": 225,
+        "size": 11.04,
+        "font": "bold",
+        "align": "center"
+      },
+      {
+        "page": 1,
+        "field": "checkupDate",
+        "x": 409.224,
+        "y": 128.9,
+        "width": 79.622,
+        "size": 11.04,
+        "font": "italic",
+        "align": "left"
+      }
+    ],
+    "genderMarks": {
+      "Nam": {
+        "x": 130.046,
+        "y": 681.28
+      },
+      "Nữ": {
+        "x": 179.366,
+        "y": 681.28
+      }
+    }
+  },
+  "bilingual": {
+    "template": "dong-thuan-bilingual.pdf",
+    "pageCount": 4,
+    "consentPages": [
+      0,
+      1
+    ],
+    "refusalPages": [
+      2,
+      3
+    ],
+    "fields": [
+      {
+        "page": 0,
+        "field": "fullName",
+        "x": 192.77,
+        "y": 677.02,
+        "width": 351.23,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "birthDate",
+        "x": 267.65,
+        "y": 632.86,
+        "width": 276.35,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "identityDocument",
+        "x": 72.024,
+        "y": 598.9,
+        "width": 471.976,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "phoneNumber",
+        "x": 257.57,
+        "y": 583.18,
+        "width": 286.43,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "email",
+        "x": 108.74,
+        "y": 567.31,
+        "width": 435.26,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 0,
+        "field": "workplace",
+        "x": 338.83,
+        "y": 548.47,
+        "width": 205.17,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "checkupDate",
+        "x": 135.02,
+        "y": 352.25,
+        "width": 408.98,
+        "size": 12.0,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "fullName",
+        "x": 185.69,
+        "y": 338.45,
+        "width": 358.31,
+        "size": 12.0,
+        "font": "bold",
+        "align": "left"
+      },
+      {
+        "page": 1,
+        "field": "identityDocument",
+        "x": 64.944,
+        "y": 310.97,
+        "width": 479.056,
+        "size": 12.0,
+        "font": "boldItalic",
+        "align": "left"
+      },
+      {
+        "page": 2,
+        "field": "fullName",
+        "x": 181.7,
+        "y": 656.02,
+        "width": 154.21,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 2,
+        "field": "birthDate",
+        "x": 465.94,
+        "y": 656.02,
+        "width": 78.06,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 2,
+        "field": "identityDocument",
+        "x": 72.024,
+        "y": 627.7,
+        "width": 471.976,
+        "size": 11.04,
+        "font": "regular",
+        "align": "left"
+      },
+      {
+        "page": 3,
+        "field": "fullName",
+        "x": 427.694,
+        "y": 395.23,
+        "width": 225,
+        "size": 11.04,
+        "font": "bold",
+        "align": "center"
+      },
+      {
+        "page": 3,
+        "field": "checkupDay",
+        "x": 482.5,
+        "y": 508.99,
+        "width": 17.312,
+        "size": 11.04,
+        "font": "italic",
+        "align": "left"
+      },
+      {
+        "page": 3,
+        "field": "checkupMonth",
+        "x": 505.772,
+        "y": 508.99,
+        "width": 17.301,
+        "size": 11.04,
+        "font": "italic",
+        "align": "left"
+      },
+      {
+        "page": 3,
+        "field": "checkupYear",
+        "x": 412.863,
+        "y": 496.39,
+        "width": 33.199,
+        "size": 11.04,
+        "font": "italic",
+        "align": "left"
+      }
+    ],
+    "genderMarks": {
+      "Nam": {
+        "x": 180.086,
+        "y": 658.48
+      },
+      "Nữ": {
+        "x": 265.556,
+        "y": 658.48
+      }
+    }
+  }
+}

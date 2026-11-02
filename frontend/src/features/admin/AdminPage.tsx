@@ -587,6 +587,7 @@ export function AdminPage({
 
         <div className="dym-admin-workspace">
           <AdminHeader
+            registrationHref={!isLoadingIdentity && (authorizedIsAdmin || staffRole === 'receptionist') ? `/?branch=${branch}&staff=1` : undefined}
             branch={branch}
             branchOptions={branchOptions}
             onBranchChange={handleBranchChange}

@@ -33,7 +33,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-dym-blue-800">
           Kính chào Quý khách
         </h1>
-        <p className="text-sm font-medium text-dym-blue-700 mt-0.5">
+        <p className="text-sm font-medium text-slate-600 mt-0.5">
           Welcome to DYM Medical Center
         </p>
 

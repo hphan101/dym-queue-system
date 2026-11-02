@@ -30,3 +30,6 @@ agent-skills
 skills-lock.json
 graphify-out/
 .graphifyignore
+
+# Local consent template exports and visual QA
+/tmp/consent-forms/

@@ -573,7 +573,7 @@ export function StaffPage({
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
-      <div className="dym-admin-shell" data-color-mode={themeMode}>
+      <div className="dym-admin-shell dym-staff-page" data-color-mode={themeMode}>
         <AdminSidebar
           activePage="staff"
           branch={scopeBranch}
@@ -658,7 +658,7 @@ export function StaffPage({
               aria-labelledby="staff-list-title"
             >
               {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
-              <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
                 <div className="dym-registry-title-block">
                   <h2 id="staff-list-title" className="dym-registry-title">
                     Danh Sách Nhân Viên Phòng Khám
@@ -696,7 +696,7 @@ export function StaffPage({
                         className="h-7 gap-1.5 px-3 text-xs font-medium"
                       >
                         <span
-                          className="size-1.5 rounded-full bg-emerald-500"
+                          className="size-1.5 rounded-full bg-current"
                           aria-hidden="true"
                         />
                         <span>Hoạt động</span>
@@ -713,7 +713,7 @@ export function StaffPage({
                         className="h-7 gap-1.5 px-3 text-xs font-medium"
                       >
                         <span
-                          className="size-1.5 rounded-full bg-amber-500"
+                          className="size-1.5 rounded-full bg-current"
                           aria-hidden="true"
                         />
                         <span>Đã khóa</span>
@@ -757,7 +757,7 @@ export function StaffPage({
                       </Button>
                     ) : (
                       <kbd
-                        className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                        className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-xs font-medium text-muted-foreground"
                         title="Phím tắt: /"
                       >
                         /
@@ -828,7 +828,7 @@ export function StaffPage({
               ) : filteredStaff.length === 0 ? (
                 <div className="dym-table-empty-box">
                   <div className="dym-empty-icon-wrap">
-                    <UserGroupIcon className="w-7 h-7 text-sky-600" aria-hidden="true" />
+                    <UserGroupIcon className="w-7 h-7 text-muted-foreground" aria-hidden="true" />
                   </div>
                   <h3 className="dym-empty-title">Không tìm thấy nhân viên</h3>
                   <p className="dym-empty-desc">
@@ -866,7 +866,7 @@ export function StaffPage({
                           {/* Staff Avatar + Name + Login */}
                           <td>
                             <div className="flex items-center gap-3">
-                              <Avatar name={account.displayName} size="md" tooltip={false} />
+                              <Avatar className="dym-staff-avatar" name={account.displayName} size="md" tooltip={false} />
                               <div className="dym-patient-info">
                                 <span className="dym-patient-name">
                                   <HighlightText text={account.displayName} query={query} />
@@ -986,7 +986,7 @@ export function StaffPage({
                                 disabled={pendingAccountId === account.userId}
                                 onClick={() => requestAccountDelete(account)}
                                 title="Xóa tài khoản này"
-                                className="h-8 px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                className="dym-staff-delete-button h-8 px-3 text-xs font-medium"
                               >
                                 Xóa
                               </Button>

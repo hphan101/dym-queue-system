@@ -7,6 +7,7 @@ import {
   responseHeaders,
 } from "../_shared/http.ts";
 import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
+import { hashRegistrationSession, SESSION_TOKEN_PATTERN } from "../_shared/registrationAccess.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
 const COOLDOWN_SECONDS = 600;
@@ -189,6 +190,8 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     ["workplaceProvince", 120],
     ["workplaceWard", 160],
     ["checkupReason", 160],
+    ["language", 20],
+    ["email", 120],
   ];
 
   for (const [key, maxLen] of optionalTextFields) {
@@ -400,8 +403,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   let payload: RegistrationPayload | null = null;
+  let sessionToken = "";
   try {
-    payload = parsePayload(JSON.parse(rawBody));
+    const decoded: unknown = JSON.parse(rawBody);
+    payload = parsePayload(decoded);
+    if (isRecord(decoded) && typeof decoded.registrationSession === "string") sessionToken = decoded.registrationSession;
   } catch {
     // Handled by the common invalid payload response below.
   }
@@ -416,6 +422,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
       400,
       origin,
     );
+  }
+
+  if (!SESSION_TOKEN_PATTERN.test(sessionToken)) {
+    return jsonResponse({ success: false, code: "REGISTRATION_SESSION_INVALID", error: "Vui lòng quét mã QR tại phòng khám để đăng ký." }, 403, origin);
   }
 
   // Bots that fill the hidden field receive a plausible response, but no row
@@ -500,7 +510,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
       );
     }
 
-    const { data, error } = await supabase.rpc("issue_registration", {
+    const { data, error } = await supabase.rpc("issue_registration_with_session", {
+      p_session_hash: await hashRegistrationSession(sessionToken),
+      p_request_hash: await createHmac(`registration-request|${JSON.stringify(payload)}`, fingerprintSecret),
       p_branch_code: payload.branch,
       p_full_name: payload.fullName.trim().toUpperCase(),
       p_birth_date: payload.birthDate,
@@ -518,6 +530,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     if (error) {
       const errorText = databaseErrorText(error);
+      if (errorText.includes("REGISTRATION_SESSION_")) {
+        return jsonResponse({
+          success: false,
+          code: errorText.includes("REGISTRATION_SESSION_EXPIRED") ? "REGISTRATION_SESSION_EXPIRED" : "REGISTRATION_SESSION_INVALID",
+          error: "Phiên đăng ký đã hết hạn hoặc không hợp lệ. Vui lòng quét lại mã QR tại phòng khám.",
+        }, 403, origin);
+      }
       if (errorText.includes("RATE_LIMITED")) {
         return jsonResponse(
           {
@@ -578,6 +597,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       {
         success: true,
         queueNumber: formatQueueNumber(issued.queue_number),
+        queueDate: issued.queue_date,
       },
       200,
       origin,

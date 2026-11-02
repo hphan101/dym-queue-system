@@ -4,6 +4,7 @@ import {
   BellRing,
   Building2,
   RotateCcw,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 import type { BranchCode } from '../../../types/domain';
 import { getTodayInVietnam } from '../../../lib/date';
 import { formatDisplayDate } from '../utils/adminFormatters';
+import { openStaffRegistrationTab } from '../../../lib/navigation';
 
 export interface AdminHeaderProps {
   title?: string;
@@ -30,6 +32,7 @@ export interface AdminHeaderProps {
   isNotificationSoundEnabled?: boolean;
   onToggleNotificationSound?: () => void;
   actions?: ReactNode;
+  registrationHref?: string;
 }
 
 export function AdminHeader({
@@ -42,6 +45,7 @@ export function AdminHeader({
   isNotificationSoundEnabled,
   onToggleNotificationSound,
   actions,
+  registrationHref,
 }: AdminHeaderProps) {
   const today = getTodayInVietnam();
   const isToday = !date || date === today;
@@ -58,6 +62,10 @@ export function AdminHeader({
         className="flex flex-wrap items-center justify-end gap-2.5"
         aria-label="Bộ lọc điều phối"
       >
+        {registrationHref && <Button type="button" size="sm" className="h-9 gap-2 px-3 text-xs font-medium"
+          onClick={() => openStaffRegistrationTab(registrationHref)} title="Mở đăng ký hộ khách trong tab mới">
+          <Plus className="size-3.5" aria-hidden="true" />Đăng ký
+        </Button>}
         {/* Sound Toggle (if configured) */}
         {isNotificationSoundEnabled !== undefined && onToggleNotificationSound && (
           <Button
@@ -78,7 +86,7 @@ export function AdminHeader({
             )}
           >
             {isNotificationSoundEnabled ? (
-              <BellRing className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <BellRing className="size-3.5 shrink-0 text-foreground" aria-hidden="true" />
             ) : (
               <BellOff
                 className="size-3.5 shrink-0 text-muted-foreground"
@@ -154,7 +162,7 @@ export function AdminHeader({
                 size="sm"
                 onClick={() => onDateChange(today)}
                 title="Quay về ngày hôm nay"
-                className="h-9 gap-1 px-2.5 text-xs font-medium text-primary hover:text-primary"
+                className="h-9 gap-1 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
                 <RotateCcw className="size-3.5 shrink-0" aria-hidden="true" />
                 <span>Hôm nay</span>

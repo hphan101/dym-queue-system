@@ -4,6 +4,7 @@ import dymLogo from '../../assets/dym-logo.png';
 import dymLogoDark from '../../assets/dym-logo-dark.png';
 import { BRANCH_NAMES, isBranchCode } from '../../config/branches';
 import { formatQueueNumber } from '../../lib/queueNumber';
+import { getTodayInVietnam } from '../../lib/date';
 import { translations, type SupportedLanguage } from '../../locales';
 import type { BranchCode } from '../../types/domain';
 import { CheckupReasonScreen } from './CheckupReasonScreen';
@@ -12,6 +13,10 @@ import { SuccessView } from './SuccessView';
 import { TT25RegistrationForm } from './TT25RegistrationForm';
 import type { RegistrationResponse, TT25RegistrationData } from './types';
 import { WelcomeScreen } from './WelcomeScreen';
+import { clearRegistrationReceipt, readRegistrationReceipt, storeRegistrationReceipt } from './registrationReceipt';
+import { useRegistrationAccess } from './useRegistrationAccess';
+import { RegistrationAccessNotice } from './RegistrationAccessNotice';
+import './registration-access.css';
 
 function getBranchFromUrl(): BranchCode | null {
   const branch = new URLSearchParams(window.location.search)
@@ -22,6 +27,10 @@ function getBranchFromUrl(): BranchCode | null {
 
 export function RegistrationFlowPage() {
   const branch = getBranchFromUrl();
+  const assisted = new URLSearchParams(window.location.search).get('staff') === '1';
+  const access = useRegistrationAccess(branch, assisted);
+  const accessReady = access.state.status === 'ready' && access.state.session.branch === branch;
+  const [receipt, setReceipt] = useState(() => assisted ? null : readRegistrationReceipt(branch));
   const [lang, setLang] = useState<SupportedLanguage>(() => {
     const saved = localStorage.getItem('dym_registration_lang');
     return saved === 'en' ? saved : 'vi';
@@ -29,11 +38,7 @@ export function RegistrationFlowPage() {
 
   const [step, setStep] = useState<
     'welcome' | 'reason' | 'consent' | 'form' | 'success'
-  >(() => {
-    const savedStep = localStorage.getItem('dym_registration_step');
-    const savedQueue = localStorage.getItem('dym_registration_queue');
-    return savedStep === 'success' && savedQueue ? 'success' : 'welcome';
-  });
+  >(() => receipt ? 'success' : 'welcome');
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [consentAgreed, setConsentAgreed] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +46,32 @@ export function RegistrationFlowPage() {
   const [error, setError] = useState<string | null>(null);
   const [registeredData, setRegisteredData] =
     useState<TT25RegistrationData | null>(null);
-  const [queueNumber, setQueueNumber] = useState<string>(() => {
-    const storedQueueNumber = localStorage.getItem('dym_registration_queue');
-    return storedQueueNumber ? formatQueueNumber(storedQueueNumber) : '';
-  });
+  const [queueNumber, setQueueNumber] = useState<string>(() => receipt?.queueNumber ?? '');
+
+  useEffect(() => {
+    const saved = assisted ? null : readRegistrationReceipt(branch);
+    setReceipt(saved);
+    setQueueNumber(saved?.queueNumber ?? '');
+    setRegisteredData(null);
+    setStep(saved ? 'success' : 'welcome');
+  }, [branch, assisted]);
+
+  useEffect(() => {
+    if (!receipt) return;
+    const expireReceipt = () => {
+      if (receipt.branch === branch && receipt.queueDate === getTodayInVietnam()) return;
+      setReceipt(null);
+      setQueueNumber('');
+      setRegisteredData(null);
+      setStep('welcome');
+    };
+    const timer = window.setInterval(expireReceipt, 30_000);
+    document.addEventListener('visibilitychange', expireReceipt);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', expireReceipt);
+    };
+  }, [receipt, branch]);
 
   const registrationApiUrl = import.meta.env.VITE_REGISTRATION_API_URL;
 
@@ -77,6 +104,11 @@ export function RegistrationFlowPage() {
   };
 
   const handleFormSubmit = async (formData: TT25RegistrationData) => {
+    if (access.state.status !== 'ready' || access.state.session.branch !== formData.branch ||
+      access.state.session.expiresAt <= Date.now()) {
+      access.invalidate();
+      return;
+    }
     setIsLoading(true);
     setShowPageLoader(false);
     setError(null);
@@ -103,6 +135,8 @@ export function RegistrationFlowPage() {
       ...formData,
       companyName: formData.workplace || '',
       consentAgreed,
+      language: lang,
+      registrationSession: access.state.session.token,
     };
 
     try {
@@ -125,19 +159,26 @@ export function RegistrationFlowPage() {
         setQueueNumber(formattedQueueNumber);
         setRegisteredData({
           ...formData,
+          language: lang,
           consentAgreed,
           queueNumber: formattedQueueNumber,
         });
         setStep('success');
+        access.complete();
 
         // Patient details remain in memory; only the queue receipt persists.
-        localStorage.setItem('dym_registration_step', 'success');
-        localStorage.setItem('dym_registration_queue', formattedQueueNumber);
-        localStorage.setItem(
-          'dym_last_registration_time',
-          Date.now().toString(),
-        );
+        const nextReceipt = {
+          branch: formData.branch,
+          queueDate: result.queueDate ?? getTodayInVietnam(),
+          queueNumber: formattedQueueNumber,
+        };
+        setReceipt(nextReceipt);
+        if (!assisted) storeRegistrationReceipt(nextReceipt);
+        try {
+          if (!assisted) localStorage.setItem('dym_last_registration_time', Date.now().toString());
+        } catch { /* Registration is already saved on the server. */ }
       } else {
+        if (result?.code === 'REGISTRATION_SESSION_INVALID' || result?.code === 'REGISTRATION_SESSION_EXPIRED') access.invalidate();
         throw new Error(result?.error || translations[lang].saveError);
       }
     } catch (err: unknown) {
@@ -161,6 +202,9 @@ export function RegistrationFlowPage() {
     setConsentAgreed(true);
     setRegisteredData(null);
     setQueueNumber('');
+    setReceipt(null);
+    if (!assisted) clearRegistrationReceipt();
+    access.invalidate();
     setError(null);
 
     localStorage.removeItem('dym_registration_step');
@@ -170,7 +214,7 @@ export function RegistrationFlowPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#f4f9fc] flex flex-col justify-between pt-6">
+    <div className={`registration-access-surface min-h-[100dvh] flex flex-col justify-between pt-6${step !== 'success' && !accessReady && access.state.status !== 'checking' ? ' registration-entry-page' : ''}`}>
       {showPageLoader && (
         <div className="page-loader animate-fade-in">
           <img
@@ -183,7 +227,12 @@ export function RegistrationFlowPage() {
       )}
 
       <main className="flex-grow max-w-md md:max-w-xl lg:max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-center">
-        <div className="bg-white rounded-lg border border-slate-200/80 p-5 sm:p-8 shadow-sm">
+        <div className={step !== 'success' && !accessReady && access.state.status !== 'checking'
+          ? 'registration-entry-card'
+          : 'bg-white rounded-lg border border-slate-200/80 p-5 sm:p-8 shadow-sm'}>
+          {assisted && accessReady && <a className="mb-4 inline-block text-sm font-medium underline underline-offset-4" href={`/?page=admin&branch=${branch}`}>Về tiếp nhận</a>}
+          {step !== 'success' && <RegistrationAccessNotice state={access.state} onRetry={access.retry} />}
+          <div hidden={step !== 'success' && !accessReady}>
           {branch && step === 'form' && (
             <div className="mb-6 text-center">
               <span className="inline-block px-2.5 py-0.5 rounded-full bg-dym-blue-50 text-dym-blue-700 text-xs font-semibold mb-1.5">
@@ -259,12 +308,14 @@ export function RegistrationFlowPage() {
             />
           ) : (
             <SuccessView
+              assisted={assisted && access.state.status === 'ready' && access.state.assisted === true}
               queueNumber={queueNumber}
               data={registeredData}
               onReset={handleReset}
               lang={lang}
             />
           )}
+          </div>
         </div>
       </main>
 

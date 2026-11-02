@@ -323,12 +323,12 @@ export function RosterDashboardPage({
               Quyết toán tháng {selectedMonth}
             </span>
             <BanknotesIcon
-              className="dym-metric-summary-icon text-sky-500"
+              className="dym-metric-summary-icon text-muted-foreground"
               aria-hidden="true"
             />
           </div>
           <div className="dym-metric-summary-value-row">
-            <strong className="dym-metric-summary-number text-sky-600 dark:text-sky-400">
+            <strong className="dym-metric-summary-number text-foreground">
               {formatVndCurrency(metrics.monthTotalCost)}
             </strong>
             <span className="dym-metric-summary-unit">
@@ -594,7 +594,7 @@ export function RosterDashboardPage({
 
       {/* Monthly Personnel Cost Settlement Table by ID */}
       <section className="dym-roster-panel">
-        <div className="flex flex-col gap-3 border-b border-border bg-card/40 px-5 py-4">
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
           <div className="dym-registry-title-block">
             <h2 className="dym-registry-title">
               Bảng Quyết Toán Chi Phí Nhân Sự Theo ID — Tháng {selectedMonth}

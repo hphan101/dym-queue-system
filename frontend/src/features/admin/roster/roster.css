@@ -90,7 +90,6 @@
   border-radius: var(--radius-panel);
   background: var(--color-paper-2);
   color: var(--color-ink);
-  overflow: clip;
 }
 
 .dym-roster-panel-header {
@@ -102,6 +101,8 @@
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--color-rule);
   background: var(--color-paper-raised);
+  border-top-left-radius: calc(var(--radius-panel) - 1px);
+  border-top-right-radius: calc(var(--radius-panel) - 1px);
 }
 
 .dym-roster-panel-title-group {
@@ -249,8 +250,8 @@
 }
 
 .dym-admin-shell[data-color-mode='dark'] .dym-roster-role-badge.role-doctor {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.14);
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.14);
 }
 
 .dym-roster-role-badge.role-nurse {

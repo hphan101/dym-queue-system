@@ -73,6 +73,11 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
 
   useEffect(() => {
     let isMounted = true;
+    try {
+      window.sessionStorage.removeItem('dym_registration_overrides_v1');
+      window.localStorage.removeItem('dym_registration_overrides_v1');
+      window.localStorage.removeItem('dym_tt25_customer_extras_v1');
+    } catch { /* Server data is used even when browser storage is unavailable. */ }
 
     const {
       data: { subscription },
