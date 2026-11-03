@@ -20,9 +20,11 @@ export const BLOOD_GROUPS = [
   'AB (Rh-)',
 ];
 
-export const CHECKUP_REASONS = [
-  'Khám sức khỏe định kì theo công ty',
-  'Khám sức khỏe đi học/đi làm',
-  'Khám sức khỏe cá nhân tự nguyện',
-];
+export const CHECKUP_REASON_OPTIONS = [
+  { value: 'Khám sức khỏe định kì doanh nghiệp', labelEn: 'Corporate periodic health checkup' },
+  { value: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit', labelEn: 'Health checkup for a Work Permit application' },
+  { value: 'Khám sức khỏe khác', labelEn: 'Other health checkups' },
+] as const;
+
+export const CHECKUP_REASONS = CHECKUP_REASON_OPTIONS.map((option) => option.value);
 

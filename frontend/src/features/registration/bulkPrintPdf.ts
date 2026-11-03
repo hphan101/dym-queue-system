@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { generateConsentPdf } from './consentPdfService';
-import { generateTT25OriginalPdf } from './tt25PdfService';
+import { generateTT25OriginalPdf } from './tt25HcmPdfService';
 import type { TT25RegistrationData } from './tt25Types';
 
 export type BulkPrintMode = 'consent' | 'tt25' | 'both';
@@ -8,7 +8,7 @@ export type BulkPrintMode = 'consent' | 'tt25' | 'both';
 /**
  * Merge Consent and/or TT25 PDFs of many patients into one file, in the given order.
  * With padForDuplex, each document is padded to an even page count so the next one
- * always starts on a fresh sheet when printing double-sided (TT25 has 7 pages).
+ * always starts on a fresh sheet regardless of the selected template's page count.
  */
 export async function generateBulkPrintPdf(
   items: TT25RegistrationData[],

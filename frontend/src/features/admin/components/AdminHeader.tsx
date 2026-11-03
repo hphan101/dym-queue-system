@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import type { BranchCode } from '../../../types/domain';
 import { getTodayInVietnam } from '../../../lib/date';
 import { formatDisplayDate } from '../utils/adminFormatters';
-import { openStaffRegistrationTab } from '../../../lib/navigation';
+import { openStaffTab } from '../../../lib/navigation';
 
 export interface AdminHeaderProps {
   title?: string;
@@ -63,7 +63,7 @@ export function AdminHeader({
         aria-label="Bộ lọc điều phối"
       >
         {registrationHref && <Button type="button" size="sm" className="h-9 gap-2 px-3 text-xs font-medium"
-          onClick={() => openStaffRegistrationTab(registrationHref)} title="Mở đăng ký hộ khách trong tab mới">
+          onClick={() => openStaffTab(registrationHref)} title="Mở đăng ký hộ khách trong tab mới">
           <Plus className="size-3.5" aria-hidden="true" />Đăng ký
         </Button>}
         {/* Sound Toggle (if configured) */}

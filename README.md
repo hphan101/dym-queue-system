@@ -49,7 +49,7 @@ Publishable key được phép xuất hiện ở frontend. Không đặt service
 ## QR đăng ký tại phòng khám
 
 Nhân viên mở mục **QR đăng ký tại quầy** trong thanh điều hướng. Mục này mở trong
-cùng tab, dùng phiên lễ tân/admin đang đăng nhập và chi nhánh đang chọn, không yêu
+tab mới, dùng phiên lễ tân/admin đang đăng nhập và chi nhánh đang chọn, không yêu
 cầu đăng nhập lại. Tài khoản chỉ thấy các chi nhánh được cấp quyền; tài khoản có
 một chi nhánh được chọn tự động. Thiết bị chưa có phiên nhân viên vẫn cần đăng nhập.
 Nút **Tiếp nhận** quay lại màn hình quản trị. Có thể dùng nút
@@ -90,6 +90,7 @@ Mã chi nhánh:
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run db:lint
 npm run db:push

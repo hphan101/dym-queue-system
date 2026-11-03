@@ -111,6 +111,10 @@ export function jsonResponse(
 export const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
 export const LOGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 
+export function getBearerToken(request: Request): string | null {
+  return /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1] ?? null;
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

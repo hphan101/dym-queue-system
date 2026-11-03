@@ -1,4 +1,4 @@
-import { getClientIp, isOriginAllowed, isRecord, jsonResponse, responseHeaders } from "../_shared/http.ts";
+import { getBearerToken, getClientIp, isOriginAllowed, isRecord, jsonResponse, responseHeaders } from "../_shared/http.ts";
 import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
 import {
   createQrChallenge, createRegistrationSessionToken, hashRegistrationSession,
@@ -29,7 +29,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     const client = createAdminClient(url, secretKey);
 
     if (body.action === "qr") {
-      const token = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1];
+      const token = getBearerToken(request);
       if (!token) return jsonResponse({ code: "AUTH_REQUIRED" }, 401, origin);
       const { data: authData, error: authError } = await client.auth.getUser(token);
       if (authError || !authData.user) return jsonResponse({ code: "AUTH_REQUIRED" }, 401, origin);

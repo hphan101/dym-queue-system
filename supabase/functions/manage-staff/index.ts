@@ -1,6 +1,7 @@
 import { type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import {
   CONTROL_CHARACTERS,
+  getBearerToken,
   isOriginAllowed,
   isRecord,
   isSafeText,
@@ -172,12 +173,6 @@ async function findAuthUserByLoginName(
   return data.users.find(
     (user) => user.id !== exceptUserId && getLoginName(user) === loginName,
   );
-}
-
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const match = /^Bearer\s+(.+)$/i.exec(authorization);
-  return match?.[1] ?? null;
 }
 
 type ActorCheckResult =

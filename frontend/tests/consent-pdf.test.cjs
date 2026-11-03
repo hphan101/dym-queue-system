@@ -15,10 +15,19 @@ function loadService() {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
   const exports = {};
+  const date = {};
+  new Function('exports', ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/lib/date.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText)(date);
+  const drawing = {};
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/pdfDrawing.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText)(drawing, require);
   const dependencies = {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit,
     './consentTemplateFields.json': layout,
-    '../../lib/date': { getTodayInVietnam: () => '2026-11-01' },
+    '../../lib/date': { ...date, getTodayInVietnam: () => '2026-11-01' },
+    './pdfDrawing': drawing,
   };
   const execute = new Function('exports', 'require', 'fetch', 'Blob', 'URL', code);
   execute(exports, (name) => dependencies[name], async (url) => {

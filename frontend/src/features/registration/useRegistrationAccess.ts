@@ -13,6 +13,24 @@ export type RegistrationAccessState =
   | { status: 'checking' | 'required' | 'qr-expired' | 'session-expired' | 'error'; message?: string }
   | { status: 'ready'; session: RegistrationSession; assisted?: boolean };
 
+function accessFailure(error: unknown, assisted: boolean): RegistrationAccessState {
+  if (error instanceof RegistrationAccessError) {
+    switch (error.code) {
+      case 'QR_EXPIRED':
+        return { status: 'qr-expired' };
+      case 'RATE_LIMITED':
+        return { status: 'error', message: 'Có quá nhiều lượt truy cập. Vui lòng chờ ít phút hoặc liên hệ lễ tân.' };
+      case 'AUTH_REQUIRED':
+        return { status: 'error', message: 'Vui lòng đăng nhập tài khoản lễ tân hoặc quản trị viên rồi mở lại Đăng ký.' };
+      case 'ACCESS_DENIED':
+        return { status: 'error', message: 'Tài khoản chưa được phép đăng ký hộ tại chi nhánh này.' };
+    }
+  }
+  return { status: 'error', message: assisted
+    ? 'Chưa mở được đăng ký hộ. Vui lòng kiểm tra kết nối rồi thử lại.'
+    : 'Không thể kiểm tra mã QR. Vui lòng kiểm tra kết nối rồi thử lại.' };
+}
+
 export function useRegistrationAccess(branch: BranchCode | null, assisted = false) {
   const [state, setState] = useState<RegistrationAccessState>({ status: 'checking' });
   const [attempt, setAttempt] = useState(0);
@@ -47,16 +65,7 @@ export function useRegistrationAccess(branch: BranchCode | null, assisted = fals
       } catch (error) {
         if (!current) return;
         if (controller.signal.aborted && !timedOut) return;
-        setState(error instanceof RegistrationAccessError && error.code === 'QR_EXPIRED'
-          ? { status: 'qr-expired' }
-          : { status: 'error', message: error instanceof RegistrationAccessError && error.code === 'RATE_LIMITED'
-            ? 'Có quá nhiều lượt truy cập. Vui lòng chờ ít phút hoặc liên hệ lễ tân.'
-            : error instanceof RegistrationAccessError && error.code === 'AUTH_REQUIRED'
-              ? 'Vui lòng đăng nhập tài khoản lễ tân hoặc quản trị viên rồi mở lại Đăng ký.'
-              : error instanceof RegistrationAccessError && error.code === 'ACCESS_DENIED'
-                ? 'Tài khoản chưa được phép đăng ký hộ tại chi nhánh này.'
-                : assisted ? 'Chưa mở được đăng ký hộ. Vui lòng kiểm tra kết nối rồi thử lại.'
-                  : 'Không thể kiểm tra mã QR. Vui lòng kiểm tra kết nối rồi thử lại.' });
+        setState(accessFailure(error, assisted));
       }
     };
     void open().finally(() => window.clearTimeout(timeout));

@@ -6,3 +6,9 @@ export function getTodayInVietnam(): string {
     day: '2-digit',
   }).format(new Date());
 }
+
+export function formatDateForPrint(value?: string): string {
+  if (!value) return '';
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : /^\d{2}\/\d{2}\/\d{4}$/.test(value) ? value : '';
+}

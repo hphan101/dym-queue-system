@@ -4,24 +4,7 @@ import dymLogoDark from '../../assets/dym-logo-dark.png';
 import { BRANCH_NAMES } from '../../config/branches';
 import type { BranchCode } from '../../types/domain';
 import type { SupportedLanguage } from '../../locales';
-
-const PRIMARY_CHECKUP_REASONS = [
-  {
-    value: 'Khám sức khỏe định kì theo công ty',
-    labelVi: 'Khám sức khỏe định kì theo công ty',
-    labelEn: 'Corporate periodic health checkup',
-  },
-  {
-    value: 'Khám sức khỏe đi học/đi làm',
-    labelVi: 'Khám sức khỏe đi học/đi làm',
-    labelEn: 'Health checkup for study / work',
-  },
-  {
-    value: 'Khám sức khỏe cá nhân tự nguyện',
-    labelVi: 'Khám sức khỏe cá nhân tự nguyện',
-    labelEn: 'Voluntary personal health checkup',
-  },
-] as const;
+import { CHECKUP_REASON_OPTIONS } from './tt25Constants';
 
 interface CheckupReasonScreenProps {
   branch: BranchCode | null;
@@ -69,7 +52,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
 
       {/* Reason Options */}
       <div className="mt-6 space-y-3 max-w-md mx-auto">
-        {PRIMARY_CHECKUP_REASONS.map((item, idx) => (
+        {CHECKUP_REASON_OPTIONS.map((item, idx) => (
           <button
             key={item.value}
             type="button"
@@ -81,7 +64,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
                 {idx + 1}
               </span>
               <span className="text-sm sm:text-base font-bold text-slate-800 group-hover:text-dym-blue-800 transition-colors leading-snug">
-                {isEn ? item.labelEn : item.labelVi}
+                {isEn ? item.labelEn : item.value}
               </span>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 shrink-0 group-hover:text-dym-blue-600 group-hover:translate-x-0.5 transition-[transform,color] duration-150 ease-out-quint" />

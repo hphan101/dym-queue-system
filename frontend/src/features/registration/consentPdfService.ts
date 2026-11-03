@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { getTodayInVietnam } from '../../lib/date';
+import { formatDateForPrint, getTodayInVietnam } from '../../lib/date';
+import { drawPdfCheck } from './pdfDrawing';
 import layouts from './consentTemplateFields.json';
 import type { TT25RegistrationData } from './tt25Types';
 
@@ -34,12 +35,6 @@ export function getConsentPageIndices(language: ConsentFormLanguage, option: Con
     : Array.from({ length: layout.pageCount }, (_, index) => index);
 }
 
-export function formatConsentDate(value?: string): string {
-  if (!value) return '';
-  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : /^\d{2}\/\d{2}\/\d{4}$/.test(value) ? value : '';
-}
-
 export async function generateConsentPdf(
   data: TT25RegistrationData,
   pageOption: ConsentPageOption = 'all',
@@ -58,11 +53,11 @@ export async function generateConsentPdf(
   await Promise.all(Object.entries(fontBytes).map(async ([name, bytes]) => {
     fonts[name] = await pdf.embedFont(bytes.slice(0), { subset: true });
   }));
-  const checkupDate = formatConsentDate(data.checkupDate || getTodayInVietnam());
+  const checkupDate = formatDateForPrint(data.checkupDate || getTodayInVietnam());
   const [checkupDay = '', checkupMonth = '', checkupYear = ''] = checkupDate.split('/');
   const values: Record<string, string> = {
     fullName: (data.fullName || '').trim().toUpperCase(),
-    birthDate: formatConsentDate(data.birthDate), identityDocument: (data.cccd || '').trim(),
+    birthDate: formatDateForPrint(data.birthDate), identityDocument: (data.cccd || '').trim(),
     phoneNumber: (data.phoneNumber || '').trim(), email: (data.email || '').trim(),
     workplace: (data.workplace || '').trim(), checkupDate, checkupDay, checkupMonth, checkupYear,
   };
@@ -98,12 +93,7 @@ export async function generateConsentPdf(
     });
   }
   const mark = layout.genderMarks[data.gender];
-  if (mark) {
-    for (const slope of [-1, 1]) pages[0].drawLine({
-      start: { x: mark.x - 2, y: mark.y - 2 * slope },
-      end: { x: mark.x + 2, y: mark.y + 2 * slope }, thickness: .7, color: rgb(0, 0, 0),
-    });
-  }
+  if (mark) drawPdfCheck(pages[0], mark.x, mark.y);
 
   let output = pdf;
   if (pageOption !== 'all') {

@@ -134,13 +134,14 @@ test('print status remains unchanged until the server confirms, including on fai
 for (const name of ['TT25PrintModal', 'ConsentPrintModal']) {
   test(`${name}: only the Print action marks printed; preview and download do not`, async () => {
     const harness = reactHarness(name === 'ConsentPrintModal'
-      ? ['blob:pdf', false, null, 'all', null, true] : ['blob:pdf', false, null, 'pdf']);
+      ? ['blob:pdf', false, null, 'all', null, true] : ['blob:pdf', false, null, null, true]);
     let confirmations = 0;
     const component = load(`features/registration/${name}.tsx`, {
       ...harness.mocks, 'react-dom': { createPortal: (tree) => tree },
       './consentPdfService': {
         getConsentFormLanguage: () => 'vi', getConsentPageIndices: () => [0, 1],
       },
+      './tt25HcmPdfService': { getTT25TemplateInfo: () => ({ key: 'vnm', label: 'Tiếng Việt', pageCount: 9 }) },
     }, {
       window: { print() {}, open: () => ({}), innerWidth: 1280 }, navigator: { userAgent: 'Desktop', maxTouchPoints: 0 },
       document: { body: { appendChild() {}, removeChild() {} }, createElement: () => ({ click() {} }) },

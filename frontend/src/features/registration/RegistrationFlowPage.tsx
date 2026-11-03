@@ -213,8 +213,11 @@ export function RegistrationFlowPage() {
     localStorage.removeItem('dym_tt25_customer_extras_v1');
   };
 
+  const showAccessGate = step !== 'success' && !accessReady;
+  const showEntryCard = showAccessGate && access.state.status !== 'checking';
+
   return (
-    <div className={`registration-access-surface min-h-[100dvh] flex flex-col justify-between pt-6${step !== 'success' && !accessReady && access.state.status !== 'checking' ? ' registration-entry-page' : ''}`}>
+    <div className={`registration-access-surface min-h-[100dvh] flex flex-col justify-between pt-6${showEntryCard ? ' registration-entry-page' : ''}`}>
       {showPageLoader && (
         <div className="page-loader animate-fade-in">
           <img
@@ -227,12 +230,12 @@ export function RegistrationFlowPage() {
       )}
 
       <main className="flex-grow max-w-md md:max-w-xl lg:max-w-2xl w-full mx-auto px-4 py-6 flex flex-col justify-center">
-        <div className={step !== 'success' && !accessReady && access.state.status !== 'checking'
+        <div className={showEntryCard
           ? 'registration-entry-card'
           : 'bg-white rounded-lg border border-slate-200/80 p-5 sm:p-8 shadow-sm'}>
           {assisted && accessReady && <a className="mb-4 inline-block text-sm font-medium underline underline-offset-4" href={`/?page=admin&branch=${branch}`}>Về tiếp nhận</a>}
           {step !== 'success' && <RegistrationAccessNotice state={access.state} onRetry={access.retry} />}
-          <div hidden={step !== 'success' && !accessReady}>
+          <div hidden={showAccessGate}>
           {branch && step === 'form' && (
             <div className="mb-6 text-center">
               <span className="inline-block px-2.5 py-0.5 rounded-full bg-dym-blue-50 text-dym-blue-700 text-xs font-semibold mb-1.5">

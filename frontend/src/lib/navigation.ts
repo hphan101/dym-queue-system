@@ -1,10 +1,10 @@
 export const APP_NAVIGATION_EVENT = 'dym-app-navigation';
 
-export function openStaffRegistrationTab(href: string) {
+export function openStaffTab(href: string) {
   const destination = new URL(href, window.location.origin);
   if (destination.origin !== window.location.origin) return;
   // A same-origin blank tab inherits sessionStorage. Detach its opener before
-  // navigating so registration reuses staff auth without retaining tab control.
+  // navigating so the new page reuses staff auth without retaining tab control.
   const tab = window.open('about:blank', '_blank');
   if (!tab) { navigateWithinApp(destination.href); return; }
   tab.opener = null;

@@ -27,6 +27,15 @@ const cryptoHelpers = load('supabase/functions/_shared/registrationAccess.ts');
 const now = Date.UTC(2026, 10, 1, 9, 0, 0);
 const secret = 'test-only-server-signing-secret';
 
+test('shared Bearer parsing preserves staff and QR authorization header handling', () => {
+  const { getBearerToken } = load('supabase/functions/_shared/http.ts');
+  for (const [header, expected] of [[undefined, null], ['Basic token', null], ['Bearer', null],
+    ['Bearer staff-token', 'staff-token'], ['bearer staff-token', 'staff-token'], ['Bearer   staff-token', 'staff-token']]) {
+    const request = new Request('https://test.invalid', { headers: header ? { Authorization: header } : {} });
+    assert.equal(getBearerToken(request), expected);
+  }
+});
+
 test('missing QR deployment is reported distinctly from a network failure', async () => {
   const api = load('frontend/src/features/registration/registrationAccessApi.ts', {}, {
     fetch: async () => new Response(JSON.stringify({ code: 'NOT_FOUND' }), { status: 404 }),
@@ -35,13 +44,18 @@ test('missing QR deployment is reported distinctly from a network failure', asyn
     (error) => error instanceof api.RegistrationAccessError && error.code === 'QR_SERVICE_NOT_DEPLOYED');
 });
 
-test('QR menu keeps the current tab, staff session and selected branch', () => {
+test('QR menu opens a new staff tab for the selected branch and leaves reception in place', () => {
   let navigatedTo;
+  let detached = false;
   const session = new Map([['dym-staff-auth', 'existing-staff-session']]);
   const navigation = load('frontend/src/lib/navigation.ts', {}, {
     URL, Event,
     window: { location: { origin: 'https://clinic.invalid', href: 'https://clinic.invalid/?page=admin&branch=q7' },
-      history: { pushState: (_, __, url) => { navigatedTo = url; } }, dispatchEvent() {}, scrollTo() {},
+      open: (url, target) => {
+        assert.equal(url, 'about:blank'); assert.equal(target, '_blank');
+        return { set opener(value) { detached = value === null; }, location: { replace: (href) => { navigatedTo = new URL(href); } } };
+      },
+      history: { pushState() { throw new Error('Reception must remain open'); } }, dispatchEvent() {}, scrollTo() {},
       sessionStorage: { getItem: (key) => session.get(key) } },
   });
   const symbols = new Proxy({}, { get: (_, key) => key === '__esModule' ? false : String(key) });
@@ -58,15 +72,13 @@ test('QR menu keeps the current tab, staff session and selected branch', () => {
   const find = (node) => {
     if (Array.isArray(node)) return node.map(find).find(Boolean);
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'a' && node.props.href === '/registration-qr?branch=q7') return node;
+    if (node.type === 'button' && node.props['aria-label'] === 'Mở màn hình QR đăng ký') return node;
     return find(node.props?.children);
   };
   const link = find(tree);
   assert.ok(link);
-  assert.equal(link.props.target, undefined);
-  let prevented = false;
-  link.props.onClick({ defaultPrevented: false, button: 0, preventDefault() { prevented = true; } });
-  assert.equal(prevented, true);
+  link.props.onClick();
+  assert.equal(detached, true);
   assert.equal(navigatedTo.pathname, '/registration-qr');
   assert.equal(navigatedTo.searchParams.get('branch'), 'q7');
   assert.equal(session.get('dym-staff-auth'), 'existing-staff-session');
@@ -96,15 +108,15 @@ test('registration opens a same-origin tab, detaches its opener, and falls back 
       history: { pushState: (_, __, url) => events.push(['fallback', url.href]) }, dispatchEvent() {}, scrollTo() {},
     },
   });
-  navigation.openStaffRegistrationTab('/?branch=q7&staff=1');
+  navigation.openStaffTab('/?branch=q7&staff=1');
   assert.deepEqual(events, [
     ['open', 'about:blank', '_blank'], ['opener', null], ['navigate', 'https://clinic.invalid/?branch=q7&staff=1'],
   ]);
   events.length = 0;
-  navigation.openStaffRegistrationTab('https://outside.invalid/');
+  navigation.openStaffTab('https://outside.invalid/');
   assert.equal(events.length, 0);
   blocked = true;
-  navigation.openStaffRegistrationTab('/?branch=hn&staff=1');
+  navigation.openStaffTab('/?branch=hn&staff=1');
   assert.equal(events[1][0], 'fallback');
   assert.equal(events[1][1], 'https://clinic.invalid/?branch=hn&staff=1');
 });

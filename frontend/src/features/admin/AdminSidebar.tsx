@@ -45,7 +45,7 @@ import {
 import dymLogo from '../../assets/dym-logo.png';
 import dymLogoDark from '../../assets/dym-logo-dark.png';
 import { BRANCH_NAMES } from '../../config/branches';
-import { handleInternalLinkClick } from '../../lib/navigation';
+import { handleInternalLinkClick, openStaffTab } from '../../lib/navigation';
 import type { BranchCode } from '../../types/domain';
 import type { StaffRole } from './types';
 
@@ -191,13 +191,14 @@ export function AdminSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Mở màn hình QR đăng ký">
-                <a
-                  href={`/registration-qr?branch=${branch}`}
-                  onClick={(event) => handleInternalLinkClick(event, `/registration-qr?branch=${branch}`)}
+                <button
+                  type="button"
+                  aria-label="Mở màn hình QR đăng ký"
+                  onClick={() => openStaffTab(`/registration-qr?branch=${branch}`)}
                 >
                   <QrCode aria-hidden="true" />
                   <span>QR đăng ký tại quầy</span>
-                </a>
+                </button>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
