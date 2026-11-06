@@ -9,7 +9,6 @@ import {
   signOutAdminSession,
 } from '../adminIdentity';
 import { AdminHeader } from '../components/AdminHeader';
-import { useAdminScope } from '../hooks/useAdminScope';
 import { useAdminTheme } from '../hooks/useAdminTheme';
 import { useSidebarResponsive } from '../hooks/useSidebarResponsive';
 import { dymAdminTheme } from '../theme';
@@ -22,6 +21,7 @@ export interface RosterShellProps {
   activePage: Extract<
     AdminPageKey,
     | 'roster-dashboard'
+    | 'roster-settlement'
     | 'roster-insite'
     | 'roster-onsite'
     | 'roster-personnel'
@@ -41,17 +41,16 @@ export function RosterShell({
 }: RosterShellProps) {
   const { themeMode, setThemeMode } = useAdminTheme();
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
-  const { branch: scopeBranch, date: scopeDate } = useAdminScope();
   const [staffName] = useState(getInitialStaffName);
-  const { errorBanner, successBanner, clearBanners } = useRosterData();
+  const { selectedBranch, selectedDate, errorBanner, successBanner, clearBanners } = useRosterData();
 
   return (
     <Theme theme={dymAdminTheme} mode={themeMode}>
       <div className="dym-admin-shell" data-color-mode={themeMode}>
         <AdminSidebar
           activePage={activePage}
-          branch={scopeBranch}
-          date={scopeDate}
+          branch={selectedBranch}
+          date={selectedDate}
           staffName={staffName}
           isAdmin={authorizedIsAdmin}
           staffRole={authorizedIsAdmin ? 'admin' : 'operator'}

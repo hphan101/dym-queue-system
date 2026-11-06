@@ -23,6 +23,7 @@ const ALLOWED_ROLES = new Set(["admin", "operator", "receptionist"]);
 type StaffRole = "admin" | "operator" | "receptionist";
 
 interface StaffInput {
+  canEditRosterHistory: boolean;
   displayName: string;
   role: StaffRole;
   branchCodes: string[];
@@ -83,7 +84,9 @@ function parseStaffInput(value: Record<string, unknown>): StaffInput | null {
     return null;
   }
 
-  return { displayName, role: role as StaffRole, branchCodes };
+  if (value.canEditRosterHistory !== undefined && typeof value.canEditRosterHistory !== 'boolean') return null;
+  const canEditRosterHistory = role !== 'receptionist' && value.canEditRosterHistory === true;
+  return { displayName, role: role as StaffRole, branchCodes, canEditRosterHistory };
 }
 
 function parsePayload(value: unknown): StaffRequest | null {
@@ -273,7 +276,7 @@ async function listStaff(serviceClient: SupabaseClient, databaseClient: Supabase
   const [usersResult, profilesResult, accessResult, branchesResult] = await Promise.all([
     serviceClient.auth.admin.listUsers({ page: 1, perPage: MAX_STAFF_ACCOUNTS }),
     databaseClient.from("profiles").select(
-      "user_id, display_name, role, is_active, created_at, updated_at",
+      "user_id, display_name, role, is_active, can_edit_roster_history, created_at, updated_at",
     ),
     databaseClient.from("staff_branch_access").select("user_id, branch_id"),
     databaseClient.from("branches").select("id, code, name").eq("is_active", true),
@@ -313,6 +316,7 @@ async function listStaff(serviceClient: SupabaseClient, databaseClient: Supabase
         displayName: String(profile.display_name),
         role: String(profile.role),
         isActive: Boolean(profile.is_active),
+        canEditRosterHistory: Boolean(profile.can_edit_roster_history),
         branches: (accessByUser.get(String(profile.user_id)) ?? [])
           .sort((left, right) => left.code.localeCompare(right.code)),
         createdAt: String(profile.created_at),
@@ -368,6 +372,7 @@ async function handleCreateStaff(
       display_name: payload.displayName,
       role: payload.role,
       is_active: true,
+      can_edit_roster_history: payload.canEditRosterHistory,
     });
     if (profileError) throw profileError;
 
@@ -385,6 +390,7 @@ async function handleCreateStaff(
     display_name: payload.displayName,
     role: payload.role,
     branch_codes: payload.branchCodes,
+    can_edit_roster_history: payload.canEditRosterHistory,
   });
 
   return jsonResponse({ success: true, userId: targetUserId }, 201, origin);
@@ -418,7 +424,7 @@ async function handleUpdateStaff(
 
   const { data: oldProfile, error: oldProfileError } = await serviceClient
     .from("profiles")
-    .select("display_name, role, is_active")
+    .select("display_name, role, is_active, can_edit_roster_history")
     .eq("user_id", payload.userId)
     .maybeSingle();
   const { data: oldAccess, error: oldAccessError } = await serviceClient
@@ -432,7 +438,7 @@ async function handleUpdateStaff(
 
   const { error: profileError } = await serviceClient
     .from("profiles")
-    .update({ display_name: payload.displayName, role: payload.role })
+    .update({ display_name: payload.displayName, role: payload.role, can_edit_roster_history: payload.canEditRosterHistory })
     .eq("user_id", payload.userId);
   if (profileError) throw profileError;
 
@@ -446,6 +452,7 @@ async function handleUpdateStaff(
     await serviceClient.from("profiles").update({
       display_name: oldProfile.display_name,
       role: oldProfile.role,
+      can_edit_roster_history: oldProfile.can_edit_roster_history,
     }).eq("user_id", payload.userId);
     await replaceBranchAccess(
       serviceClient,
@@ -482,6 +489,7 @@ async function handleUpdateStaff(
     login_name: payload.loginName,
     role: payload.role,
     branch_codes: payload.branchCodes,
+    can_edit_roster_history: payload.canEditRosterHistory,
   });
 
   return jsonResponse({ success: true }, 200, origin);

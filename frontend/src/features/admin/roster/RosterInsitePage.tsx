@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useRosterDeepLink } from './useRosterDeepLink';
+import { GripVertical } from 'lucide-react';
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
@@ -48,6 +50,11 @@ import {
 } from './RosterAssignmentCell';
 import {
   formatVndCurrency,
+  getProvisionalCost,
+  getCountedProvisionalCost,
+  isRosterDateLocked,
+  updateClinicRoom,
+  saveClinicRoomOrder,
   ROSTER_BRANCH_LABELS,
   SHIFT_SHORT_LABELS,
   shiftIsoDate,
@@ -57,8 +64,17 @@ import {
 } from './rosterService';
 import { RosterShell } from './RosterShell';
 import { useRosterData } from './useRosterData';
+import { RosterInsiteWeek } from './RosterInsiteWeek';
+import './insiteDay.css';
+import './positionDrag.css';
+import { useCampaignPositionDrag } from './useCampaignPositionDrag';
+import { applySavedPositionOrder } from './campaignPositionOrder';
+import { RosterProvisionalCost } from './RosterProvisionalCost';
+import { canAssignDoctorToRoom, inferDoctorSpecialty, DOCTOR_SPECIALTIES, type DoctorSpecialty } from './doctorSpecialties';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select';
 
 interface EffectiveRoomRow {
+  doctorSpecialty: DoctorSpecialty | null;
   key: string;
   roomId: string | null;
   overrideId: string | null;
@@ -83,6 +99,8 @@ export function RosterInsitePage({
   authorizedIsAdmin?: boolean;
 }) {
   const {
+    canEditHistory,
+    rosterToday,
     selectedBranch,
     setSelectedBranch,
     selectedDate,
@@ -111,7 +129,17 @@ export function RosterInsitePage({
     removeAssignment,
   } = useRosterData();
 
-  const today = getTodayInVietnam();
+  const today = rosterToday || getTodayInVietnam();
+  const historyLocked = isRosterDateLocked(selectedDate, today, canEditHistory);
+  const [view, setView] = useState<'week' | 'day'>('week');
+  const [weekDate, setWeekDate] = useState(selectedDate);
+  const [weekRefresh, setWeekRefresh] = useState(0);
+  useRosterDeepLink('roster-insite', (link) => {
+    setSelectedDate(link.date);
+    setSelectedBranch(link.branch);
+    setWeekDate(link.date);
+    if (link.view === 'day') setView('day');
+  });
 
   // Step 1: Fixed Room Catalog Drawer (⚙) state
   const [isRoomCatalogOpen, setIsRoomCatalogOpen] = useState(false);
@@ -184,7 +212,7 @@ export function RosterInsitePage({
   );
 
   // Effective displayed rooms = Fixed catalog rooms (active on date) - Hidden rooms + Added "Chỉ hôm nay" rooms
-  const effectiveRooms = useMemo<EffectiveRoomRow[]>(() => {
+  const defaultRooms = useMemo<EffectiveRoomRow[]>(() => {
     const fixedRows: EffectiveRoomRow[] = catalogRoomsForDate
       .filter((r) => !hiddenRoomIdsSet.has(r.id))
       .map((r) => ({
@@ -192,6 +220,7 @@ export function RosterInsitePage({
         roomId: r.id,
         overrideId: null,
         roomName: r.room_name,
+        doctorSpecialty: r.doctor_specialty === undefined ? inferDoctorSpecialty(r.room_name) : r.doctor_specialty,
         displayOrder: r.display_order,
         isTemporaryToday: false,
       }));
@@ -201,6 +230,7 @@ export function RosterInsitePage({
       roomId: null,
       overrideId: o.id,
       roomName: o.custom_room_name,
+      doctorSpecialty: inferDoctorSpecialty(o.custom_room_name),
       displayOrder: o.display_order,
       isTemporaryToday: true,
     }));
@@ -218,6 +248,25 @@ export function RosterInsitePage({
       ) ?? null,
     [schedules, selectedBranch, selectedDate],
   );
+
+  const orderedRoomKeys = useMemo(() => applySavedPositionOrder(
+    defaultRooms.map((room) => room.key),
+    currentInsiteSchedule?.position_order_mode === 'manual' ? currentInsiteSchedule.position_list : [],
+  ), [defaultRooms, currentInsiteSchedule]);
+  const roomDrag = useCampaignPositionDrag({
+    campaignId: `${selectedBranch}:${selectedDate}`,
+    positions: orderedRoomKeys,
+    disabled: isLoading || isMutating || historyLocked,
+    onSave: async (keys) => {
+      await saveClinicRoomOrder(selectedBranch, selectedDate, keys);
+      await reloadAll(false);
+    },
+    onError: setErrorMessage,
+  });
+  const effectiveRooms = useMemo(() => {
+    const byKey = new Map(defaultRooms.map((room) => [room.key, room]));
+    return roomDrag.positions.map((key) => byKey.get(key)).filter((room): room is EffectiveRoomRow => Boolean(room));
+  }, [defaultRooms, roomDrag.positions]);
 
   const rawInsiteAssignments = useMemo(() => {
     if (!currentInsiteSchedule) return [];
@@ -306,16 +355,19 @@ export function RosterInsitePage({
   const {
     baseCost: dayBaseCost,
     allowanceCost: dayAllowanceCost,
-    totalCost: dayTotalCost,
+    totalCost: dayAssignedCost,
   } = useMemo(
     () => summarizeAssignmentCosts(visibleInsiteAssignments),
     [visibleInsiteAssignments],
   );
 
+  const provisionalCost = getProvisionalCost(currentInsiteSchedule);
+  const dayTotalCost = dayAssignedCost + getCountedProvisionalCost(currentInsiteSchedule, today);
+
   const dayCostBreakdownText = useMemo(
     () =>
-      `Cố định ${formatVndCurrency(dayBaseCost)} + Phụ cấp ${formatVndCurrency(dayAllowanceCost)}`,
-    [dayBaseCost, dayAllowanceCost],
+      `Cố định ${formatVndCurrency(dayBaseCost)} + Phụ cấp ${formatVndCurrency(dayAllowanceCost)} + Dự phòng ${formatVndCurrency(provisionalCost)}${selectedDate < today ? ' (không tính vào thực tế)' : ''}`,
+    [dayBaseCost, dayAllowanceCost, provisionalCost, selectedDate, today],
   );
 
   const staffedRoomsCount = useMemo(
@@ -545,6 +597,13 @@ export function RosterInsitePage({
       return false;
     }
 
+    const person = personnelMap.get(draft.personnelId);
+    const existing = rawInsiteAssignments.find((item) => item.id === draft.editingAssignmentId);
+    if (person && (!existing || existing.personnel_id !== person.id) && !canAssignDoctorToRoom(person, targetRoom.doctorSpecialty)) {
+      setErrorMessage('Bác sĩ chưa có chuyên môn phù hợp với phòng này.');
+      return false;
+    }
+
     if (draft.conflictAssignment) {
       const conflictRoom = getAssignmentRoomDisplayName(
         draft.conflictAssignment,
@@ -628,11 +687,11 @@ export function RosterInsitePage({
   return (
     <RosterShell
       activePage="roster-insite"
-      title={`Lịch phòng khám Insite (${ROSTER_BRANCH_LABELS[selectedBranch]})`}
+      title={`Lịch tại Phòng khám (${ROSTER_BRANCH_LABELS[selectedBranch]})`}
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
         <div className="flex items-center gap-2">
-          {currentInsiteSchedule && visibleInsiteAssignments.length > 0 && (
+          {view === 'day' && currentInsiteSchedule && (visibleInsiteAssignments.length > 0 || provisionalCost > 0) && (
             <Button
               type="button"
               size="sm"
@@ -655,7 +714,7 @@ export function RosterInsitePage({
             variant="outline"
             size="sm"
             disabled={isLoading}
-            onClick={() => void reloadAll(true)}
+            onClick={() => { setWeekRefresh((value) => value + 1); void reloadAll(true); }}
             className="h-9 gap-1.5 bg-card px-3 text-[13px] font-medium shadow-sm"
           >
             <ArrowPathIcon
@@ -667,6 +726,19 @@ export function RosterInsitePage({
         </div>
       }
     >
+      {view === 'week' ? (
+        <RosterInsiteWeek refreshKey={weekRefresh} date={weekDate}
+          onDateChange={(date) => { setWeekDate(date); setSelectedDate(date); }}
+          onOpenDay={(date) => { setSelectedDate(date); setView('day'); }} />
+      ) : (
+        <div className="dym-insite-day">
+          <div className="dym-day-intro">
+            <Button type="button" variant="outline" onClick={() => { closePopover(); setIsAddingDailyRoom(false); setView('week'); }}>
+              <ChevronLeftIcon data-icon="inline-start" /> Về lịch tuần
+            </Button>
+            <h2>Lịch ngày {formatDisplayDate(selectedDate)}</h2>
+            <span className="dym-day-state">{historyLocked ? 'Chỉ xem' : selectedDate < today ? 'Được sửa lịch cũ' : 'Có thể chỉnh sửa'}</span>
+          </div>
       {/* Top Bar: [D1] [D7] ◀ Date ▶ Hôm nay [Sao chép từ hôm qua] | Tổng ngày: X đ ⚙ */}
       <div className="dym-roster-scope-bar">
         <div className="dym-roster-scope-left">
@@ -754,7 +826,7 @@ export function RosterInsitePage({
             type="button"
             variant="outline"
             size="sm"
-            disabled={isMutating || isLoading}
+            disabled={isMutating || isLoading || historyLocked}
             onClick={() => void handleCopyFromYesterday()}
             className="h-9 gap-1.5 bg-card px-3 text-[13px] font-medium shadow-sm"
           >
@@ -768,9 +840,9 @@ export function RosterInsitePage({
           <div
             tabIndex={0}
             title={dayCostBreakdownText}
-            className="group relative flex cursor-default items-center gap-1.5 rounded-md border border-border bg-card px-3.5 py-1.5 text-[15px] shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="dym-day-total group relative outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
           >
-            <span className="text-muted-foreground">Tổng ngày:</span>
+            <span className="text-muted-foreground">{selectedDate < today ? 'Chi phí thực tế:' : 'Tổng dự kiến:'}</span>
             <strong className="dym-roster-tabular font-semibold text-foreground">
               {formatVndCurrency(dayTotalCost)}
             </strong>
@@ -791,6 +863,7 @@ export function RosterInsitePage({
             type="button"
             variant="outline"
             size="icon"
+            disabled={historyLocked}
             onClick={() => setIsRoomCatalogOpen(true)}
             className="size-9 bg-card shadow-sm"
             title={`Danh mục phòng cố định (${catalogRoomsForDate.length} phòng)`}
@@ -801,21 +874,32 @@ export function RosterInsitePage({
         </div>
       </div>
 
+      {historyLocked && <p role="status" className="my-3 rounded-md border border-border bg-muted p-3 text-sm">Lịch đã khóa: từ hôm qua trở về trước chỉ tài khoản được cấp quyền sửa lịch cũ mới được chỉnh sửa.</p>}
+      <fieldset disabled={historyLocked} className="min-w-0 border-0 p-0">
+      <RosterProvisionalCost key={`${selectedBranch}-${selectedDate}-${provisionalCost}`}
+        branch={selectedBranch} date={selectedDate} amount={provisionalCost}
+        readOnly={historyLocked} historical={selectedDate < today}
+        disabled={isLoading || isMutating} onSaved={async () => { await reloadAll(false); showNotice('Đã lưu chi phí dự phòng.'); }} />
+
       {/* Room-Grouped List with Per-Day Room Adjustments */}
-      <section className="dym-roster-panel">
+      <section className="dym-roster-panel dym-day-room-panel">
+        <header className="dym-day-room-header"><h3>Phân công theo phòng</h3><span>{staffedRoomsCount}/{effectiveRooms.length} phòng đã xếp · {visibleInsiteAssignments.length} ca trực</span></header>
         <div className="dym-roster-table-wrap">
+          <span id="clinic-room-order-help" className="sr-only">Giữ tay nắm để kéo phòng rồi thả tại vị trí mới. Có thể dùng phím mũi tên lên hoặc xuống, Escape để hủy.</span>
           <table className="dym-roster-table">
             <thead>
               <tr>
+                <th className="dym-position-handle-cell"><span className="sr-only">Đổi thứ tự phòng</span></th>
                 <th className="w-56 sm:w-64">Phòng</th>
                 <th>Nhân sự trực</th>
                 <th className="is-right w-36 sm:w-44">Chi phí phòng</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody ref={roomDrag.bodyRef}>
               {isLoading ? (
                 [0, 1, 2, 3, 4].map((index) => (
                   <tr key={index} aria-hidden="true">
+                    <td className="dym-position-handle-cell" />
                     <td>
                       <Skeleton className="h-4 w-32" />
                     </td>
@@ -852,11 +936,22 @@ export function RosterInsitePage({
                     return (
                       <tr
                         key={roomRow.key}
+                        data-position={roomRow.key}
+                        data-dragging={roomDrag.drag?.source === roomRow.key}
+                        style={roomDrag.drag?.source === roomRow.key ? { transform: `translate3d(0, ${roomDrag.drag.offset}px, 0)` } : undefined}
                         className={cn(
-                          'group/row',
+                          'dym-position-row group/row',
                           !hasStaff && 'bg-muted/15',
                         )}
                       >
+                        <td className="dym-position-handle-cell">
+                          <Button type="button" variant="ghost" size="icon-sm"
+                            className="dym-position-drag-handle"
+                            disabled={isLoading || isMutating || historyLocked}
+                            aria-label={`Đổi thứ tự phòng ${roomRow.roomName}`}
+                            aria-describedby="clinic-room-order-help"
+                            {...roomDrag.handleProps(roomRow.key)}><GripVertical /></Button>
+                        </td>
                         <td className="align-middle">
                           <div className="flex items-center gap-1.5">
                             {/* Left hover ⋯ menu for per-day room hide / delete */}
@@ -948,10 +1043,11 @@ export function RosterInsitePage({
 
                         <td className="align-middle">
                           <RosterAssignmentCell
+                            readOnly={historyLocked}
                             rowKey={roomRow.key}
                             targetLabel={roomRow.roomName}
                             assignments={roomAssigns}
-                            activePersonnel={activePersonnel}
+                            activePersonnel={activePersonnel.filter((person) => canAssignDoctorToRoom(person, roomRow.doctorSpecialty))}
                             personnelMap={personnelMap}
                             sameDayAssignmentsByPerson={
                               sameDayAssignmentsByPerson
@@ -1000,7 +1096,7 @@ export function RosterInsitePage({
 
                   {/* Dashed Bottom Row: "+ Thêm phòng cho ngày này" */}
                   <tr className="bg-muted/10">
-                    <td colSpan={3} className="py-2.5">
+                    <td colSpan={4} className="py-2.5">
                       {isAddingDailyRoom ? (
                         <form
                           onSubmit={(e) => void handleAddDailyRoomSubmit(e)}
@@ -1064,7 +1160,7 @@ export function RosterInsitePage({
             {!isLoading && (
               <tfoot>
                 <tr>
-                  <td className="text-[13px] text-muted-foreground">
+                  <td colSpan={2} className="text-[13px] text-muted-foreground">
                     <div className="flex flex-col gap-0.5">
                       <span>
                         Đã xếp {staffedRoomsCount}/{effectiveRooms.length} phòng
@@ -1087,10 +1183,11 @@ export function RosterInsitePage({
                     </div>
                   </td>
                   <td className="text-[13px] text-muted-foreground">
-                    <span>{visibleInsiteAssignments.length} ca trực · </span>
-                    <span className="dym-roster-tabular font-medium text-foreground/85">
-                      {dayCostBreakdownText}
-                    </span>
+                    <div className="dym-day-breakdown">
+                      <span>Cố định <strong>{formatVndCurrency(dayBaseCost)}</strong></span>
+                      <span>Phụ cấp <strong>{formatVndCurrency(dayAllowanceCost)}</strong></span>
+                      <span>Dự phòng <strong>{formatVndCurrency(provisionalCost)}</strong>{selectedDate < today && ' · Không tính thực tế'}</span>
+                    </div>
                   </td>
                   <td
                     title={dayCostBreakdownText}
@@ -1114,10 +1211,14 @@ export function RosterInsitePage({
           </table>
         </div>
       </section>
+      </fieldset>
+
+        </div>
+      )}
 
       {/* Confirmation Dialog when hiding/deleting a room that has assigned shifts */}
       <Dialog
-        open={Boolean(pendingRoomRemoval)}
+        open={Boolean(pendingRoomRemoval) && !historyLocked}
         onOpenChange={(open) => {
           if (!open) setPendingRoomRemoval(null);
         }}
@@ -1165,7 +1266,7 @@ export function RosterInsitePage({
       </Dialog>
 
       {/* Fixed Room Catalog Drawer (⚙ Sheet) */}
-      <Sheet open={isRoomCatalogOpen} onOpenChange={setIsRoomCatalogOpen}>
+      <Sheet open={isRoomCatalogOpen && !historyLocked} onOpenChange={setIsRoomCatalogOpen}>
         <SheetContent
           side="right"
           className="flex w-full flex-col gap-5 sm:max-w-md"
@@ -1264,6 +1365,16 @@ export function RosterInsitePage({
                       >
                         {room.room_name}
                       </button>
+                      <Select value={room.doctor_specialty ?? 'unconfigured'} onValueChange={(value) => {
+                        void updateClinicRoom(room.id, { doctor_specialty: value === 'unconfigured' ? null : value as DoctorSpecialty })
+                          .then(() => reloadAll(false)).catch(() => setErrorMessage('Không thể lưu chuyên môn của phòng.'));
+                      }}>
+                        <SelectTrigger aria-label={`Chuyên môn bác sĩ cho phòng ${room.room_name}`} className="h-8 w-40"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectGroup>
+                          <SelectItem value="unconfigured">Chưa chọn chuyên môn</SelectItem>
+                          {DOCTOR_SPECIALTIES.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                        </SelectGroup></SelectContent>
+                      </Select>
                       <button
                         type="button"
                         onClick={() => requestDeactivateCatalogRoom(room)}

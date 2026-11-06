@@ -1,908 +1,104 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import {
-  ArrowDownTrayIcon,
-  ArrowPathIcon,
-  ArrowRightIcon,
-  BanknotesIcon,
-  BuildingOffice2Icon,
-  TruckIcon,
-  UserGroupIcon,
-} from '@heroicons/react/24/outline';
-import { Search, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { ArrowRight, Building2, CalendarDays, CircleAlert, Eye, EyeOff, RefreshCw, Users } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DatePicker, MonthPicker } from '@/components/ui/date-picker';
-import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { handleInternalLinkClick } from '../../../lib/navigation';
-import {
-  formatVndCurrency,
-  ROLE_SHORT_LABELS,
-  SHIFT_SHORT_LABELS,
-  summarizeAssignmentCosts,
-  type MedicalPersonnel,
-  type PersonnelRoleType,
-} from './rosterService';
+import { BRANCH_NAMES } from '../../../config/branches';
 import { formatDisplayDate } from '../utils/adminFormatters';
-import {
-  exportMonthlyPersonnelCostExcel,
-  exportScheduleCostExcel,
-} from './exportRosterExcel';
-import { useRosterData } from './useRosterData';
 import { RosterShell } from './RosterShell';
+import { WeeklyCampaignChart } from './WeeklyCampaignChart';
+import { useRosterData } from './useRosterData';
+import { fetchRosterBundleForRange, formatVndCurrency, ROSTER_BRANCH_LABELS, SCHEDULE_TYPE_LABELS, shiftIsoDate } from './rosterService';
+import { buildDashboardSummary, dashboardHref, type DashboardBranch, type DashboardBundle } from './dashboardSummary';
+import './dashboard.css';
+import './campaignColors.css';
 
-export function RosterDashboardPage({
-  authorizedIsAdmin = true,
-}: {
-  authorizedIsAdmin?: boolean;
-}) {
-  const {
-    selectedDate,
-    setSelectedDate,
-    selectedMonth,
-    setSelectedMonth,
-    setSelectedBranch,
-    personnelList,
-    activePersonnel,
-    personnelMap,
-    roomMap,
-    schedules,
-    scheduleMap,
-    assignments,
-    isLoading,
-    reloadAll,
-  } = useRosterData();
-
-  const searchInputId = useId();
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [roleFilter, setRoleFilter] = useState<'all' | PersonnelRoleType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const isEditable =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        Boolean(target?.isContentEditable);
-
-      if (event.key === '/' && !isEditable) {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const d1DailySchedule = useMemo(
-    () =>
-      schedules.find(
-        (s) =>
-          s.schedule_type === 'insite' &&
-          s.branch_code === 'q1' &&
-          s.schedule_date === selectedDate,
-      ) ?? null,
-    [schedules, selectedDate],
-  );
-
-  const d7DailySchedule = useMemo(
-    () =>
-      schedules.find(
-        (s) =>
-          s.schedule_type === 'insite' &&
-          s.branch_code === 'q7' &&
-          s.schedule_date === selectedDate,
-      ) ?? null,
-    [schedules, selectedDate],
-  );
-
-  const d1DailyAssignments = useMemo(
-    () =>
-      d1DailySchedule
-        ? assignments.filter((a) => a.schedule_id === d1DailySchedule.id)
-        : [],
-    [assignments, d1DailySchedule],
-  );
-
-  const d7DailyAssignments = useMemo(
-    () =>
-      d7DailySchedule
-        ? assignments.filter((a) => a.schedule_id === d7DailySchedule.id)
-        : [],
-    [assignments, d7DailySchedule],
-  );
-
-  const onsiteCampaigns = useMemo(
-    () =>
-      schedules
-        .filter((s) => s.schedule_type !== 'insite')
-        .sort((a, b) => b.schedule_date.localeCompare(a.schedule_date)),
-    [schedules],
-  );
-
-  const monthlySummary = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        person: MedicalPersonnel;
-        shiftCount: number;
-        insiteCount: number;
-        onsiteCount: number;
-        totalBase: number;
-        totalAllowance: number;
-        totalGrand: number;
-      }
-    >();
-
-    for (const a of assignments) {
-      const sched = scheduleMap.get(a.schedule_id);
-      const person = personnelMap.get(a.personnel_id);
-      if (!sched || !person) continue;
-
-      if (roleFilter !== 'all' && person.role_type !== roleFilter) continue;
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const hay =
-          `${person.personnel_code} ${person.full_name} ${person.phone_number} ${person.email}`.toLowerCase();
-        if (!hay.includes(q)) continue;
-      }
-
-      const cur = map.get(person.id) ?? {
-        person,
-        shiftCount: 0,
-        insiteCount: 0,
-        onsiteCount: 0,
-        totalBase: 0,
-        totalAllowance: 0,
-        totalGrand: 0,
-      };
-
-      const base = Number(a.base_cost_snapshot ?? 0);
-      const allow = Number(a.allowance_cost ?? 0);
-
-      cur.shiftCount += 1;
-      if (sched.schedule_type === 'insite') {
-        cur.insiteCount += 1;
-      } else {
-        cur.onsiteCount += 1;
-      }
-      cur.totalBase += base;
-      cur.totalAllowance += allow;
-      cur.totalGrand += base + allow;
-
-      map.set(person.id, cur);
-    }
-
-    return Array.from(map.values()).sort((a, b) => b.totalGrand - a.totalGrand);
-  }, [assignments, scheduleMap, personnelMap, roleFilter, searchQuery]);
-
-  const maxPersonCost = useMemo(
-    () =>
-      monthlySummary.length > 0
-        ? Math.max(...monthlySummary.map((r) => r.totalGrand), 1)
-        : 1,
-    [monthlySummary],
-  );
-
-  const metrics = useMemo(() => {
-    const dailyInsiteCount = d1DailyAssignments.length + d7DailyAssignments.length;
-    const dailyInsiteCost = summarizeAssignmentCosts([
-      ...d1DailyAssignments,
-      ...d7DailyAssignments,
-    ]).totalCost;
-
-    const onsiteIds = new Set(onsiteCampaigns.map((c) => c.id));
-    const monthOnsiteCost = summarizeAssignmentCosts(
-      assignments.filter((a) => onsiteIds.has(a.schedule_id)),
-    ).totalCost;
-
-    const monthTotalCost = summarizeAssignmentCosts(assignments).totalCost;
-
-    return {
-      dailyInsiteCount,
-      dailyInsiteCost,
-      onsiteCampaignCount: onsiteCampaigns.length,
-      monthOnsiteCost,
-      monthTotalAssignments: assignments.length,
-      monthTotalCost,
-    };
-  }, [d1DailyAssignments, d7DailyAssignments, onsiteCampaigns, assignments]);
-
-  return (
-    <RosterShell
-      activePage="roster-dashboard"
-      title="Tổng quan Lịch trực & Quyết toán Chi phí"
-      authorizedIsAdmin={authorizedIsAdmin}
-      headerActions={
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={assignments.length === 0}
-            onClick={() =>
-              exportMonthlyPersonnelCostExcel({
-                monthStr: selectedMonth,
-                schedules,
-                assignments,
-                personnelList,
-                roomMap,
-                filterRole: roleFilter,
-                filterPersonnelQuery: searchQuery,
-              })
-            }
-            className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
-          >
-            <ArrowDownTrayIcon className="size-3.5 shrink-0" />
-            <span>Xuất Excel Tháng ({selectedMonth})</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isLoading}
-            onClick={() => void reloadAll(true)}
-            className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-          >
-            <ArrowPathIcon
-              className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
-              aria-hidden="true"
-            />
-            <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-          </Button>
-        </div>
-      }
-    >
-      {/* Scope Bar: Date & Settlement Month */}
-      <div className="dym-roster-scope-bar">
-        <div className="dym-roster-scope-left">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              Ngày trực D1 / D7:
-            </span>
-            <DatePicker
-              value={selectedDate}
-              onChange={setSelectedDate}
-              ariaLabel="Chọn ngày trực D1 / D7"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              Tháng quyết toán:
-            </span>
-            <MonthPicker
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-              ariaLabel="Chọn tháng quyết toán"
-            />
-          </div>
-        </div>
-
-        <div className="dym-roster-scope-right">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 bg-card px-3 text-xs font-medium no-underline shadow-sm"
-          >
-            <a
-              href="/?page=roster-insite"
-              onClick={(e) => handleInternalLinkClick(e, '/?page=roster-insite')}
-            >
-              <span>Xếp phòng D1 / D7</span>
-              <ArrowRightIcon className="size-3.5 shrink-0" />
-            </a>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 bg-card px-3 text-xs font-medium no-underline shadow-sm"
-          >
-            <a
-              href="/?page=roster-onsite"
-              onClick={(e) => handleInternalLinkClick(e, '/?page=roster-onsite')}
-            >
-              <span>Đoàn khám Onsite</span>
-              <ArrowRightIcon className="size-3.5 shrink-0" />
-            </a>
-          </Button>
-        </div>
-      </div>
-
-      {/* Unified Overview Summary Metrics Grid */}
-      <section
-        className="dym-metrics-summary-grid"
-        aria-label="Chỉ số chi phí và ca trực"
-      >
-        <div className="dym-metric-summary-card">
-          <div className="dym-metric-summary-header">
-            <span className="dym-metric-summary-label">
-              Quyết toán tháng {selectedMonth}
-            </span>
-            <BanknotesIcon
-              className="dym-metric-summary-icon text-muted-foreground"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="dym-metric-summary-value-row">
-            <strong className="dym-metric-summary-number text-foreground">
-              {formatVndCurrency(metrics.monthTotalCost)}
-            </strong>
-            <span className="dym-metric-summary-unit">
-              / {metrics.monthTotalAssignments} ca
-            </span>
-          </div>
-        </div>
-
-        <div className="dym-metric-summary-card">
-          <div className="dym-metric-summary-header">
-            <span className="dym-metric-summary-label">
-              Trực D1 & D7 ({formatDisplayDate(selectedDate)})
-            </span>
-            <BuildingOffice2Icon
-              className="dym-metric-summary-icon text-emerald-500"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="dym-metric-summary-value-row">
-            <strong className="dym-metric-summary-number">
-              {formatVndCurrency(metrics.dailyInsiteCost)}
-            </strong>
-            <span className="dym-metric-summary-unit">
-              / {metrics.dailyInsiteCount} ca
-            </span>
-          </div>
-        </div>
-
-        <div className="dym-metric-summary-card">
-          <div className="dym-metric-summary-header">
-            <span className="dym-metric-summary-label">
-              Đoàn Onsite ({selectedMonth})
-            </span>
-            <TruckIcon
-              className="dym-metric-summary-icon text-amber-500"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="dym-metric-summary-value-row">
-            <strong className="dym-metric-summary-number">
-              {formatVndCurrency(metrics.monthOnsiteCost)}
-            </strong>
-            <span className="dym-metric-summary-unit">
-              / {metrics.onsiteCampaignCount} đoàn
-            </span>
-          </div>
-        </div>
-
-        <div className="dym-metric-summary-card">
-          <div className="dym-metric-summary-header">
-            <span className="dym-metric-summary-label">Nhân sự hoạt động</span>
-            <UserGroupIcon
-              className="dym-metric-summary-icon"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="dym-metric-summary-value-row">
-            <strong className="dym-metric-summary-number">
-              {activePersonnel.length}
-            </strong>
-            <span className="dym-metric-summary-unit">nhân sự</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Side-by-Side Daily D1 & D7 Insite Roster Overview */}
-      <div className="dym-roster-grid-2col">
-        {(
-          [
-            {
-              branch: 'q1' as const,
-              title: 'Lịch trực D1 — Quận 1',
-              schedule: d1DailySchedule,
-              rows: d1DailyAssignments,
-            },
-            {
-              branch: 'q7' as const,
-              title: 'Lịch trực D7 — Quận 7',
-              schedule: d7DailySchedule,
-              rows: d7DailyAssignments,
-            },
-          ] as const
-        ).map(({ branch, title, schedule, rows }) => {
-          const branchTotal = rows.reduce(
-            (s, r) => s + Number(r.base_cost_snapshot) + Number(r.allowance_cost),
-            0,
-          );
-          return (
-            <section key={branch} className="dym-roster-panel">
-              <header className="dym-roster-panel-header">
-                <div className="dym-roster-panel-title-group">
-                  <h2 className="dym-roster-panel-title">
-                    {title} · {formatDisplayDate(selectedDate)}
-                  </h2>
-                  <p className="dym-roster-panel-subtitle">
-                    {rows.length} vị trí trực · Tổng chi phí:{' '}
-                    <strong className="dym-roster-tabular">
-                      {formatVndCurrency(branchTotal)}
-                    </strong>
-                  </p>
-                </div>
-                <div className="dym-roster-panel-actions">
-                  {schedule && rows.length > 0 && (
-                    <button
-                      type="button"
-                      className="dym-roster-icon-btn"
-                      onClick={() =>
-                        exportScheduleCostExcel({
-                          schedule,
-                          assignments: rows,
-                          personnelMap,
-                          roomMap,
-                        })
-                      }
-                    >
-                      <ArrowDownTrayIcon />
-                      <span>Excel</span>
-                    </button>
-                  )}
-                  <a
-                    href={`/?page=roster-insite&branch=${branch}&date=${selectedDate}`}
-                    className="dym-roster-icon-btn no-underline"
-                    onClick={(e) => {
-                      setSelectedBranch(branch);
-                      handleInternalLinkClick(
-                        e,
-                        `/?page=roster-insite&branch=${branch}&date=${selectedDate}`,
-                      );
-                    }}
-                  >
-                    <span>Xếp phòng {branch === 'q1' ? 'D1' : 'D7'}</span>
-                    <ArrowRightIcon />
-                  </a>
-                </div>
-              </header>
-
-              {isLoading ? (
-                <div
-                  className="dym-roster-table-wrap"
-                  role="status"
-                  aria-live="polite"
-                  aria-busy="true"
-                >
-                  <span className="sr-only">Đang tải lịch trực phòng khám...</span>
-                  <table className="dym-roster-table" aria-hidden="true">
-                    <thead>
-                      <tr>
-                        <th>Phòng khám</th>
-                        <th>Nhân sự</th>
-                        <th className="is-center">Vai trò</th>
-                        <th className="is-center">Ca</th>
-                        <th className="is-right">Chi phí</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[0, 1, 2].map((index) => (
-                        <tr key={index}>
-                          <td>
-                            <Skeleton className="h-4 w-28" />
-                          </td>
-                          <td>
-                            <div className="flex flex-col gap-1.5">
-                              <Skeleton className="h-4 w-32" />
-                              <Skeleton className="h-3 w-24" />
-                            </div>
-                          </td>
-                          <td className="is-center">
-                            <Skeleton className="mx-auto h-5 w-16 rounded-full" />
-                          </td>
-                          <td className="is-center">
-                            <Skeleton className="mx-auto h-5 w-16 rounded-full" />
-                          </td>
-                          <td className="is-right">
-                            <Skeleton className="ml-auto h-4 w-20" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : rows.length === 0 ? (
-                <div className="dym-roster-empty-slot">
-                  <span>
-                    <strong>Chưa có nhân sự trực ngày {formatDisplayDate(selectedDate)}</strong>{' '}
-                    tại {branch === 'q1' ? 'D1 — Quận 1' : 'D7 — Quận 7'}.
-                  </span>
-                  <a
-                    href={`/?page=roster-insite&branch=${branch}&date=${selectedDate}`}
-                    className="dym-roster-icon-btn no-underline"
-                    onClick={(e) => {
-                      setSelectedBranch(branch);
-                      handleInternalLinkClick(
-                        e,
-                        `/?page=roster-insite&branch=${branch}&date=${selectedDate}`,
-                      );
-                    }}
-                  >
-                    <span>Gán nhân sự ngay</span>
-                    <ArrowRightIcon />
-                  </a>
-                </div>
-              ) : (
-                <div className="dym-roster-table-wrap">
-                  <table className="dym-roster-table">
-                    <thead>
-                      <tr>
-                        <th>Phòng khám</th>
-                        <th>Nhân sự</th>
-                        <th className="is-center">Vai trò</th>
-                        <th className="is-center">Ca</th>
-                        <th className="is-right">Chi phí</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((item) => {
-                        const person = personnelMap.get(item.personnel_id);
-                        const room = item.room_id ? roomMap.get(item.room_id) : undefined;
-                        const rowTotal =
-                          Number(item.base_cost_snapshot) + Number(item.allowance_cost);
-                        return (
-                          <tr key={item.id}>
-                            <td className="font-semibold">
-                              {room?.room_name || item.position_label || '—'}
-                            </td>
-                            <td>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {person?.full_name || '—'}
-                                </span>
-                                <span className="text-xs text-slate-500 dym-roster-tabular">
-                                  {person?.personnel_code} · {person?.phone_number || '—'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="is-center">
-                              {person && (
-                                <span
-                                  className={`dym-roster-role-badge role-${person.role_type}`}
-                                >
-                                  {ROLE_SHORT_LABELS[person.role_type]}
-                                </span>
-                              )}
-                            </td>
-                            <td className="is-center">
-                              <span className="dym-roster-shift-badge">
-                                {SHIFT_SHORT_LABELS[item.shift_period]}
-                              </span>
-                            </td>
-                            <td className="is-right font-semibold dym-roster-tabular">
-                              {formatVndCurrency(rowTotal)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
-
-      {/* Monthly Personnel Cost Settlement Table by ID */}
-      <section className="dym-roster-panel">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
-          <div className="dym-registry-title-block">
-            <h2 className="dym-registry-title">
-              Bảng Quyết Toán Chi Phí Nhân Sự Theo ID — Tháng {selectedMonth}
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Role Filter Tabs (shadcn Tabs) */}
-            <Tabs
-              value={roleFilter}
-              onValueChange={(value) =>
-                setRoleFilter(value as 'all' | PersonnelRoleType)
-              }
-            >
-              <TabsList
-                aria-label="Lọc theo vai trò"
-                className="h-9 bg-muted p-1"
-              >
-                <TabsTrigger
-                  value="all"
-                  className="h-7 gap-1.5 px-3 text-xs font-medium"
-                >
-                  <span>Tất cả vai trò</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="doctor"
-                  className="h-7 gap-1.5 px-3 text-xs font-medium"
-                >
-                  <span
-                    className="size-1.5 rounded-full bg-sky-500"
-                    aria-hidden="true"
-                  />
-                  <span>Bác sĩ</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="nurse"
-                  className="h-7 gap-1.5 px-3 text-xs font-medium"
-                >
-                  <span
-                    className="size-1.5 rounded-full bg-emerald-500"
-                    aria-hidden="true"
-                  />
-                  <span>Điều dưỡng (Nurse)</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="technician"
-                  className="h-7 gap-1.5 px-3 text-xs font-medium"
-                >
-                  <span
-                    className="size-1.5 rounded-full bg-violet-500"
-                    aria-hidden="true"
-                  />
-                  <span>KTV / Khác</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="ctv"
-                  className="h-7 gap-1.5 px-3 text-xs font-medium"
-                >
-                  <span
-                    className="size-1.5 rounded-full bg-amber-500"
-                    aria-hidden="true"
-                  />
-                  <span>Cộng tác viên (CTV)</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-              <div className="relative w-full sm:w-64 lg:w-72">
-                <label htmlFor={searchInputId} className="sr-only">
-                  Tìm nhân sự trong bảng quyết toán
-                </label>
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  ref={searchInputRef}
-                  id={searchInputId}
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm theo ID, họ tên, SĐT..."
-                  className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
-                />
-                {searchQuery ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSearchQuery('')}
-                    aria-label="Xóa từ khóa tìm kiếm"
-                    className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X aria-hidden="true" />
-                  </Button>
-                ) : (
-                  <kbd
-                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                    aria-hidden="true"
-                  >
-                    /
-                  </kbd>
-                )}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={monthlySummary.length === 0}
-                onClick={() =>
-                  exportMonthlyPersonnelCostExcel({
-                    monthStr: selectedMonth,
-                    schedules,
-                    assignments,
-                    personnelList,
-                    roomMap,
-                    filterRole: roleFilter,
-                    filterPersonnelQuery: searchQuery,
-                  })
-                }
-                className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-              >
-                <ArrowDownTrayIcon className="size-3.5 shrink-0" />
-                <span>Xuất Excel theo ID</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div
-            className="dym-roster-table-wrap"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-          >
-            <span className="sr-only">Đang tải bảng quyết toán chi phí...</span>
-            <table className="dym-roster-table" aria-hidden="true">
-              <thead>
-                <tr>
-                  <th>Mã ID</th>
-                  <th>Họ và tên nhân sự</th>
-                  <th className="is-center">Vai trò</th>
-                  <th>Số điện thoại</th>
-                  <th className="is-right">Cost định mức</th>
-                  <th className="is-center">Số ca</th>
-                  <th className="is-center">Insite / Onsite</th>
-                  <th className="is-right">Tổng Cost cố định</th>
-                  <th className="is-right">Tổng Phụ cấp</th>
-                  <th className="is-right">Tổng thực nhận</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[0, 1, 2, 3, 4].map((index) => (
-                  <tr key={index}>
-                    <td>
-                      <Skeleton className="h-5 w-16 rounded-md" />
-                    </td>
-                    <td>
-                      <div className="flex flex-col gap-1.5">
-                        <Skeleton className="h-4 w-36" />
-                        <Skeleton className="h-1.5 w-28 rounded-full" />
-                      </div>
-                    </td>
-                    <td className="is-center">
-                      <Skeleton className="mx-auto h-5 w-16 rounded-full" />
-                    </td>
-                    <td>
-                      <Skeleton className="h-4 w-24" />
-                    </td>
-                    <td className="is-right">
-                      <Skeleton className="ml-auto h-4 w-20" />
-                    </td>
-                    <td className="is-center">
-                      <Skeleton className="mx-auto h-4 w-8" />
-                    </td>
-                    <td className="is-center">
-                      <Skeleton className="mx-auto h-4 w-16" />
-                    </td>
-                    <td className="is-right">
-                      <Skeleton className="ml-auto h-4 w-24" />
-                    </td>
-                    <td className="is-right">
-                      <Skeleton className="ml-auto h-4 w-20" />
-                    </td>
-                    <td className="is-right">
-                      <Skeleton className="ml-auto h-4 w-24" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : monthlySummary.length === 0 ? (
-          <div className="dym-roster-empty-slot">
-            <span>
-              <strong>Chưa có phát sinh ca trực hoặc đoàn khám trong tháng {selectedMonth}.</strong>{' '}
-              Khi bạn gán nhân sự ở trang Lịch phòng D1/D7 hoặc Đoàn khám Onsite, chi phí sẽ tự động tổng hợp tại đây.
-            </span>
-          </div>
-        ) : (
-          <div className="dym-roster-table-wrap">
-            <table className="dym-roster-table">
-              <thead>
-                <tr>
-                  <th>Mã ID</th>
-                  <th>Họ và tên nhân sự</th>
-                  <th className="is-center">Vai trò</th>
-                  <th>Số điện thoại</th>
-                  <th className="is-right">Cost định mức</th>
-                  <th className="is-center">Số ca</th>
-                  <th className="is-center">Insite / Onsite</th>
-                  <th className="is-right">Tổng Cost cố định</th>
-                  <th className="is-right">Tổng Phụ cấp</th>
-                  <th className="is-right">Tổng thực nhận</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlySummary.map((row, idx) => {
-                  const pct = Math.min(
-                    100,
-                    Math.max(4, Math.round((row.totalGrand / maxPersonCost) * 100)),
-                  );
-                  return (
-                    <tr key={row.person.id}>
-                      <td>
-                        <span className="dym-roster-code-badge">
-                          {row.person.personnel_code}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{row.person.full_name}</span>
-                          <div className="dym-roster-thin-bar-track" aria-hidden="true">
-                            <div
-                              className={`dym-roster-thin-bar-fill ${idx === 0 ? 'is-top' : ''}`}
-                              style={{ transform: `scaleX(${pct / 100})` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="is-center">
-                        <span
-                          className={`dym-roster-role-badge role-${row.person.role_type}`}
-                        >
-                          {ROLE_SHORT_LABELS[row.person.role_type]}
-                        </span>
-                      </td>
-                      <td className="dym-roster-tabular">
-                        {row.person.phone_number || '—'}
-                      </td>
-                      <td className="is-right dym-roster-tabular text-slate-500">
-                        {formatVndCurrency(row.person.fixed_cost)}
-                      </td>
-                      <td className="is-center dym-roster-tabular font-semibold">
-                        {row.shiftCount}
-                      </td>
-                      <td className="is-center dym-roster-tabular text-xs">
-                        {row.insiteCount} phòng / {row.onsiteCount} đoàn
-                      </td>
-                      <td className="is-right dym-roster-tabular">
-                        {formatVndCurrency(row.totalBase)}
-                      </td>
-                      <td className="is-right dym-roster-tabular">
-                        {formatVndCurrency(row.totalAllowance)}
-                      </td>
-                      <td className="is-right dym-roster-tabular font-semibold">
-                        {formatVndCurrency(row.totalGrand)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={5}>
-                    Tổng quyết toán ({monthlySummary.length} nhân sự)
-                  </td>
-                  <td className="is-center dym-roster-tabular">
-                    {monthlySummary.reduce((s, r) => s + r.shiftCount, 0)}
-                  </td>
-                  <td />
-                  <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalBase, 0),
-                    )}
-                  </td>
-                  <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalAllowance, 0),
-                    )}
-                  </td>
-                  <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalGrand, 0),
-                    )}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </section>
-    </RosterShell>
-  );
+function PageLink({ href, children, ...props }: ComponentProps<'a'> & { href: string }) {
+  return <a {...props} href={href} onClick={event => { props.onClick?.(event); handleInternalLinkClick(event, href); }}>{children}</a>;
 }
 
-export default RosterDashboardPage;
+export function RosterDashboardPage({ authorizedIsAdmin = true, isActiveTab = true }: { authorizedIsAdmin?: boolean; isActiveTab?: boolean }) {
+  const { selectedDate, setSelectedDate, selectedBranch, setSelectedBranch, roomsList, schedules, assignments, dailyRoomOverrides, personnelMap, rosterToday, isLoading, errorBanner, reloadAll } = useRosterData();
+  const [branch, setBranch] = useState<DashboardBranch>('all');
+  const [showCosts, setShowCosts] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [result, setResult] = useState<{ key: string; bundle: DashboardBundle } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingRange, setLoadingRange] = useState(true);
+  const month = selectedDate.slice(0, 7);
+  const monthEnd = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  const upcomingEnd = shiftIsoDate(selectedDate, 6);
+  const rangeEnd = upcomingEnd > monthEnd ? upcomingEnd : monthEnd;
+  const rangeKey = `${month}:${rangeEnd}`;
+
+  useEffect(() => {
+    if (!isActiveTab || isLoading) return;
+    let current = true;
+    setLoadingRange(true);
+    setLoadError(null);
+    void fetchRosterBundleForRange(`${month}-01`, rangeEnd).then(bundle => {
+      if (current) setResult({ key: rangeKey, bundle });
+    }).catch(cause => {
+      if (current) setLoadError(cause instanceof Error ? cause.message : 'Không tải được tổng quan.');
+    }).finally(() => { if (current) setLoadingRange(false); });
+    return () => { current = false; };
+  }, [month, rangeEnd, rangeKey, isActiveTab, isLoading, schedules, assignments, dailyRoomOverrides, refresh]);
+
+  const summary = useMemo(() => result?.key === rangeKey
+    ? buildDashboardSummary(result.bundle, roomsList, selectedDate, branch, rosterToday) : null,
+  [result, rangeKey, roomsList, selectedDate, branch, rosterToday]);
+  const busy = isLoading || loadingRange || !summary;
+  const scopeBranch = branch === 'all' ? selectedBranch : branch;
+  const settlementHref = dashboardHref('roster-settlement', selectedDate, scopeBranch);
+  const campaignHref = (schedule: DashboardBundle['schedules'][number]) => dashboardHref('roster-onsite', schedule.schedule_date, schedule.branch_code, schedule.id, schedule.schedule_type);
+  const taskLinks = summary ? [
+    ...summary.clinics.filter(clinic => clinic.missing > 0).map(clinic => ({ title: `${ROSTER_BRANCH_LABELS[clinic.branch as 'q1' | 'q7']}: thiếu ${clinic.missing} phòng`, description: `Đã xếp ${clinic.filled}/${clinic.total} phòng · ${formatDisplayDate(selectedDate)}`, href: dashboardHref('roster-insite', selectedDate, clinic.branch) })),
+    ...summary.dailyCampaigns.filter(item => item.missing.length > 0).map(item => ({ title: `${item.schedule.company_name}: thiếu ${item.missing.length} vị trí`, description: item.missing.join(', '), href: campaignHref(item.schedule) })),
+    ...summary.conflicts.map(item => ({ title: `${personnelMap.get(item.personnelId)?.full_name ?? 'Nhân sự'}: cần kiểm tra trùng ca`, description: item.schedules.map(schedule => schedule.company_name || BRANCH_NAMES[schedule.branch_code]).join(' · '), href: item.schedules[0].schedule_type === 'insite' ? dashboardHref('roster-insite', selectedDate, item.schedules[0].branch_code) : campaignHref(item.schedules[0]) })),
+    ...summary.unlinked.map(item => ({ title: `${item.schedule.company_name}: set-up chưa liên kết`, description: `Chọn đoàn Onsite HC liên quan · ${formatDisplayDate(item.schedule.schedule_date)}`, href: campaignHref(item.schedule) })),
+    ...summary.unconfigured.map(item => ({ title: `${item.schedule.company_name}: chưa khai báo vị trí`, description: `${SCHEDULE_TYPE_LABELS[item.schedule.schedule_type]} · ${formatDisplayDate(item.schedule.schedule_date)}`, href: campaignHref(item.schedule) })),
+  ] : [];
+  const metrics = summary ? [
+    { title: 'Đoàn trong ngày', value: summary.dailyCampaigns.length, note: `${summary.upcoming.length} lịch đoàn trong 7 ngày`, icon: CalendarDays },
+    { title: 'Phòng đã có nhân sự', value: `${summary.staffed}/${summary.rooms}`, note: `${summary.rooms - summary.staffed} phòng cần bổ sung`, icon: Building2 },
+    { title: 'Nhân sự đã phân công', value: summary.personnel, note: 'Số người riêng biệt trong ngày', icon: Users },
+    { title: 'Vị trí còn thiếu', value: summary.missing, note: 'Theo danh sách phòng / vị trí đã khai báo', icon: CircleAlert },
+  ] : [];
+
+  return <RosterShell activePage="roster-dashboard" title="Tổng quan vận hành" authorizedIsAdmin={authorizedIsAdmin}
+    headerActions={<Button variant="outline" size="sm" disabled={isLoading || loadingRange} onClick={() => { setRefresh(value => value + 1); void reloadAll(true); }}><RefreshCw data-icon="inline-start" />Làm mới</Button>}>
+    <div className="dym-roster-dashboard dym-onsite-page">
+      <div className="roster-dashboard-toolbar">
+        <div><h2>Nhịp vận hành trong ngày</h2><p>Phân công Clinic và các đoàn khám · {formatDisplayDate(selectedDate)}</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <DatePicker value={selectedDate} onChange={setSelectedDate} ariaLabel="Ngày xem tổng quan" />
+          <Select value={branch} onValueChange={value => { setBranch(value as DashboardBranch); if (value !== 'all') setSelectedBranch(value as 'q1' | 'q7'); }}><SelectTrigger className="w-44" aria-label="Lọc chi nhánh"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Tất cả chi nhánh</SelectItem><SelectItem value="q1">D1 – Quận 1</SelectItem><SelectItem value="q7">D7 – Quận 7</SelectItem></SelectGroup></SelectContent></Select>
+        </div>
+      </div>
+      {(loadError || errorBanner) ? <Alert variant="destructive"><AlertTitle>Chưa tải được dữ liệu tổng quan</AlertTitle><AlertDescription>{loadError || errorBanner}</AlertDescription><Button variant="outline" size="sm" className="mt-3" onClick={() => { setRefresh(value => value + 1); void reloadAll(true); }}>Thử lại</Button></Alert>
+        : busy ? <div className="roster-dashboard-metrics" role="status" aria-label="Đang tải tổng quan">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-36" />)}</div>
+        : summary && <>
+          <div className="roster-dashboard-metrics">{metrics.map(({ title, value, note, icon: Icon }) => <Card key={title}><CardHeader className="p-4 pb-2"><div className="flex items-center justify-between gap-2"><CardDescription>{title}</CardDescription><Icon className="size-4 text-muted-foreground" aria-hidden="true" /></div></CardHeader><CardContent className="px-4 pb-4"><strong className="roster-dashboard-number">{value}</strong><p className="roster-dashboard-caption">{note}</p></CardContent></Card>)}</div>
+            <Card><CardHeader className="px-5 py-4"><CardTitle>Clinic trong ngày</CardTitle><CardDescription>Mỗi phòng có ít nhất một nhân sự được tính là đã xếp.</CardDescription></CardHeader><CardContent className="roster-dashboard-clinic-grid px-5 pb-4">{summary.clinics.map(clinic => <div key={clinic.branch} className="roster-dashboard-clinic"><div className="flex items-center justify-between gap-3"><strong>{ROSTER_BRANCH_LABELS[clinic.branch as 'q1' | 'q7']}</strong><Badge variant="outline">{clinic.total === 0 ? 'Chưa có phòng' : clinic.missing ? `Thiếu ${clinic.missing} phòng` : 'Đã xếp đủ'}</Badge></div><div className="roster-dashboard-progress" role="progressbar" aria-label={`Phòng đã xếp tại ${clinic.branch}`} aria-valuenow={clinic.filled} aria-valuemin={0} aria-valuemax={clinic.total || 1}><span style={{ width: `${clinic.total ? clinic.filled / clinic.total * 100 : 0}%` }} /></div><div className="flex items-center justify-between gap-2"><p className="roster-dashboard-caption">Đã xếp {clinic.filled}/{clinic.total} phòng</p><Button variant="ghost" size="sm" asChild><PageLink href={dashboardHref('roster-insite', selectedDate, clinic.branch)}>Xem lịch<ArrowRight data-icon="inline-end" /></PageLink></Button></div></div>)}</CardContent></Card>
+          <div className="roster-dashboard-main-grid">
+            <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>Cần xử lý</CardTitle><Badge variant="secondary">{taskLinks.length} mục</Badge></div><CardDescription>Thiếu nhân sự trong ngày và lịch đoàn cần hoàn thiện trong 7 ngày.</CardDescription></CardHeader><CardContent className="roster-dashboard-tasks">
+              {taskLinks.length ? taskLinks.map((item, index) => <PageLink key={`${item.href}:${index}`} href={item.href}><div className="roster-dashboard-task"><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowRight aria-hidden="true" /></div></PageLink>) : <Empty><EmptyHeader><EmptyTitle>Đã hoàn tất phân công</EmptyTitle><EmptyDescription>Chưa phát hiện mục cần xử lý trong phạm vi đang xem.</EmptyDescription></EmptyHeader></Empty>}
+            </CardContent></Card>
+          <WeeklyCampaignChart weeks={summary.weeks} count={summary.monthlyCampaignCount} month={month} />
+          </div>
+          <Card><CardHeader><CardTitle>Đoàn khám sắp tới</CardTitle><CardDescription>7 ngày từ {formatDisplayDate(selectedDate)} · Mỗi ngày thực hiện của đoàn được hiển thị riêng.</CardDescription></CardHeader><CardContent>
+            {summary.upcoming.length ? <div className="roster-dashboard-table-scroll"><table className="roster-dashboard-table"><caption className="sr-only">Danh sách đoàn trong 7 ngày</caption><thead><tr><th>Ngày thực hiện</th><th>Công ty / Đơn vị</th><th>Loại đoàn</th><th>Cơ sở ký HĐ</th><th>Phân công</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{summary.upcoming.map(item => <tr key={item.schedule.id}><td className="tabular-nums">{formatDisplayDate(item.schedule.schedule_date)}{item.schedule.schedule_date === selectedDate && <small>Ngày đang xem</small>}</td><td><strong>{item.schedule.company_name || 'Chưa có tên công ty'}</strong><small>{item.schedule.campaign_code}</small></td><td><span className="dym-campaign-type-label" data-type={item.schedule.schedule_type}>{SCHEDULE_TYPE_LABELS[item.schedule.schedule_type]}</span></td><td>{BRANCH_NAMES[item.schedule.branch_code]}</td><td><Badge variant={item.required > 0 && item.missing.length === 0 ? 'secondary' : 'outline'}>{item.required ? `${item.filled}/${item.required} vị trí` : 'Chưa khai báo'}</Badge><small>{item.required ? item.missing.length ? `Còn thiếu ${item.missing.length}` : 'Đã có nhân sự' : 'Cần thêm danh sách vị trí'}</small></td><td><Button variant="ghost" size="sm" asChild><PageLink href={campaignHref(item.schedule)}>Chi tiết<ArrowRight data-icon="inline-end" /></PageLink></Button></td></tr>)}</tbody></table></div>
+              : <Empty><EmptyHeader><EmptyTitle>Chưa có đoàn trong 7 ngày này</EmptyTitle><EmptyDescription>Đổi ngày hoặc chi nhánh để xem lịch khác.</EmptyDescription></EmptyHeader><Button variant="outline" asChild><PageLink href={dashboardHref('roster-onsite', selectedDate, scopeBranch)}>Mở lịch đoàn</PageLink></Button></Empty>}
+          </CardContent></Card>
+          <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-col gap-2"><CardTitle>Chi phí tháng {month.slice(5)}/{month.slice(0, 4)}</CardTitle><CardDescription>Theo chi nhánh đang lọc. Chi phí thực tế không gồm dự phòng.</CardDescription></div><Button variant="outline" size="sm" aria-pressed={showCosts} onClick={() => setShowCosts(value => !value)}>{showCosts ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}{showCosts ? 'Ẩn chi phí' : 'Hiện chi phí'}</Button></div></CardHeader><CardContent><div className="roster-dashboard-finances">{[{ label: 'Chi phí dự kiến', value: summary.forecast, note: 'Chi phí đã xếp + dự phòng từ hôm nay' }, { label: 'Dự phòng còn thiếu', value: summary.reserve, note: 'Chỉ tính lịch từ hôm nay trở đi' }, { label: 'Chi phí thực tế', value: summary.actual, note: 'Chi phí đã xếp đến hết hôm qua' }].map(item => <div key={item.label}><p>{item.label}</p><strong className="roster-dashboard-money">{showCosts ? formatVndCurrency(item.value) : '••••••'}</strong><small>{item.note}</small></div>)}</div><div className="mt-5 flex justify-end"><Button variant="outline" size="sm" asChild><PageLink href={settlementHref}>Mở trang Quyết toán<ArrowRight data-icon="inline-end" /></PageLink></Button></div></CardContent></Card>
+        </>}
+    </div>
+  </RosterShell>;
+}
+

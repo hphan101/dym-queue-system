@@ -8,6 +8,7 @@ import { useAdminTheme } from './hooks/useAdminTheme';
 import RegistrationsPage from './RegistrationsPage';
 import {
   RosterDashboardPage,
+  RosterSettlementPage,
   RosterDataProvider,
   RosterInsitePage,
   RosterOnsitePage,
@@ -21,6 +22,7 @@ export type AdminDestination =
   | 'dashboard'
   | 'registrations'
   | 'roster-dashboard'
+  | 'roster-settlement'
   | 'roster-insite'
   | 'roster-onsite'
   | 'roster-personnel'
@@ -35,6 +37,7 @@ function isDestinationAllowed(
   }
   if (
     destination === 'roster-dashboard' ||
+    destination === 'roster-settlement' ||
     destination === 'roster-insite' ||
     destination === 'roster-onsite'
   ) {
@@ -181,6 +184,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
 
       {canAccessRoster &&
         (activeVisitedTabs.has('roster-dashboard') ||
+          activeVisitedTabs.has('roster-settlement') ||
           activeVisitedTabs.has('roster-insite') ||
           activeVisitedTabs.has('roster-onsite') ||
           (isAdmin && activeVisitedTabs.has('roster-personnel'))) && (
@@ -191,7 +195,13 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
                   destination === 'roster-dashboard' ? 'contents' : 'hidden'
                 }
               >
-                <RosterDashboardPage authorizedIsAdmin={isAdmin} />
+                <RosterDashboardPage authorizedIsAdmin={isAdmin} isActiveTab={destination === 'roster-dashboard'} />
+              </div>
+            )}
+
+            {activeVisitedTabs.has('roster-settlement') && (
+              <div className={destination === 'roster-settlement' ? 'contents' : 'hidden'}>
+                <RosterSettlementPage authorizedIsAdmin={isAdmin} isActiveTab={destination === 'roster-settlement'} />
               </div>
             )}
 

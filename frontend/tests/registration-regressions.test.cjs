@@ -23,7 +23,13 @@ function load(file, mocks = {}, globals = {}) {
   const generic = new Proxy({}, { get: (_, name) => String(name) });
   vm.runInNewContext(code, {
     exports, console, Date, ...globals,
-    require: (name) => mocks[name] ?? generic,
+    require: (name) => {
+      if (name in mocks) return mocks[name];
+      if (name === './pdfBrowser' || name === './usePrintModalDismiss') {
+        return load(path.join(path.dirname(file), `${name}.ts`), mocks, globals);
+      }
+      return generic;
+    },
   });
   return exports;
 }

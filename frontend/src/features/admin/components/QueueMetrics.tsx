@@ -15,6 +15,14 @@ import {
 
 export type { QueueStatus };
 
+const clockFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
 interface QueueMetricsProps {
   currentQueue: string;
   currentPatient: string;
@@ -44,26 +52,12 @@ export function QueueMetrics({
 }: QueueMetricsProps) {
   // Live clock display for clinical console
   const [currentTime, setCurrentTime] = useState<string>(() =>
-    new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(new Date()),
+    clockFormatter.format(new Date()),
   );
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(
-        new Intl.DateTimeFormat('vi-VN', {
-          timeZone: 'Asia/Ho_Chi_Minh',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        }).format(new Date()),
-      );
+      setCurrentTime(clockFormatter.format(new Date()));
     }, 1000);
     return () => clearInterval(timer);
   }, []);

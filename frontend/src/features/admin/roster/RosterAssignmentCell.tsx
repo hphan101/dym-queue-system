@@ -43,6 +43,8 @@ export interface RosterAssignmentDraft {
 }
 
 interface RosterAssignmentCellProps {
+  showCosts?: boolean;
+  readOnly?: boolean;
   rowKey: string;
   targetLabel: string;
   assignments: RosterAssignment[];
@@ -67,6 +69,8 @@ interface RosterAssignmentCellProps {
 }
 
 export function RosterAssignmentCell({
+  showCosts = true,
+  readOnly = false,
   rowKey,
   targetLabel,
   assignments,
@@ -266,6 +270,13 @@ export function RosterAssignmentCell({
           (p) => !getPersonConflictForShift(p.id, assignShift),
         )));
 
+  if (readOnly) return <div className="flex flex-wrap items-center gap-2">
+    {assignments.length ? assignments.map((assignment) => <span key={assignment.id} className="rounded-md border border-border px-2 py-1 text-sm">
+      {personnelMap.get(assignment.personnel_id)?.full_name ?? 'Nhân sự'} · {SHIFT_SHORT_LABELS[assignment.shift_period]}
+      {showCosts && <span className="ml-2 text-xs text-muted-foreground">{formatVndCurrency(Number(assignment.base_cost_snapshot) + Number(assignment.allowance_cost))}</span>}
+    </span>) : <span className="text-sm text-muted-foreground">Chưa có người</span>}
+  </div>;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {!hasStaff ? (
@@ -278,7 +289,7 @@ export function RosterAssignmentCell({
           const isEditingThisChip =
             isOpen && editingAssignmentId === assign.id;
           const hasAllowance = Number(assign.allowance_cost) > 0;
-          const chipTooltip = formatChipTooltip
+          const chipTooltip = !showCosts ? `${person?.full_name ?? 'Nhân sự'} · ${SHIFT_SHORT_LABELS[assign.shift_period]}` : formatChipTooltip
             ? formatChipTooltip(assign, person)
             : `Cố định ${formatVndCurrency(assign.base_cost_snapshot)} + Phụ cấp ${formatVndCurrency(assign.allowance_cost)}${assign.note ? ` · Ghi chú: ${assign.note}` : ''}`;
 
@@ -319,7 +330,7 @@ export function RosterAssignmentCell({
                 <span className="font-medium text-muted-foreground">
                   {SHIFT_SHORT_LABELS[assign.shift_period]}
                 </span>
-                {hasAllowance && (
+                {showCosts && hasAllowance && (
                   <span
                     className="inline-flex size-4 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold leading-none text-amber-600 dark:text-amber-400"
                     aria-label={`Có phụ cấp ${formatVndCurrency(assign.allowance_cost)}`}
@@ -501,9 +512,9 @@ export function RosterAssignmentCell({
                                   {SHIFT_SHORT_LABELS[otherAssign.shift_period]}
                                 </Badge>
                               )}
-                              <span className="dym-roster-tabular text-[13px] font-medium text-muted-foreground">
+{showCosts && (                              <span className="dym-roster-tabular text-[13px] font-medium text-muted-foreground">
                                 {formatNumberPlain(person.fixed_cost)} ₫
-                              </span>
+                              </span>)}
                               {isSelected && (
                                 <CheckIcon className="size-4 text-primary" />
                               )}
@@ -551,7 +562,7 @@ export function RosterAssignmentCell({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            {showCosts && <div className="flex items-center justify-between gap-3">
               <label
                 htmlFor={`base-cost-${rowKey}`}
                 className="text-[13px] font-medium text-muted-foreground"
@@ -569,7 +580,7 @@ export function RosterAssignmentCell({
                 }
                 className="dym-roster-tabular h-8 w-40 text-right text-[13px]"
               />
-            </div>
+            </div>}
 
             {/* Collapsible Allowance & Notes */}
             <div className="flex flex-col gap-2 border-t border-border pt-2">
@@ -578,7 +589,7 @@ export function RosterAssignmentCell({
                 onClick={() => setIsExtraExpanded((prev) => !prev)}
                 className="flex items-center justify-between text-left text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out-quint hover:text-foreground"
               >
-                <span>Phụ cấp và ghi chú</span>
+                <span>{showCosts ? 'Phụ cấp và ghi chú' : 'Ghi chú'}</span>
                 <ChevronDownIcon
                   className={cn(
                     'size-4 transition-transform duration-150 ease-out-quint',
@@ -589,7 +600,7 @@ export function RosterAssignmentCell({
 
               {isExtraExpanded && (
                 <div className="dym-roster-collapsible-enter grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex flex-col gap-1">
+                  {showCosts && <div className="flex flex-col gap-1">
                     <label
                       htmlFor={`allowance-${rowKey}`}
                       className="text-xs font-medium text-muted-foreground"
@@ -607,7 +618,7 @@ export function RosterAssignmentCell({
                       }
                       className="dym-roster-tabular h-8 text-right text-[13px]"
                     />
-                  </div>
+                  </div>}
 
                   <div className="flex flex-col gap-1">
                     <label

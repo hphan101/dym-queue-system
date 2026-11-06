@@ -12,6 +12,7 @@ import {
   bulkImportMedicalPersonnel,
   copyInsiteScheduleFromDate,
   createClinicRoom,
+  createOnsiteSchedules,
   deactivateClinicRoomFromDate,
   deleteOrArchiveMedicalPersonnel,
   deleteRosterAssignment,
@@ -20,6 +21,7 @@ import {
   ensureInsiteSchedule,
   fetchClinicRooms,
   fetchMedicalPersonnel,
+  fetchRosterHistoryPermission,
   fetchRosterBundleForMonth,
   hideCatalogRoomForDate,
   removeCampaignPositionAndAssignments,
@@ -70,6 +72,15 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
     },
     [selectedMonth],
   );
+
+  const [canEditHistory, setCanEditHistory] = useState(false);
+  const [rosterToday, setRosterToday] = useState(today);
+  useEffect(() => {
+    const refresh = () => { setRosterToday(getTodayInVietnam()); void fetchRosterHistoryPermission().then(setCanEditHistory); };
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(() => setRosterToday(getTodayInVietnam()), 30000);
+    return () => { window.removeEventListener('focus', refresh); window.clearInterval(timer); };
+  }, []);
 
   const [personnelList, setPersonnelList] = useState<MedicalPersonnel[]>([]);
   const [roomsList, setRoomsList] = useState<ClinicRoom[]>([]);
@@ -125,11 +136,14 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
       if (showSpinner) setIsLoading(true);
       setErrorBanner(null);
       try {
-        const [personnelData, roomsData, monthBundle] = await Promise.all([
+        const [personnelData, roomsData, monthBundle, historyPermission] = await Promise.all([
           fetchMedicalPersonnel(),
           fetchClinicRooms(),
           fetchRosterBundleForMonth(selectedMonth),
+          fetchRosterHistoryPermission(),
         ]);
+        setCanEditHistory(historyPermission);
+        setRosterToday(getTodayInVietnam());
         setPersonnelList(personnelData);
         setRoomsList(roomsData);
         setDailyRoomOverrides(monthBundle.dailyRoomOverrides);
@@ -505,6 +519,18 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
     [selectedMonth],
   );
 
+  const createCampaigns = useCallback(async (inputs: OnsiteScheduleInput[], setupInputs?: OnsiteScheduleInput[]) => {
+    setIsMutating(true);
+    setErrorBanner(null);
+    try {
+      const created = await createOnsiteSchedules(inputs, setupInputs);
+      const month = inputs[0].schedule_date.slice(0, 7);
+      if (month !== selectedMonth) setSelectedMonth(month);
+      else setSchedules((previous) => [...created.filter((item) => item.schedule_date.startsWith(selectedMonth)), ...previous]);
+      return created;
+    } finally { setIsMutating(false); }
+  }, [selectedMonth]);
+
   const removeCampaign = useCallback(
     async (campaign: RosterSchedule) => {
       const previousSchedules = schedules;
@@ -526,13 +552,14 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
   );
 
   const updateCampaignPositions = useCallback(
-    async (campaignId: string, positionList: string[]) => {
+    async (campaignId: string, positionList: string[], orderMode?: 'alphabetical' | 'manual') => {
       setIsMutating(true);
       setErrorBanner(null);
       try {
         const updated = await updateCampaignPositionList(
           campaignId,
           positionList,
+          orderMode,
         );
         setSchedules((prev) =>
           prev.map((s) => (s.id === campaignId ? updated : s)),
@@ -837,6 +864,8 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<RosterContextValue>(
     () => ({
+      canEditHistory,
+      rosterToday,
       selectedBranch,
       setSelectedBranch,
       selectedDate,
@@ -871,6 +900,7 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
       upsertInsiteAssignment,
       copyInsiteFromYesterday,
       upsertCampaign,
+      createCampaigns,
       removeCampaign,
       updateCampaignPositions,
       renamePositionInCampaign,
@@ -885,6 +915,8 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
       removePersonnel,
     }),
     [
+      canEditHistory,
+      rosterToday,
       selectedBranch,
       selectedDate,
       setSelectedDate,
@@ -917,6 +949,7 @@ export function RosterDataProvider({ children }: { children: ReactNode }) {
       upsertInsiteAssignment,
       copyInsiteFromYesterday,
       upsertCampaign,
+      createCampaigns,
       removeCampaign,
       updateCampaignPositions,
       renamePositionInCampaign,

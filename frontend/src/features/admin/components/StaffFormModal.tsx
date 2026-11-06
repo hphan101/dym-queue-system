@@ -66,6 +66,11 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
         </header>
 
         <form onSubmit={(event) => void onSave(event)}>
+          {form.role !== 'receptionist' && <label className="dym-staff-history-permission">
+            <span>Cho phép sửa lịch cũ</span>
+            <input type="checkbox" checked={form.canEditRosterHistory} disabled={isSaving}
+              onChange={(event) => setForm((current) => ({ ...current, canEditRosterHistory: event.target.checked }))} />
+          </label>}
           {formError && (
             <div className="dym-staff-form-error" role="alert">
               {formError}

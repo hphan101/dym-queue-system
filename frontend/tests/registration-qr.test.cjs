@@ -63,6 +63,8 @@ test('QR menu opens a new staff tab for the selected branch and leaves reception
   const imports = [...source.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]);
   const mocks = Object.fromEntries(imports.map((name) => [name, symbols]));
   mocks.react = { useState: (initial) => [initial, () => {}] };
+  mocks['./hooks/useSidebarDisclosureMotion'] = { useSidebarDisclosureMotion: () => ({ panelRef: { current: null }, prepare() {} }) };
+  mocks['./sidebarMotion.css'] = {};
   mocks['react/jsx-runtime'] = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
   mocks['../../lib/navigation'] = navigation;
   mocks['../../config/branches'] = { BRANCH_NAMES: { q1: 'Quận 1', q7: 'Quận 7', hn: 'Hà Nội' } };

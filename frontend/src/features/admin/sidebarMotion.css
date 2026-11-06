@@ -1,0 +1,27 @@
+.dym-sidebar-navigation [data-sidebar="menu-button"],
+.dym-sidebar-navigation [data-sidebar="menu-sub-button"] {
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.dym-sidebar-navigation[data-roster-motion="pointer"] .dym-sidebar-roster-chevron {
+  transition: transform 200ms var(--ease-out);
+}
+html[data-navigation-motion="pointer"] .dym-admin-content {
+  opacity: 1;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+@starting-style {
+  html[data-navigation-motion="pointer"] .dym-admin-content { opacity: 0.75; }
+}
+html[data-navigation-motion="instant"] .dym-sidebar-navigation [data-sidebar="menu-button"],
+html[data-navigation-motion="instant"] .dym-sidebar-navigation [data-sidebar="menu-sub-button"] {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dym-sidebar-navigation .dym-sidebar-roster-chevron,
+  html[data-navigation-motion] .dym-admin-content,
+  .dym-sidebar-navigation [data-sidebar="menu-button"],
+  .dym-sidebar-navigation [data-sidebar="menu-sub-button"] { transition: none; }
+  @starting-style {
+    html[data-navigation-motion="pointer"] .dym-admin-content { opacity: 1; }
+  }
+}

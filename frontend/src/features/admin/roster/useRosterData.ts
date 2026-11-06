@@ -11,6 +11,8 @@ import type {
 } from './rosterService';
 
 export interface RosterContextValue {
+  canEditHistory: boolean;
+  rosterToday: string;
   // Scope state
   selectedBranch: 'q1' | 'q7';
   setSelectedBranch: (branch: 'q1' | 'q7') => void;
@@ -76,10 +78,12 @@ export interface RosterContextValue {
     sourceDate: string;
   }>;
   upsertCampaign: (input: OnsiteScheduleInput) => Promise<RosterSchedule>;
+  createCampaigns: (inputs: OnsiteScheduleInput[], setupInputs?: OnsiteScheduleInput[]) => Promise<RosterSchedule[]>;
   removeCampaign: (campaign: RosterSchedule) => Promise<void>;
   updateCampaignPositions: (
     campaignId: string,
     positionList: string[],
+    orderMode?: 'alphabetical' | 'manual',
   ) => Promise<RosterSchedule>;
   renamePositionInCampaign: (
     campaignId: string,

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Download, FileText, Loader2, Printer, RefreshCw, X } from 'lucide-react';
 import type { TT25RegistrationData } from './tt25Types';
 import { generateConsentPdf, getConsentFormLanguage, getConsentPageIndices, type ConsentPageOption } from './consentPdfService';
+import { downloadPdf, printPdf } from './pdfBrowser';
+import { usePrintModalDismiss } from './usePrintModalDismiss';
 import './tt25Print.css';
 
 interface ConsentPrintModalProps {
@@ -22,18 +24,8 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({ isOpen, on
   const [isPreviewReady, setIsPreviewReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  usePrintModalDismiss(isOpen, onClose);
   const language = getConsentFormLanguage(data);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current(); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', closeOnEscape); };
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,23 +55,12 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({ isOpen, on
     if (!allowPrint || !pdfUrl || isLoading || error || !isPreviewReady) return;
     setPrintStatusError(null);
     void onPrinted?.().catch(() => setPrintStatusError('Chưa lưu được trạng thái in. Vui lòng kiểm tra kết nối và bấm In để thử lại.'));
-    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
-    if (!mobile && iframeRef.current?.contentWindow) {
-      try { iframeRef.current.contentWindow.focus(); iframeRef.current.contentWindow.print(); return; } catch { /* Open the original PDF in the browser viewer instead. */ }
-    }
-    const tab = window.open(pdfUrl, '_blank');
-    if (tab) tab.opener = null;
-    else handleDownload();
+    printPdf(pdfUrl, iframeRef.current, handleDownload);
   };
 
   const handleDownload = () => {
     if (!allowPrint || !pdfUrl) return;
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = `Dong_Thuan_${language === 'vi' ? 'VNM' : 'Song_Ngu'}_${(data.fullName || 'KhachHang').replace(/\s+/g, '_')}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadPdf(pdfUrl, `Dong_Thuan_${language === 'vi' ? 'VNM' : 'Song_Ngu'}_${(data.fullName || 'KhachHang').replace(/\s+/g, '_')}.pdf`);
   };
 
   return createPortal(

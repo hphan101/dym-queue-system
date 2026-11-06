@@ -1,6 +1,9 @@
+import { getTodayInVietnam } from '../../../lib/date';
+import { orderCampaignPositions } from './campaignPositionOrder';
 import { columnLetter, createZipArchive, escapeXml, neutralizeSpreadsheetFormula, type ZipEntry } from '../../../lib/xlsx';
 import {
   ROLE_SHORT_LABELS,
+  getCountedProvisionalCost,
   ROSTER_BRANCH_LABELS,
   SCHEDULE_TYPE_LABELS,
   SHIFT_SHORT_LABELS,
@@ -242,6 +245,9 @@ export function exportScheduleCostExcel({
     metaLines.push(
       `Mã đoàn: ${schedule.campaign_code || '—'} | Công ty: ${schedule.company_name || '—'} | Người phụ trách: ${schedule.contact_person || '—'}`,
     );
+    metaLines.push(`Cơ sở ký hợp đồng: ${branchLabel}`);
+    metaLines.push(`Sales phụ trách: ${schedule.sales_person || '—'}`);
+    metaLines.push(`Địa chỉ xuất phát: ${schedule.departure_address || '—'}`);
     metaLines.push(`Địa chỉ khám: ${schedule.company_address || '—'}`);
   }
   if (schedule.notes) {
@@ -281,7 +287,11 @@ export function exportScheduleCostExcel({
   let totalAllowance = 0;
   let totalGrand = 0;
 
-  assignments.forEach((item, index) => {
+  const positions = orderCampaignPositions([...(schedule.position_list ?? []), ...assignments.map((item) => item.position_label || 'Vị trí chung')], schedule.position_order_mode ?? 'alphabetical');
+  const positionIndex = new Map(positions.map((position, index) => [position, index]));
+  const orderedAssignments = schedule.schedule_type === 'insite' ? assignments : [...assignments].sort((a, b) =>
+    (positionIndex.get(a.position_label || 'Vị trí chung') ?? 0) - (positionIndex.get(b.position_label || 'Vị trí chung') ?? 0));
+  orderedAssignments.forEach((item, index) => {
     const person = personnelMap.get(item.personnel_id);
     const room = item.room_id ? roomMap.get(item.room_id) : undefined;
     const positionName = room?.room_name || item.position_label || '—';
@@ -312,6 +322,17 @@ export function exportScheduleCostExcel({
       ]),
     );
   });
+
+  const provisional = getCountedProvisionalCost(schedule, getTodayInVietnam());
+  if (provisional > 0) {
+    xmlRows.push(renderRowXml(rowCursor++, 24, [
+      { val: '', styleId: 2 }, { val: 'DỰ PHÒNG CÒN THIẾU', styleId: 2 },
+      ...Array.from({ length: 7 }, () => ({ val: '', styleId: 2 })),
+      { val: provisional, styleId: 4, isNum: true },
+      { val: 'Chưa phân bổ cho nhân sự', styleId: 2 },
+    ]));
+    totalGrand += provisional;
+  }
 
   // Summary Total Row
   xmlRows.push(
@@ -353,6 +374,44 @@ export function exportScheduleCostExcel({
  * - Sheet 1: Tổng hợp chi phí theo ID nhân viên trong tháng
  * - Sheet 2: Chi tiết từng ca trực / đoàn khám trong tháng
  */
+function buildProvisionalSheet(month: string, schedules: RosterSchedule[]): string {
+  const rows = [renderRowXml(1, 26, ['Ngày', 'Chi nhánh', 'Dự phòng còn thiếu (VNĐ)'].map((val) => ({ val, styleId: 1 })))];
+  let total = 0;
+  const today = getTodayInVietnam();
+  for (const schedule of schedules.filter((item) => item.schedule_date.startsWith(month) && getCountedProvisionalCost(item, today) > 0)
+    .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date) || a.branch_code.localeCompare(b.branch_code))) {
+    const amount = getCountedProvisionalCost(schedule, today);
+    total += amount;
+    rows.push(renderRowXml(rows.length + 1, 24, [
+      { val: formatDisplayDate(schedule.schedule_date), styleId: 2 },
+      { val: ROSTER_BRANCH_LABELS[schedule.branch_code as 'q1' | 'q7'] ?? schedule.branch_code, styleId: 2 },
+      { val: amount, styleId: 4, isNum: true },
+    ]));
+  }
+  rows.push(renderRowXml(rows.length + 1, 24, [{ val: 'TỔNG DỰ PHÒNG', styleId: 5 }, { val: '', styleId: 5 }, { val: total, styleId: 6, isNum: true }]));
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="18" customWidth="1"/><col min="2" max="3" width="30" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
+}
+
+function buildActualCostSheet(month: string, schedules: RosterSchedule[], assignments: RosterAssignment[]): string {
+  const today = getTodayInVietnam();
+  const rows = [renderRowXml(1, 26, ['Ngày', 'Cơ sở', 'Loại lịch', 'Mã lịch / đoàn', 'Chi phí thực tế (không gồm dự phòng)'].map((val) => ({ val, styleId: 1 })))];
+  let total = 0;
+  for (const schedule of schedules.filter((item) => item.schedule_date.startsWith(month) && item.schedule_date < today)
+    .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date))) {
+    const amount = assignments.filter((item) => item.schedule_id === schedule.id).reduce((sum, item) => sum + Number(item.base_cost_snapshot ?? 0) + Number(item.allowance_cost ?? 0), 0);
+    total += amount;
+    rows.push(renderRowXml(rows.length + 1, 24, [
+      { val: formatDisplayDate(schedule.schedule_date), styleId: 2 },
+      { val: ROSTER_BRANCH_LABELS[schedule.branch_code as 'q1' | 'q7'] ?? schedule.branch_code, styleId: 2 },
+      { val: SCHEDULE_TYPE_LABELS[schedule.schedule_type], styleId: 2 },
+      { val: schedule.campaign_code ?? '', styleId: 2 },
+      { val: amount, styleId: 4, isNum: true },
+    ]));
+  }
+  rows.push(renderRowXml(rows.length + 1, 24, [{ val: 'THỰC TẾ ĐẾN HẾT HÔM QUA', styleId: 5 }, { val: '', styleId: 5 }, { val: '', styleId: 5 }, { val: '', styleId: 5 }, { val: total, styleId: 6, isNum: true }]));
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="4" width="24" customWidth="1"/><col min="5" max="5" width="45" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
+}
+
 export function exportMonthlyPersonnelCostExcel({
   monthStr,
   schedules,
@@ -667,6 +726,8 @@ export function exportMonthlyPersonnelCostExcel({
     [
       { name: 'Tong hop theo ID', xml: sheet1Xml },
       { name: 'Chi tiet tung ca', xml: sheet2Xml },
+      { name: 'Du phong theo ngay', xml: buildProvisionalSheet(monthStr, schedules) },
+      { name: 'Thuc te da su dung', xml: buildActualCostSheet(monthStr, schedules, validAssignments) },
     ],
     `Chi-Phi-Nhan-Su-Theo-ID_${monthStr}.xlsx`,
   );
@@ -676,7 +737,7 @@ export function exportMonthlyPersonnelCostExcel({
  * 3. Xuất File Mẫu Excel Nhập Danh Mục Nhân Sự Y Tế
  */
 export function exportPersonnelTemplateExcel(): void {
-  const colWidths = [16, 28, 18, 22, 16, 28];
+  const colWidths = [16, 28, 20, 26, 18, 30, 24, 32];
   const colsXml = colWidths
     .map(
       (w, idx) =>
@@ -685,47 +746,14 @@ export function exportPersonnelTemplateExcel(): void {
     .join('');
 
   const headers = [
-    'Mã nhân sự (ID)',
-    'Họ và tên',
-    'Phân loại (BS / DD / KTV / CTV)',
-    'Cost cố định / ngày (VNĐ)',
-    'Số điện thoại',
-    'Email',
+    'Staff ID', 'Tên', 'CCCD', 'Số CCHN', 'SĐT', 'Email',
+    'Lương / ngày (VNĐ)', 'Phân loại (BS / DD / KTV / CTV)',
   ];
-
-  const sampleRows: Array<Array<{ val: string | number; isNum?: boolean }>> = [
-    [
-      { val: 'BS-001' },
-      { val: 'BS. Nguyễn Văn An' },
-      { val: 'BS' },
-      { val: 1500000, isNum: true },
-      { val: '0901234567' },
-      { val: 'an.nguyen@dymmedical.vn' },
-    ],
-    [
-      { val: 'DD-001' },
-      { val: 'ĐD. Trần Thị Bình' },
-      { val: 'DD' },
-      { val: 700000, isNum: true },
-      { val: '0902345678' },
-      { val: 'binh.tran@dymmedical.vn' },
-    ],
-    [
-      { val: 'KTV-001' },
-      { val: 'Mr. Lê Minh Hạo (X-Ray)' },
-      { val: 'KTV' },
-      { val: 850000, isNum: true },
-      { val: '0903456789' },
-      { val: 'hao.le@dymmedical.vn' },
-    ],
-    [
-      { val: 'CTV-001' },
-      { val: 'Phạm Hoàng Mai' },
-      { val: 'CTV' },
-      { val: 500000, isNum: true },
-      { val: '0904567890' },
-      { val: '' },
-    ],
+  const sampleRows = [
+    ['BS-001', 'Nguyễn Văn An', '001090000001', '012345/HCM-CCHN', '0901234567', 'an.nguyen@dymmedical.vn', 1500000, 'BS'],
+    ['DD-001', 'Trần Thị Bình', '', '', '0902345678', 'binh.tran@dymmedical.vn', 700000, 'DD'],
+    ['KTV-001', 'Lê Minh Hạo', '', '', '0903456789', 'hao.le@dymmedical.vn', 850000, 'KTV'],
+    ['CTV-001', 'Phạm Hoàng Mai', '', '', '0904567890', '', 500000, 'CTV'],
   ];
 
   const rowsXml: string[] = [];
@@ -744,9 +772,9 @@ export function exportPersonnelTemplateExcel(): void {
         r++,
         22,
         row.map((cell, idx) => ({
-          val: cell.val,
-          styleId: cell.isNum ? 4 : idx === 0 || idx === 2 ? 3 : 2,
-          isNum: cell.isNum,
+          val: cell,
+          styleId: typeof cell === 'number' ? 4 : idx === 0 || idx === 7 ? 3 : 2,
+          isNum: typeof cell === 'number',
         })),
       ),
     );

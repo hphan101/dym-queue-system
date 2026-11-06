@@ -12,6 +12,7 @@ export function openStaffTab(href: string) {
 }
 
 interface InternalLinkEvent {
+  detail?: number;
   defaultPrevented: boolean;
   button: number;
   metaKey: boolean;
@@ -21,7 +22,7 @@ interface InternalLinkEvent {
   preventDefault: () => void;
 }
 
-function navigateWithinApp(href: string) {
+function navigateWithinApp(href: string, pointerInitiated = false) {
   const nextUrl = new URL(href, window.location.origin);
   const currentUrl = new URL(window.location.href);
 
@@ -33,6 +34,9 @@ function navigateWithinApp(href: string) {
     return;
   }
 
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.navigationMotion = pointerInitiated ? 'pointer' : 'instant';
+  }
   window.history.pushState(null, '', nextUrl);
   window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -54,5 +58,5 @@ export function handleInternalLinkClick(
   }
 
   event.preventDefault();
-  navigateWithinApp(href);
+  navigateWithinApp(href, (event.detail ?? 0) > 0);
 }

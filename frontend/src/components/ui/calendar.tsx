@@ -172,6 +172,8 @@ function buildCalendarGrid(year: number, month: number): CalendarCell[] {
 
 export interface CalendarProps {
   selected?: string;
+  selectedDates?: string[];
+  showDateInput?: boolean;
   onSelect?: (isoDate: string) => void;
   todayIso?: string;
   showTodayButton?: boolean;
@@ -180,6 +182,8 @@ export interface CalendarProps {
 
 export function Calendar({
   selected,
+  selectedDates,
+  showDateInput = true,
   onSelect,
   todayIso,
   showTodayButton = true,
@@ -305,7 +309,7 @@ export function Calendar({
   return (
     <div className={cn('w-[280px] select-none p-3', className)}>
       {/* Quick Manual Date Input (DD/MM/YYYY) */}
-      <div className="mb-2.5 flex items-center gap-1.5">
+      {showDateInput && <div className="mb-2.5 flex items-center gap-1.5">
         <Input
           type="text"
           inputMode="numeric"
@@ -335,7 +339,7 @@ export function Calendar({
         >
           Chọn
         </Button>
-      </div>
+      </div>}
 
       {/* Navigation Header */}
       <div className="mb-2.5 flex items-center justify-between gap-1">
@@ -488,7 +492,7 @@ export function Calendar({
 
           <div className="grid grid-cols-7 gap-y-0.5 text-center">
             {cells.map((cell) => {
-              const isSelected = cell.iso === selected;
+              const isSelected = selectedDates ? selectedDates.includes(cell.iso) : cell.iso === selected;
               const isToday = cell.iso === resolvedToday;
 
               return (
@@ -499,6 +503,8 @@ export function Calendar({
                   <button
                     type="button"
                     onClick={() => onSelect?.(cell.iso)}
+                    aria-label={isoToDisplayDmy(cell.iso)}
+                    aria-pressed={selectedDates ? isSelected : undefined}
                     className={cn(
                       'inline-flex size-8 items-center justify-center rounded-md text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35',
                       !cell.isCurrentMonth &&

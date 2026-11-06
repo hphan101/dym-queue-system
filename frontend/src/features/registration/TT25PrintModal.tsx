@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Download, FileText, Loader2, Printer, RefreshCw, X } from 'lucide-react';
 import type { TT25RegistrationData } from './tt25Types';
 import { generateTT25OriginalPdf, getTT25TemplateInfo } from './tt25HcmPdfService';
+import { downloadPdf, printPdf } from './pdfBrowser';
+import { usePrintModalDismiss } from './usePrintModalDismiss';
 import './tt25Print.css';
 
 interface TT25PrintModalProps {
@@ -21,18 +23,8 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
   const [isPreviewReady, setIsPreviewReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  usePrintModalDismiss(isOpen, onClose);
   const info = getTT25TemplateInfo(data);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeRef.current(); };
-    window.addEventListener('keydown', escape);
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', escape); };
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,22 +44,13 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
   if (!isOpen) return null;
   const handleDownload = () => {
     if (!allowPrint || !pdfUrl) return;
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = `TT25_${info.key}_${(data.fullName || 'KhachHang').replace(/\s+/g, '_')}.pdf`;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    downloadPdf(pdfUrl, `TT25_${info.key}_${(data.fullName || 'KhachHang').replace(/\s+/g, '_')}.pdf`);
   };
   const handlePrint = () => {
     if (!allowPrint || !pdfUrl || isLoading || error || !isPreviewReady) return;
     setPrintStatusError(null);
     void onPrinted?.().catch(() => setPrintStatusError('Chưa lưu được trạng thái in. Vui lòng kiểm tra kết nối và bấm In để thử lại.'));
-    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
-    if (!mobile && iframeRef.current?.contentWindow) {
-      try { iframeRef.current.contentWindow.focus(); iframeRef.current.contentWindow.print(); return; } catch { /* Use the browser PDF viewer. */ }
-    }
-    const tab = window.open(pdfUrl, '_blank');
-    if (tab) tab.opener = null;
-    else handleDownload();
+    printPdf(pdfUrl, iframeRef.current, handleDownload);
   };
   return createPortal(<div id="tt25-modal-portal-root" className="tt25-modal-root">
     <div className="tt25-modal-header no-print">

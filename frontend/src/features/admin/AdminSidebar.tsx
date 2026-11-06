@@ -48,12 +48,15 @@ import { BRANCH_NAMES } from '../../config/branches';
 import { handleInternalLinkClick, openStaffTab } from '../../lib/navigation';
 import type { BranchCode } from '../../types/domain';
 import type { StaffRole } from './types';
+import { useSidebarDisclosureMotion } from './hooks/useSidebarDisclosureMotion';
+import './sidebarMotion.css';
 
 export type AdminThemeMode = 'dark' | 'light';
 export type AdminPageKey =
   | 'dashboard'
   | 'registrations'
   | 'roster-dashboard'
+  | 'roster-settlement'
   | 'roster-insite'
   | 'roster-onsite'
   | 'roster-personnel'
@@ -94,6 +97,8 @@ export function AdminSidebar({
   onLogout,
 }: AdminSidebarProps) {
   const [isRosterOpen, setIsRosterOpen] = useState(true);
+  const [isRosterPointerMotion, setIsRosterPointerMotion] = useState(false);
+  const rosterMotion = useSidebarDisclosureMotion(isRosterOpen && !isCollapsed);
   const resolvedRole: StaffRole =
     staffRole ?? (isAdmin ? 'admin' : 'receptionist');
   const canAccessRoster =
@@ -110,6 +115,7 @@ export function AdminSidebar({
 
   const isRosterActive =
     activePage === 'roster-dashboard' ||
+    activePage === 'roster-settlement' ||
     activePage === 'roster-insite' ||
     activePage === 'roster-onsite' ||
     activePage === 'roster-personnel';
@@ -129,13 +135,19 @@ export function AdminSidebar({
   const rosterItems = [
     {
       key: 'roster-dashboard' as const,
-      label: 'Tổng quan & Quyết toán',
+      label: 'Tổng quan vận hành',
       href: rosterDashboardHref,
       icon: PieChart,
     },
     {
+      key: 'roster-settlement' as const,
+      label: 'Quyết toán chi phí',
+      href: `/?page=roster-settlement&${scopeQuery}`,
+      icon: ClipboardList,
+    },
+    {
       key: 'roster-insite' as const,
-      label: 'Lịch phòng D1 / D7',
+      label: 'Lịch tại Phòng khám',
       href: rosterInsiteHref,
       icon: Building2,
     },
@@ -163,7 +175,7 @@ export function AdminSidebar({
       onOpenChange={(open) => onCollapsedChange(!open)}
       className="min-h-0 w-auto flex-none"
     >
-      <Sidebar collapsible="icon" className="border-sidebar-border font-sans antialiased tracking-[-0.011em]">
+      <Sidebar collapsible="icon" data-roster-motion={isRosterPointerMotion ? 'pointer' : 'instant'} className="dym-sidebar-navigation border-sidebar-border font-sans antialiased tracking-[-0.011em]">
         {/* DYM Brand Logo Header (centered like original) */}
         <SidebarHeader className="gap-2.5 border-b border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-2.5">
           {!isCollapsed ? (
@@ -286,20 +298,25 @@ export function AdminSidebar({
                       <SidebarMenuItem>
                         <SidebarMenuButton
                           isActive={isRosterActive && !isRosterOpen}
-                          onClick={() => setIsRosterOpen((prev) => !prev)}
+                          onClick={(event) => {
+                            rosterMotion.prepare(event.detail);
+                            setIsRosterPointerMotion(event.detail > 0);
+                            setIsRosterOpen((prev) => !prev);
+                          }}
                           aria-expanded={isRosterOpen}
                         >
                           <CalendarRange aria-hidden="true" />
                           <span>Điều phối & Đoàn khám</span>
                           <ChevronRight
-                            className={`ml-auto size-4 text-sidebar-foreground/50 transition-transform duration-200 ${
+                            className={`dym-sidebar-roster-chevron ml-auto size-4 text-sidebar-foreground/50 ${
                               isRosterOpen ? 'rotate-90' : ''
                             }`}
                             aria-hidden="true"
                           />
                         </SidebarMenuButton>
 
-                        {isRosterOpen && (
+                        <div ref={rosterMotion.panelRef} inert={!isRosterOpen} aria-hidden={!isRosterOpen}
+                          style={{ height: isRosterOpen ? 'auto' : 0, opacity: isRosterOpen ? 1 : 0, overflow: 'hidden' }}>
                           <SidebarMenuSub>
                             {rosterItems.map((item) => {
                               const Icon = item.icon;
@@ -325,7 +342,7 @@ export function AdminSidebar({
                               );
                             })}
                           </SidebarMenuSub>
-                        )}
+                        </div>
                       </SidebarMenuItem>
                     </SidebarMenu>
                   ) : (

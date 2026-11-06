@@ -49,6 +49,7 @@ interface StaffApiResponse {
 }
 
 const EMPTY_FORM: StaffFormState = {
+  canEditRosterHistory: false,
   userId: null,
   displayName: '',
   loginName: '',
@@ -358,6 +359,7 @@ export function StaffPage({
       loginName: account.loginName,
       password: '',
       role: account.role,
+      canEditRosterHistory: account.canEditRosterHistory ?? false,
       branchCodes: account.branches.map((branch) => branch.code),
     });
     setFormError(null);
@@ -400,6 +402,7 @@ export function StaffPage({
           loginName: form.loginName,
           role: form.role,
           branchCodes: form.branchCodes,
+          canEditRosterHistory: form.canEditRosterHistory,
         });
         showSuccess(`Đã cập nhật ${form.displayName.trim()}.`);
       } else {
@@ -410,6 +413,7 @@ export function StaffPage({
           displayName: form.displayName,
           role: form.role,
           branchCodes: form.branchCodes,
+          canEditRosterHistory: form.canEditRosterHistory,
         });
         showSuccess(`Đã tạo tài khoản cho ${form.displayName.trim()}.`);
       }
@@ -928,7 +932,7 @@ export function StaffPage({
                                 account.isActive ? 'is-active' : 'is-locked'
                               }`}
                             >
-                              <span className="dym-status-led-dot" />
+                              <span className="dym-status-led-dot" aria-hidden="true" />
                               {account.isActive ? 'Hoạt động' : 'Đã khóa'}
                             </span>
                           </td>

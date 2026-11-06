@@ -65,6 +65,13 @@ function resolveAppRoute(rawPathname: string, search: string): AppRoute {
     return { kind: 'admin', destination: 'roster-insite' };
   }
   if (
+    pathname === '/roster-settlement' ||
+    pathname.startsWith('/admin/roster-settlement') ||
+    requestedPage === 'roster-settlement'
+  ) {
+    return { kind: 'admin', destination: 'roster-settlement' };
+  }
+  if (
     pathname === '/roster' ||
     pathname === '/roster-dashboard' ||
     pathname.startsWith('/admin/roster') ||

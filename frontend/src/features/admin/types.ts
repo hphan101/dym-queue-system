@@ -13,6 +13,7 @@ export interface StaffBranch {
 }
 
 export interface StaffAccount {
+  canEditRosterHistory: boolean;
   userId: string;
   loginName: string;
   displayName: string;
@@ -24,6 +25,7 @@ export interface StaffAccount {
 }
 
 export interface StaffFormState {
+  canEditRosterHistory: boolean;
   userId: string | null;
   displayName: string;
   loginName: string;

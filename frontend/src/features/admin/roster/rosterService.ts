@@ -1,14 +1,19 @@
 import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
+import type { PositionOrderMode } from './campaignPositionOrder';
+import { inferDoctorSpecialty, DOCTOR_SPECIALTIES, type DoctorSpecialty } from './doctorSpecialties';
 
 export type PersonnelRoleType = 'doctor' | 'nurse' | 'technician' | 'ctv';
-export type RosterScheduleType = 'insite' | 'onsite_exam' | 'blood_draw';
+export type RosterScheduleType = 'insite' | 'onsite_exam' | 'blood_draw' | 'setup';
 export type ShiftPeriod = 'FULL' | 'AM' | 'PM';
 
 export interface MedicalPersonnel {
   id: string;
   personnel_code: string;
   full_name: string;
+  identity_number: string;
+  practicing_certificate: string;
+  specialties: DoctorSpecialty[];
   role_type: PersonnelRoleType;
   phone_number: string;
   email: string;
@@ -23,6 +28,9 @@ export interface MedicalPersonnelInput {
   id?: string | null;
   personnel_code: string;
   full_name: string;
+  identity_number?: string;
+  practicing_certificate?: string;
+  specialties?: DoctorSpecialty[];
   role_type: PersonnelRoleType;
   phone_number: string;
   email: string;
@@ -31,6 +39,7 @@ export interface MedicalPersonnelInput {
 }
 
 export interface ClinicRoom {
+  doctor_specialty: DoctorSpecialty | null;
   id: string;
   branch_code: BranchCode;
   room_name: string;
@@ -54,6 +63,13 @@ export interface DailyRoomOverride {
 }
 
 export interface RosterSchedule {
+  campaign_group_id?: string;
+  setup_onsite_ids?: string[];
+  setup_targets?: RosterSchedule[];
+  position_order_mode: PositionOrderMode;
+  sales_person: string;
+  departure_address: string;
+  provisional_cost: number;
   id: string;
   schedule_type: RosterScheduleType;
   branch_code: BranchCode;
@@ -68,6 +84,8 @@ export interface RosterSchedule {
   created_at: string;
   updated_at: string;
 }
+
+export const ROSTER_SCHEDULE_SELECT = '*,setup_targets:roster_setup_links!roster_setup_links_setup_id_fkey(onsite:roster_schedules!roster_setup_links_onsite_id_fkey(*))';
 
 export interface RosterAssignment {
   id: string;
@@ -92,8 +110,13 @@ export interface EnrichedRosterAssignment extends RosterAssignment {
 }
 
 export interface OnsiteScheduleInput {
+  campaign_group_id?: string;
+  setup_onsite_ids?: string[];
+  position_order_mode?: PositionOrderMode;
+  sales_person?: string;
+  departure_address?: string;
   id?: string | null;
-  schedule_type: 'onsite_exam' | 'blood_draw';
+  schedule_type: 'onsite_exam' | 'blood_draw' | 'setup';
   branch_code: BranchCode;
   schedule_date: string;
   campaign_code: string;
@@ -106,9 +129,10 @@ export interface OnsiteScheduleInput {
 }
 
 export const CAMPAIGN_POSITION_TEMPLATES: Record<
-  'onsite_exam' | 'blood_draw',
+  'onsite_exam' | 'blood_draw' | 'setup',
   string[]
 > = {
+  setup: [],
   onsite_exam: [
     'Đo huyết áp & Sinh hiệu',
     'Khám Nội tổng quát',
@@ -209,8 +233,9 @@ export function generateNextPersonnelCode(
 
 export const SCHEDULE_TYPE_LABELS: Record<RosterScheduleType, string> = {
   insite: 'Lịch trực phòng khám (Insite)',
-  onsite_exam: 'Đoàn khám ngoại viện (Onsite)',
-  blood_draw: 'Đoàn lấy máu ngoại viện',
+  onsite_exam: 'Onsite HC',
+  blood_draw: 'Blood sampling',
+  setup: 'Onsite set-up',
 };
 
 export const SHIFT_PERIOD_LABELS: Record<ShiftPeriod, string> = {
@@ -298,20 +323,21 @@ export const ROSTER_BRANCH_LABELS: Record<'q1' | 'q7', string> = {
   q7: 'D7 — Quận 7',
 };
 
+const numberFormatter = new Intl.NumberFormat('vi-VN');
+
 export function formatVndCurrency(amount: number): string {
-  const safeAmount = Number.isFinite(amount) ? Math.round(amount) : 0;
-  return new Intl.NumberFormat('vi-VN').format(safeAmount) + ' ₫';
+  return formatNumberPlain(amount) + ' ₫';
 }
 
 export function formatNumberPlain(amount: number): string {
   const safeAmount = Number.isFinite(amount) ? Math.round(amount) : 0;
-  return new Intl.NumberFormat('vi-VN').format(safeAmount);
+  return numberFormatter.format(safeAmount);
 }
 
 export function formatCurrencyInput(amount: number): string {
   const safeAmount = Number.isFinite(amount) ? Math.round(amount) : 0;
   if (safeAmount <= 0) return '';
-  return new Intl.NumberFormat('vi-VN').format(safeAmount);
+  return numberFormatter.format(safeAmount);
 }
 
 export function parseCurrencyInput(raw: string): number {
@@ -333,7 +359,50 @@ export function getMonthRange(monthStr: string): { startDate: string; endDate: s
   };
 }
 
+export function validateDoctorSpecialties(values: DoctorSpecialty[]): DoctorSpecialty[] {
+  if (!Array.isArray(values) || values.some((value) => !DOCTOR_SPECIALTIES.some((option) => option.value === value))) throw new Error('Chuyên môn bác sĩ không hợp lệ.');
+  return [...new Set(values)];
+}
+export async function fetchRosterHistoryPermission(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return false;
+    const { data: profile, error } = await supabase.from('profiles').select('role,is_active,can_edit_roster_history').eq('user_id', data.user.id).maybeSingle();
+    return !error && profile?.is_active === true && ['admin', 'operator'].includes(profile.role) && profile.can_edit_roster_history === true;
+  } catch { return false; }
+}
+export function isRosterDateLocked(date: string, today: string, canEditHistory = false): boolean {
+  return date < today && !canEditHistory;
+}
+export function getCountedProvisionalCost(schedule: Pick<RosterSchedule, 'schedule_type' | 'schedule_date' | 'provisional_cost'> | null | undefined, today: string): number {
+  return schedule && schedule.schedule_date >= today ? getProvisionalCost(schedule) : 0;
+}
+
+export function getProvisionalCost(schedule?: Pick<RosterSchedule, 'schedule_type' | 'provisional_cost'> | null): number {
+  return Number(schedule?.provisional_cost ?? 0);
+}
+export async function saveInsiteProvisionalCost(branch: BranchCode, date: string, amount: number): Promise<RosterSchedule> {
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > 1_000_000_000_000) throw new Error('Chi phí dự phòng phải từ 0 đến 1.000.000.000.000 VNĐ.');
+  const schedule = await ensureInsiteSchedule(branch, date);
+  return saveScheduleProvisionalCost(schedule.id, amount);
+}
+export async function saveScheduleProvisionalCost(scheduleId: string, amount: number): Promise<RosterSchedule> {
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > 1_000_000_000_000) throw new Error('Chi phí dự phòng phải từ 0 đến 1.000.000.000.000 VNĐ.');
+  const { data, error } = await supabase.from('roster_schedules').update({ provisional_cost: amount })
+    .eq('id', scheduleId).select('*').single();
+  if (error) throw new Error('Không thể lưu chi phí dự phòng. Vui lòng thử lại.');
+  return normalizeRosterSchedule(data as RosterSchedule);
+}
+
 // 1. Medical Personnel CRUD
+export function getPersonnelIdentityError(identityNumber = '', certificate = ''): string | null {
+  if (identityNumber.trim() && !/^\d{12}$/.test(identityNumber.trim())) {
+    return 'CCCD phải gồm đúng 12 chữ số.';
+  }
+  if (certificate.trim().length > 100) return 'Số CCHN không được vượt quá 100 ký tự.';
+  return null;
+}
+
 export async function fetchMedicalPersonnel(): Promise<MedicalPersonnel[]> {
   const [personnelRes, assignRefsRes] = await Promise.all([
     supabase
@@ -372,9 +441,14 @@ export async function fetchMedicalPersonnel(): Promise<MedicalPersonnel[]> {
 export async function saveMedicalPersonnel(
   input: MedicalPersonnelInput,
 ): Promise<MedicalPersonnel> {
+  const identityError = getPersonnelIdentityError(input.identity_number, input.practicing_certificate);
+  if (identityError) throw new Error(identityError);
   const payload = {
     personnel_code: input.personnel_code.trim().toUpperCase(),
     full_name: input.full_name.trim(),
+    identity_number: input.identity_number?.trim() ?? '',
+    practicing_certificate: input.practicing_certificate?.trim() ?? '',
+    ...(input.specialties !== undefined ? { specialties: validateDoctorSpecialties(input.specialties) } : {}),
     role_type: input.role_type,
     phone_number: input.phone_number.trim(),
     email: input.email.trim(),
@@ -450,11 +524,18 @@ export async function bulkImportMedicalPersonnel(
   items: MedicalPersonnelInput[],
 ): Promise<MedicalPersonnel[]> {
   if (items.length === 0) return [];
+  for (const item of items) {
+    const identityError = getPersonnelIdentityError(item.identity_number, item.practicing_certificate);
+    if (identityError) throw new Error(`${item.personnel_code}: ${identityError}`);
+  }
 
   const nowIso = new Date().toISOString();
   const payloads = items.map((item) => ({
     personnel_code: item.personnel_code.trim().toUpperCase(),
     full_name: item.full_name.trim(),
+    ...(item.identity_number !== undefined ? { identity_number: item.identity_number.trim() } : {}),
+    ...(item.practicing_certificate !== undefined ? { practicing_certificate: item.practicing_certificate.trim() } : {}),
+    ...(item.specialties !== undefined ? { specialties: validateDoctorSpecialties(item.specialties) } : {}),
     role_type: item.role_type,
     phone_number: item.phone_number.trim(),
     email: item.email.trim(),
@@ -538,6 +619,7 @@ export async function createClinicRoom(
     .insert({
       branch_code: branchCode,
       room_name: trimmedName,
+      doctor_specialty: inferDoctorSpecialty(trimmedName),
       display_order: displayOrder,
       is_active: true,
     })
@@ -559,11 +641,12 @@ export async function updateClinicRoom(
   payload: Partial<
     Pick<
       ClinicRoom,
-      'room_name' | 'display_order' | 'is_active' | 'inactive_from'
+      'room_name' | 'display_order' | 'is_active' | 'inactive_from' | 'doctor_specialty'
     >
   >,
 ): Promise<ClinicRoom> {
   const updateData: Record<string, unknown> = {};
+  if (payload.doctor_specialty !== undefined) updateData.doctor_specialty = payload.doctor_specialty;
   if (payload.room_name !== undefined) {
     updateData.room_name = payload.room_name.trim();
   }
@@ -762,63 +845,43 @@ export async function unhideAllCatalogRoomsForDate(
 }
 
 // 3. Roster Schedules & Assignments
-export async function fetchRosterBundleForMonth(monthStr: string): Promise<{
+export function fetchRosterBundleForMonth(monthStr: string) {
+  const { startDate, endDate } = getMonthRange(monthStr);
+  return fetchRosterBundleForRange(startDate, endDate);
+}
+
+async function readRosterPages<T>(read: (start: number, end: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const rows: T[] = [];
+  const size = 500;
+  for (let start = 0; ; start += size) {
+    const { data, error } = await read(start, start + size - 1);
+    if (error) throw new Error(error.message || 'Không tải được dữ liệu lịch.');
+    rows.push(...(data ?? []) as T[]);
+    if (!data || data.length < size) return rows;
+  }
+}
+
+export async function fetchRosterBundleForRange(startDate: string, endDate: string): Promise<{
   schedules: RosterSchedule[];
   assignments: RosterAssignment[];
   dailyRoomOverrides: DailyRoomOverride[];
 }> {
-  const { startDate, endDate } = getMonthRange(monthStr);
-
-  const [
-    { data: schedulesData, error: schedulesError },
-    { data: overridesData, error: overridesError },
-  ] = await Promise.all([
-    supabase
-      .from('roster_schedules')
-      .select('*')
-      .gte('schedule_date', startDate)
-      .lte('schedule_date', endDate)
-      .order('schedule_date', { ascending: false })
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('roster_daily_room_overrides')
-      .select('*')
-      .gte('schedule_date', startDate)
-      .lte('schedule_date', endDate)
-      .order('display_order', { ascending: true })
-      .order('created_at', { ascending: true }),
+  const [schedulesData, dailyRoomOverrides] = await Promise.all([
+    readRosterPages<RosterSchedule>((start, end) => supabase.from('roster_schedules').select(ROSTER_SCHEDULE_SELECT)
+      .gte('schedule_date', startDate).lte('schedule_date', endDate).order('id').range(start, end)),
+    readRosterPages<DailyRoomOverride>((start, end) => supabase.from('roster_daily_room_overrides').select('*')
+      .gte('schedule_date', startDate).lte('schedule_date', endDate).order('id').range(start, end)),
   ]);
-
-  if (schedulesError) {
-    throw new Error(schedulesError.message || 'Không thể tải lịch điều phối.');
+  const schedules = schedulesData.map(normalizeRosterSchedule)
+    .sort((a, b) => b.schedule_date.localeCompare(a.schedule_date) || a.created_at.localeCompare(b.created_at));
+  dailyRoomOverrides.sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at));
+  const assignmentsData: RosterAssignment[] = [];
+  for (let offset = 0; offset < schedules.length; offset += 100) {
+    const ids = schedules.slice(offset, offset + 100).map(schedule => schedule.id);
+    assignmentsData.push(...await readRosterPages<RosterAssignment>((start, end) => supabase.from('roster_assignments').select('*')
+      .in('schedule_id', ids).order('id').range(start, end)));
   }
-
-  if (overridesError) {
-    throw new Error(
-      overridesError.message || 'Không thể tải điều chỉnh phòng theo ngày.',
-    );
-  }
-
-  const schedules = ((schedulesData ?? []) as RosterSchedule[]).map(
-    normalizeRosterSchedule,
-  );
-  const dailyRoomOverrides = (overridesData ?? []) as DailyRoomOverride[];
-
-  if (schedules.length === 0) {
-    return { schedules: [], assignments: [], dailyRoomOverrides };
-  }
-
-  const scheduleIds = schedules.map((s) => s.id);
-  const { data: assignmentsData, error: assignmentsError } = await supabase
-    .from('roster_assignments')
-    .select('*')
-    .in('schedule_id', scheduleIds)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
-
-  if (assignmentsError) {
-    throw new Error(assignmentsError.message || 'Không thể tải danh sách phân công.');
-  }
+  assignmentsData.sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
 
   const assignments = ((assignmentsData ?? []) as RosterAssignment[]).map((a) => ({
     ...a,
@@ -844,6 +907,10 @@ export function normalizeRosterSchedule(raw: RosterSchedule): RosterSchedule {
   );
   return {
     ...raw,
+    setup_targets: (raw.setup_targets ?? []).flatMap((item) => {
+      const target = 'onsite' in item ? (item as unknown as { onsite: RosterSchedule | null }).onsite : item;
+      return target ? [target] : [];
+    }),
     default_allowance: Math.max(0, Math.round(Number(raw.default_allowance ?? 0) || 0)),
     position_list: cleanPositions,
   };
@@ -891,10 +958,16 @@ export async function ensureInsiteSchedule(
   return normalizeRosterSchedule(created as RosterSchedule);
 }
 
-export async function saveOnsiteSchedule(
-  input: OnsiteScheduleInput,
-): Promise<RosterSchedule> {
+function buildOnsiteSchedulePayload(input: OnsiteScheduleInput): Record<string, unknown> {
+  if ((input.sales_person?.trim().length ?? 0) > 255 || (input.departure_address?.trim().length ?? 0) > 1000) {
+    throw new Error('Sales phụ trách tối đa 255 ký tự; địa chỉ xuất phát tối đa 1.000 ký tự.');
+  }
   const payload: Record<string, unknown> = {
+    ...(input.campaign_group_id ? { campaign_group_id: input.campaign_group_id } : {}),
+    ...(input.setup_onsite_ids !== undefined ? { setup_onsite_ids: input.setup_onsite_ids } : {}),
+    ...(input.position_order_mode !== undefined ? { position_order_mode: input.position_order_mode } : {}),
+    ...(input.sales_person !== undefined ? { sales_person: input.sales_person.trim() } : {}),
+    ...(input.departure_address !== undefined ? { departure_address: input.departure_address.trim() } : {}),
     schedule_type: input.schedule_type,
     branch_code: input.branch_code,
     schedule_date: input.schedule_date,
@@ -917,6 +990,14 @@ export async function saveOnsiteSchedule(
       new Set(input.position_list.map((p) => p.trim()).filter(Boolean)),
     );
   }
+
+  return payload;
+}
+
+export async function saveOnsiteSchedule(
+  input: OnsiteScheduleInput,
+): Promise<RosterSchedule> {
+  const payload = buildOnsiteSchedulePayload(input);
 
   if (input.id) {
     const { data, error } = await supabase
@@ -945,9 +1026,34 @@ export async function saveOnsiteSchedule(
   return normalizeRosterSchedule(data as RosterSchedule);
 }
 
+export async function createOnsiteSchedules(inputs: OnsiteScheduleInput[], setupInputs?: OnsiteScheduleInput[]): Promise<RosterSchedule[]> {
+  if (!inputs.length || inputs.some((input) => input.id)) throw new Error('Danh sách đoàn mới không hợp lệ.');
+  if (setupInputs !== undefined) {
+    if (!setupInputs.length || inputs.some((input) => input.schedule_type !== 'onsite_exam') || setupInputs.some((input) => input.id || input.schedule_type !== 'setup')) {
+      throw new Error('Chọn ngày set-up để tạo kèm đoàn Onsite HC.');
+    }
+    const { data, error } = await supabase.rpc('create_onsite_with_setup', {
+      p_hc: inputs.map(buildOnsiteSchedulePayload), p_setup: setupInputs.map(buildOnsiteSchedulePayload),
+    });
+    if (error) throw new Error(error.message || 'Không thể tạo đoàn HC và lịch set-up.');
+    return ((data ?? []) as RosterSchedule[]).map(normalizeRosterSchedule);
+  }
+  // getRandomValues remains available on HTTP LAN, where randomUUID is unavailable.
+  const groupBytes = crypto.getRandomValues(new Uint8Array(16));
+  groupBytes[6] = (groupBytes[6] & 15) | 64;
+  groupBytes[8] = (groupBytes[8] & 63) | 128;
+  const groupHex = Array.from(groupBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const groupId = [groupHex.slice(0, 8), groupHex.slice(8, 12), groupHex.slice(12, 16), groupHex.slice(16, 20), groupHex.slice(20)].join('-');
+  const { data, error } = await supabase.from('roster_schedules')
+    .insert(inputs.map((input) => ({ ...buildOnsiteSchedulePayload(input), campaign_group_id: groupId }))).select('*');
+  if (error) throw new Error(error.message || 'Không thể tạo đoàn cho các ngày đã chọn.');
+  return (data ?? []).map((item) => normalizeRosterSchedule(item as RosterSchedule));
+}
+
 export async function updateCampaignPositionList(
   scheduleId: string,
   positionList: string[],
+  orderMode?: PositionOrderMode,
 ): Promise<RosterSchedule> {
   const cleanPositions = Array.from(
     new Set(positionList.map((p) => p.trim()).filter(Boolean)),
@@ -956,6 +1062,7 @@ export async function updateCampaignPositionList(
     .from('roster_schedules')
     .update({
       position_list: cleanPositions,
+      ...(orderMode !== undefined ? { position_order_mode: orderMode } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', scheduleId)
@@ -967,6 +1074,12 @@ export async function updateCampaignPositionList(
   }
 
   return normalizeRosterSchedule(data as RosterSchedule);
+}
+
+export async function saveClinicRoomOrder(branch: BranchCode, date: string, roomKeys: string[]): Promise<void> {
+  const schedule = await ensureInsiteSchedule(branch, date);
+  // The schedule's position list stores stable room keys, keeping order local to this date.
+  await updateCampaignPositionList(schedule.id, roomKeys, 'manual');
 }
 
 export async function renameCampaignPosition(
