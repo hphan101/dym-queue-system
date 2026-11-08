@@ -1,10 +1,11 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const result = {};
-const source = fs.readFileSync(path.join(__dirname, '../src/features/admin/roster/dashboardSummary.ts'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../src/features/admin/roster/dashboard/dashboardSummary.ts'), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 new Function('exports', 'require', code)(result, () => ({}));
 

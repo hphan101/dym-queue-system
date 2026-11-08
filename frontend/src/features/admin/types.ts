@@ -52,6 +52,7 @@ export interface TT25StoredExtras {
 }
 
 export interface RegistrationDetails {
+  reception_note?: string;
   id: string;
   branch_id: string;
   queue_date: string;

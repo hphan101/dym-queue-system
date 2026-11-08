@@ -1,0 +1,193 @@
+.dym-campaign-form-dialog,
+.dym-campaign-select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.dym-campaign-form-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.dym-campaign-form-dialog form label,
+.dym-campaign-form-dialog form .text-xs {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.dym-campaign-form-dialog form input:not([type='checkbox']),
+.dym-campaign-form-dialog form button,
+.dym-campaign-select [role='option'] {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.dym-campaign-form-dialog form button[type='submit'] {
+  font-weight: 600;
+}
+
+.dym-onsite-page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+.dym-onsite-page .dym-roster-scope-bar {
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+.dym-onsite-page .dym-roster-split-layout {
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+}
+.dym-onsite-page .dym-roster-panel {
+  border-radius: 12px;
+}
+.dym-onsite-page .dym-roster-panel-header {
+  padding: 18px;
+}
+.dym-onsite-page .dym-roster-campaign-list {
+  padding: 12px;
+  gap: 14px;
+  max-height: 75svh;
+  scrollbar-width: thin;
+}
+.dym-onsite-page .dym-roster-campaign-list section > h3 {
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px 4px;
+}
+.dym-onsite-page .dym-roster-campaign-card {
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 8px;
+  padding: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dym-onsite-page .dym-roster-campaign-card[data-type] {
+  color: var(--campaign-ink);
+  background: var(--campaign-paper);
+  border-color: color-mix(
+    in srgb,
+    var(--campaign-ink) 15%,
+    var(--campaign-paper)
+  );
+}
+.dym-onsite-page .dym-roster-campaign-card[data-type].is-selected {
+  border-color: color-mix(
+    in srgb,
+    var(--campaign-ink) 45%,
+    var(--campaign-paper)
+  );
+  background: color-mix(in srgb, var(--campaign-ink) 5%, var(--campaign-paper));
+}
+.dym-onsite-page .dym-roster-campaign-card > * {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dym-onsite-page .dym-roster-campaign-card-top {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.dym-onsite-page .dym-roster-campaign-card-top > div {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.dym-onsite-page .dym-roster-campaign-company,
+.dym-onsite-page .dym-roster-campaign-meta {
+  color: inherit;
+}
+.dym-onsite-page .dym-roster-campaign-meta > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.dym-onsite-page .dym-roster-campaign-list section {
+  min-width: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-onsite-page .dym-roster-campaign-card[data-type]:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--campaign-ink) 45%,
+      var(--campaign-paper)
+    );
+  }
+  .dym-onsite-page
+    .dym-roster-campaign-card[data-type]:hover:not(.is-selected) {
+    background: var(--campaign-paper);
+  }
+}
+.dym-onsite-page .dym-roster-campaign-card:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.dym-onsite-page .dym-roster-campaign-card:active {
+  transform: none;
+}
+.dym-onsite-position-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.dym-onsite-position-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.dym-onsite-position-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.dym-onsite-position-heading > div > span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.dym-onsite-page .dym-roster-table thead {
+  background: var(--color-paper-3);
+}
+.dym-onsite-page .dym-roster-table thead th {
+  font-size: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.dym-onsite-page .dym-roster-table td {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+@media (max-width: 1100px) {
+  .dym-onsite-page .dym-roster-split-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+@media (max-width: 800px) {
+  .dym-onsite-page .dym-roster-split-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dym-onsite-page .dym-roster-campaign-list {
+    max-height: 360px;
+  }
+  .dym-onsite-position-heading {
+    padding: 14px 16px;
+  }
+  .dym-onsite-page .dym-roster-table {
+    min-width: 560px;
+  }
+  .dym-onsite-page .dym-roster-table .dym-position-handle-cell {
+    width: 60px;
+    min-width: 60px;
+  }
+  .dym-onsite-page .dym-position-drag-handle {
+    width: 40px;
+  }
+}

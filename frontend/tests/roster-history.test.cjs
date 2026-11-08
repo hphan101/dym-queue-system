@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +10,7 @@ const directory = path.join(root, 'frontend/src/features/admin/roster');
 function compile(source) { return ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; }
 function loadService() {
   const result = {};
-  new Function('exports', 'require', compile(fs.readFileSync(path.join(directory, 'rosterService.ts'), 'utf8')))(result, () => ({}));
+  new Function('exports', 'require', compile(fs.readFileSync(rosterPath('rosterService.ts'), 'utf8')))(result, () => ({}));
   return result;
 }
 

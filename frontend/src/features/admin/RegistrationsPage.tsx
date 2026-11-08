@@ -1,12 +1,18 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AdminLayout } from './components/AdminLayout';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
-  CheckCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -17,8 +23,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { Theme } from '@astryxdesign/core/theme';
-import '@astryxdesign/core/astryx.css';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,18 +57,15 @@ import { BRANCH_NAMES } from '../../config/branches';
 import { formatQueueNumber } from '../../lib/queueNumber';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
-import { AdminSidebar } from './AdminSidebar';
-import { signOutAdminSession } from './adminIdentity';
+
 import {
   REALTIME_REGISTRATION_COLUMNS,
   type RealtimeConnectionState,
 } from './constants/queueConstants';
-import { dymAdminTheme } from './theme';
+
 import './admin.css';
 import './registrations.css';
 
-import { useAdminTheme } from './hooks/useAdminTheme';
-import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useRegistrationDetailsQuery } from './hooks/useRegistrationDetailsQuery';
 import { useAdminScope } from './hooks/useAdminScope';
@@ -98,14 +100,14 @@ export function RegistrationsPage({
   isActiveTab?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { themeMode, setThemeMode } = useAdminTheme();
-  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
+
   const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
     useStaffIdentity();
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RegistrationStatusTab>('all');
+  const [statusFilter, setStatusFilter] =
+    useState<RegistrationStatusTab>('all');
   const [printFilter, setPrintFilter] = useState<
     'all' | 'unprinted' | 'partial' | 'printed'
   >('all');
@@ -113,9 +115,13 @@ export function RegistrationsPage({
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false);
   const [companySearchQuery, setCompanySearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(null);
-  const [printModalRow, setPrintModalRow] = useState<RegistrationDetails | null>(null);
-  const [consentModalRow, setConsentModalRow] = useState<RegistrationDetails | null>(null);
+  const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(
+    null,
+  );
+  const [printModalRow, setPrintModalRow] =
+    useState<RegistrationDetails | null>(null);
+  const [consentModalRow, setConsentModalRow] =
+    useState<RegistrationDetails | null>(null);
   const [bulkPrintError, setBulkPrintError] = useState<string | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
@@ -163,11 +169,10 @@ export function RegistrationsPage({
       (isQueryPending || (isQueryFetching && !fetchedRows)));
 
   const { getStatus } = usePrintStatus();
-  const rows = useMemo(
-    () => fetchedRows ?? [],
-    [fetchedRows],
-  );
-  const error = queryError ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.' : null;
+  const rows = useMemo(() => fetchedRows ?? [], [fetchedRows]);
+  const error = queryError
+    ? 'Không thể tải danh sách đăng ký. Vui lòng thử lại.'
+    : null;
 
   const printModalData = useMemo<TT25RegistrationData | null>(() => {
     const rawTarget = printModalRow || consentModalRow;
@@ -200,15 +205,25 @@ export function RegistrationsPage({
 
     // Open the tab synchronously so the popup blocker allows it after the async work.
     const printTab = window.open('', '_blank');
+    if (printTab) {
+      printTab.opener = null;
+      printTab.document.title = 'Đang tạo PDF in hàng loạt';
+      printTab.document.body.textContent = `Đang tạo PDF cho ${targets.length} khách. Vui lòng chờ…`;
+    }
     setBulkProgress(`Đang tạo 0/${targets.length}...`);
     setBulkPrintError(null);
     try {
-      const { generateBulkPrintPdf } = await import('../registration/bulkPrintPdf');
+      const { generateBulkPrintPdf } =
+        await import('../registration/bulkPrintPdf');
       const url = await generateBulkPrintPdf(
         targets.map((row) => buildPrintData(row, branch)),
         mode,
         padForDuplex,
-        (done, total) => setBulkProgress(`Đang tạo ${done}/${total}...`),
+        (done, total) => {
+          const message = done === total ? `Đang hoàn tất PDF cho ${total} khách…` : `Đang tạo ${done}/${total}...`;
+          setBulkProgress(message);
+          if (printTab && !printTab.closed) printTab.document.body.textContent = message;
+        },
       );
       if (printTab) {
         printTab.location.href = url;
@@ -221,9 +236,13 @@ export function RegistrationsPage({
       window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
 
       try {
-        await Promise.all(targets.map((row) => markRegistrationPrinted(row.id, mode)));
+        await Promise.all(
+          targets.map((row) => markRegistrationPrinted(row.id, mode)),
+        );
       } catch {
-        setBulkPrintError('Đã mở file in nhưng chưa lưu đủ trạng thái in. Vui lòng kiểm tra kết nối và bấm In lại để thử lại.');
+        setBulkPrintError(
+          'Đã mở file in nhưng chưa lưu đủ trạng thái in. Vui lòng kiểm tra kết nối và bấm In lại để thử lại.',
+        );
       }
       setCheckedIds(new Set());
     } catch (err) {
@@ -378,11 +397,6 @@ export function RegistrationsPage({
     return { all: rows.length, waiting, called };
   }, [rows]);
 
-  const completionRate = useMemo(() => {
-    if (tabCounts.all === 0) return 0;
-    return Math.round((tabCounts.called / tabCounts.all) * 100);
-  }, [tabCounts]);
-
   // Print status breakdown counts
   const printCounts = useMemo(() => {
     let unprinted = 0;
@@ -463,7 +477,11 @@ export function RegistrationsPage({
     return rows.filter((row) => {
       // Status tab match
       if (statusFilter === 'waiting') {
-        if (row.first_called_at || row.state === 'completed' || row.state === 'cancelled') {
+        if (
+          row.first_called_at ||
+          row.state === 'completed' ||
+          row.state === 'cancelled'
+        ) {
           return false;
         }
       } else if (statusFilter === 'called') {
@@ -476,7 +494,8 @@ export function RegistrationsPage({
       if (printFilter !== 'all') {
         const st = getStatus(row.id, row.tt25_data);
         if (printFilter === 'unprinted' && st.isPrinted) return false;
-        if (printFilter === 'partial' && (!st.isPrinted || st.isFull)) return false;
+        if (printFilter === 'partial' && (!st.isPrinted || st.isFull))
+          return false;
         if (printFilter === 'printed' && !st.isFull) return false;
       }
 
@@ -502,6 +521,7 @@ export function RegistrationsPage({
         row.phone_number,
         row.identity_document,
         row.company_name,
+        row.reception_note,
         row.province,
         row.ward,
         row.address_detail,
@@ -519,7 +539,10 @@ export function RegistrationsPage({
     [filteredRows, pageStartIndex],
   );
   const firstVisibleRow = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
-  const lastVisibleRow = Math.min(pageStartIndex + PAGE_SIZE, filteredRows.length);
+  const lastVisibleRow = Math.min(
+    pageStartIndex + PAGE_SIZE,
+    filteredRows.length,
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -534,828 +557,794 @@ export function RegistrationsPage({
   const availableBranches = Object.keys(BRANCH_NAMES) as BranchCode[];
 
   return (
-    <Theme theme={dymAdminTheme} mode={themeMode}>
-      <div className="dym-admin-shell" data-color-mode={themeMode}>
-        <AdminSidebar
-          activePage="registrations"
-          branch={branch}
-          date={date}
-          staffName={staffName}
-          isAdmin={authorizedIsAdmin}
-          staffRole={authorizedIsAdmin ? 'admin' : staffRole}
-          themeMode={themeMode}
-          isCollapsed={isSidebarCollapsed}
-          onCollapsedChange={setIsSidebarCollapsed}
-          onThemeToggle={() =>
-            setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))
-          }
-          onLogout={() => void signOutAdminSession()}
-        />
-
-        <div className="dym-admin-workspace">
-          {/* Unified Clinical Precision Header */}
-          <AdminHeader
-            title="Danh sách tiếp nhận"
-            branch={branch}
-            branchOptions={availableBranches.map((code) => ({
-              value: code,
-              label: BRANCH_NAMES[code],
-            }))}
-            onBranchChange={(nextBranch) => {
-              setBranch(nextBranch);
-              setQuery('');
-            }}
-            date={date}
-            onDateChange={(nextDate) => {
-              setDate(nextDate);
-              setQuery('');
-            }}
-            actions={
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoading || filteredRows.length === 0}
-                  onClick={() =>
-                    exportRegistrationsToExcel({
-                      rows: filteredRows,
-                      branch,
-                      date,
-                    })
-                  }
-                  title={
-                    filteredRows.length === 0
-                      ? 'Không có dữ liệu để xuất Excel'
-                      : `Xuất ${filteredRows.length} hồ sơ ra file Excel (.xlsx)`
-                  }
-                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-                >
-                  <ArrowDownTrayIcon
-                    className="size-3.5 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <span>Xuất Excel</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-busy={isLoading}
-                  disabled={isLoading}
-                  onClick={() => void refetchRegistrations()}
-                  title="Làm mới danh sách dữ liệu (F5)"
-                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-                >
-                  <ArrowPathIcon
-                    className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
-                    aria-hidden="true"
-                  />
-                  <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-                </Button>
-              </div>
-            }
-          />
-
-          <CustomerNoticeModal
-            notification={newRegistrationNotice}
-            onClose={() => setNewRegistrationNotice(null)}
-          />
-
-          <main className="dym-admin-content">
-            <RealtimeConnectionAlert state={connectionState} />
-
-            {(error || identityError) && (
-              <div className="dym-data-error" role="alert">
-                {error || identityError}
-              </div>
-            )}
-
-            {/* Overview Summary Metrics Strip */}
-            <section
-              className="dym-metrics-summary-grid"
-              aria-label="Thống kê danh sách tiếp nhận"
+    <AdminLayout
+      activePage="registrations"
+      branch={branch}
+      date={date}
+      staffName={staffName}
+      isAdmin={authorizedIsAdmin}
+      staffRole={authorizedIsAdmin ? 'admin' : staffRole}
+    >
+      {/* Unified Clinical Precision Header */}
+      <AdminHeader
+        title="Danh sách tiếp nhận"
+        branch={branch}
+        branchOptions={availableBranches.map((code) => ({
+          value: code,
+          label: BRANCH_NAMES[code],
+        }))}
+        onBranchChange={(nextBranch) => {
+          setBranch(nextBranch);
+          setQuery('');
+        }}
+        date={date}
+        onDateChange={(nextDate) => {
+          setDate(nextDate);
+          setQuery('');
+        }}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoading || filteredRows.length === 0}
+              onClick={() =>
+                exportRegistrationsToExcel({
+                  rows: filteredRows,
+                  branch,
+                  date,
+                })
+              }
+              title={
+                filteredRows.length === 0
+                  ? 'Không có dữ liệu để xuất Excel'
+                  : `Xuất ${filteredRows.length} hồ sơ ra file Excel (.xlsx)`
+              }
+              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
             >
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Tổng khách đăng ký</span>
-                  <UserGroupIcon className="dym-metric-summary-icon" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number">
-                    {tabCounts.all}
-                  </strong>
-                  <span className="dym-metric-summary-unit">khách hàng</span>
-                </div>
-              </div>
+              <ArrowDownTrayIcon
+                className="size-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span>Xuất Excel</span>
+            </Button>
 
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Đang chờ tiếp đón</span>
-                  <ClockIcon className="dym-metric-summary-icon text-amber-500" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number">
-                    {tabCounts.waiting}
-                  </strong>
-                  <span className="dym-metric-summary-unit">đang chờ</span>
-                </div>
-              </div>
-
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Đã gọi / Hoàn tất</span>
-                  <CheckCircleIcon className="dym-metric-summary-icon text-emerald-500" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number">
-                    {tabCounts.called}
-                  </strong>
-                  <span className="dym-metric-summary-unit">lượt gọi</span>
-                </div>
-              </div>
-
-              <div className="dym-metric-summary-card">
-                <div className="dym-metric-summary-header">
-                  <span className="dym-metric-summary-label">Tỷ lệ hoàn thành</span>
-                  <ClipboardDocumentListIcon className="dym-metric-summary-icon text-muted-foreground" aria-hidden="true" />
-                </div>
-                <div className="dym-metric-summary-value-row">
-                  <strong className="dym-metric-summary-number">
-                    {completionRate}%
-                  </strong>
-                  <span className="dym-metric-summary-unit">tiến độ</span>
-                </div>
-              </div>
-            </section>
-
-            {/* Precision Table Section */}
-            <section
-              className="dym-registry-panel"
-              aria-labelledby="registry-table-title"
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-busy={isLoading}
+              disabled={isLoading}
+              onClick={() => void refetchRegistrations()}
+              title="Làm mới danh sách dữ liệu (F5)"
+              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
             >
-              {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
-              <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
-                <div className="dym-registry-title-block">
-                  <h2 id="registry-table-title" className="dym-registry-title">
-                    Danh Sách Chi Tiết Khách Hàng
-                  </h2>
-                </div>
+              <ArrowPathIcon
+                className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+            </Button>
+          </div>
+        }
+      />
 
-                {/* Full-width aligned shadcn/ui Filter & Search Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  {/* Status Filter Tabs (shadcn Tabs + Badge) */}
-                  <Tabs
-                    value={statusFilter}
-                    onValueChange={(value) =>
-                      setStatusFilter(value as RegistrationStatusTab)
-                    }
+      <CustomerNoticeModal
+        notification={newRegistrationNotice}
+        onClose={() => setNewRegistrationNotice(null)}
+      />
+
+      <main className="dym-admin-content">
+        <RealtimeConnectionAlert state={connectionState} />
+
+        {(error || identityError) && (
+          <div className="dym-data-error" role="alert">
+            {error || identityError}
+          </div>
+        )}
+
+        {/* Precision Table Section */}
+        <section
+          className="dym-registry-panel"
+          aria-labelledby="registry-table-title"
+        >
+          {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
+          <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
+            <div className="dym-registry-title-block">
+              <h2 id="registry-table-title" className="dym-registry-title">
+                Danh Sách Chi Tiết Khách Hàng
+              </h2>
+            </div>
+
+            {/* Full-width aligned shadcn/ui Filter & Search Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Status Filter Tabs (shadcn Tabs + Badge) */}
+              <Tabs
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as RegistrationStatusTab)
+                }
+              >
+                <TabsList
+                  aria-label="Lọc hồ sơ theo trạng thái"
+                  className="h-9 bg-muted p-1"
+                >
+                  <TabsTrigger
+                    value="all"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
                   >
-                    <TabsList
-                      aria-label="Lọc hồ sơ theo trạng thái"
-                      className="h-9 bg-muted p-1"
+                    <span>Tất cả</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
                     >
-                      <TabsTrigger
-                        value="all"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span>Tất cả</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.all}
-                        </Badge>
-                      </TabsTrigger>
+                      {tabCounts.all}
+                    </Badge>
+                  </TabsTrigger>
 
-                      <TabsTrigger
-                        value="waiting"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span
-                          className="size-1.5 rounded-full bg-amber-500"
-                          aria-hidden="true"
-                        />
-                        <span>Chờ gọi</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.waiting}
-                        </Badge>
-                      </TabsTrigger>
-
-                      <TabsTrigger
-                        value="called"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span
-                          className="size-1.5 rounded-full bg-emerald-500"
-                          aria-hidden="true"
-                        />
-                        <span>Đã gọi</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.called}
-                        </Badge>
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-
-                  {/* Right Filter & Search Controls */}
-                  <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
-                    {/* Print Status Filter (shadcn Select + SelectGroup) */}
-                    <Select
-                      value={printFilter}
-                      onValueChange={(value) =>
-                        setPrintFilter(
-                          value as 'all' | 'unprinted' | 'partial' | 'printed',
-                        )
-                      }
+                  <TabsTrigger
+                    value="waiting"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
+                  >
+                    <span
+                      className="size-1.5 rounded-full bg-amber-500"
+                      aria-hidden="true"
+                    />
+                    <span>Chờ gọi</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
                     >
-                      <SelectTrigger
-                        aria-label="Lọc theo trạng thái in"
-                        className={cn(
-                          'h-9 w-[215px] bg-card px-3 text-xs font-medium shadow-sm',
-                          printFilter !== 'all' &&
-                            'border-ring bg-accent text-accent-foreground',
-                        )}
+                      {tabCounts.waiting}
+                    </Badge>
+                  </TabsTrigger>
+
+                  <TabsTrigger
+                    value="called"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
+                  >
+                    <span
+                      className="size-1.5 rounded-full bg-emerald-500"
+                      aria-hidden="true"
+                    />
+                    <span>Đã gọi</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                    >
+                      {tabCounts.called}
+                    </Badge>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Right Filter & Search Controls */}
+              <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
+                {/* Print Status Filter (shadcn Select + SelectGroup) */}
+                <Select
+                  value={printFilter}
+                  onValueChange={(value) =>
+                    setPrintFilter(
+                      value as 'all' | 'unprinted' | 'partial' | 'printed',
+                    )
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Lọc theo trạng thái in"
+                    className={cn(
+                      'h-9 w-[215px] bg-card px-3 text-xs font-medium shadow-sm',
+                      printFilter !== 'all' &&
+                        'border-ring bg-accent text-accent-foreground',
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-1.5 truncate">
+                      <Printer
+                        className="size-3.5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <SelectValue placeholder="Trạng thái in" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent align="end" className="w-[215px]">
+                    <SelectGroup>
+                      <SelectItem value="all" className="text-xs tabular-nums">
+                        Trạng thái in: Tất cả ({rows.length})
+                      </SelectItem>
+                      <SelectItem
+                        value="unprinted"
+                        className="text-xs tabular-nums"
                       >
-                        <div className="flex min-w-0 items-center gap-1.5 truncate">
-                          <Printer
-                            className="size-3.5 shrink-0 text-muted-foreground"
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-1.5 rounded-full bg-slate-400"
                             aria-hidden="true"
                           />
-                          <SelectValue placeholder="Trạng thái in" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent align="end" className="w-[215px]">
-                        <SelectGroup>
-                          <SelectItem value="all" className="text-xs tabular-nums">
-                            Trạng thái in: Tất cả ({rows.length})
-                          </SelectItem>
-                          <SelectItem
-                            value="unprinted"
-                            className="text-xs tabular-nums"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="size-1.5 rounded-full bg-slate-400"
-                                aria-hidden="true"
-                              />
-                              <span>Chưa in ({printCounts.unprinted})</span>
-                            </span>
-                          </SelectItem>
-                          <SelectItem
-                            value="partial"
-                            className="text-xs tabular-nums"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="size-1.5 rounded-full bg-sky-500"
-                                aria-hidden="true"
-                              />
-                              <span>Đã in 1 phần ({printCounts.partial})</span>
-                            </span>
-                          </SelectItem>
-                          <SelectItem
-                            value="printed"
-                            className="text-xs tabular-nums"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                className="size-1.5 rounded-full bg-emerald-500"
-                                aria-hidden="true"
-                              />
-                              <span>Đã in đủ ({printCounts.printed})</span>
-                            </span>
-                          </SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-
-                    {/* Company Filter (shadcn Popover + Button + Input) */}
-                    <Popover
-                      open={isCompanyMenuOpen}
-                      onOpenChange={setIsCompanyMenuOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={isCompanyMenuOpen}
-                          title={`${companyTriggerMeta.label} (${companyTriggerMeta.count})`}
-                          className={cn(
-                            'h-9 min-w-[190px] max-w-[260px] justify-between gap-2 bg-card px-3 text-xs font-medium shadow-sm',
-                            companyFilter !== 'all' &&
-                              'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
-                          )}
-                        >
-                          <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
-                            <Building2
-                              className="size-3.5 shrink-0 text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                            <span className="truncate">
-                              {companyTriggerMeta.label}
-                            </span>
-                          </span>
-                          <span className="flex shrink-0 items-center gap-1">
-                            <Badge
-                              variant="secondary"
-                              className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
-                            >
-                              {companyTriggerMeta.count}
-                            </Badge>
-                            <ChevronsUpDown
-                              className="size-3.5 shrink-0 opacity-50"
-                              aria-hidden="true"
-                            />
-                          </span>
-                        </Button>
-                      </PopoverTrigger>
-
-                      <PopoverContent align="end" className="w-72 p-0">
-                        <div className="relative flex items-center border-b border-border p-2">
-                          <Search
-                            className="pointer-events-none absolute left-4 size-3.5 text-muted-foreground"
+                          <span>Chưa in ({printCounts.unprinted})</span>
+                        </span>
+                      </SelectItem>
+                      <SelectItem
+                        value="partial"
+                        className="text-xs tabular-nums"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-1.5 rounded-full bg-sky-500"
                             aria-hidden="true"
                           />
-                          <Input
-                            ref={companySearchInputRef}
-                            type="text"
-                            value={companySearchQuery}
-                            onChange={(e) => setCompanySearchQuery(e.target.value)}
-                            placeholder="Tìm tên công ty / đơn vị..."
-                            className="h-8 bg-background pl-8 pr-7 text-xs shadow-none"
+                          <span>Đã in 1 phần ({printCounts.partial})</span>
+                        </span>
+                      </SelectItem>
+                      <SelectItem
+                        value="printed"
+                        className="text-xs tabular-nums"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-1.5 rounded-full bg-emerald-500"
+                            aria-hidden="true"
                           />
-                          {companySearchQuery && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setCompanySearchQuery('')}
-                              aria-label="Xóa tìm kiếm công ty"
-                              className="absolute right-3 size-6 text-muted-foreground hover:text-foreground"
-                            >
-                              <X aria-hidden="true" />
-                            </Button>
-                          )}
-                        </div>
+                          <span>Đã in đủ ({printCounts.printed})</span>
+                        </span>
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
 
-                        <div
-                          role="listbox"
-                          aria-label="Chọn đơn vị hoặc công ty"
-                          className="flex max-h-60 flex-col gap-0.5 overflow-y-auto p-1.5"
+                {/* Company Filter (shadcn Popover + Button + Input) */}
+                <Popover
+                  open={isCompanyMenuOpen}
+                  onOpenChange={setIsCompanyMenuOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={isCompanyMenuOpen}
+                      title={`${companyTriggerMeta.label} (${companyTriggerMeta.count})`}
+                      className={cn(
+                        'h-9 min-w-[190px] max-w-[260px] justify-between gap-2 bg-card px-3 text-xs font-medium shadow-sm',
+                        companyFilter !== 'all' &&
+                          'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
+                      )}
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+                        <Building2
+                          className="size-3.5 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">
+                          {companyTriggerMeta.label}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Badge
+                          variant="secondary"
+                          className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
                         >
-                          {!companySearchQuery.trim() && (
-                            <>
-                              <button
-                                type="button"
-                                role="option"
-                                aria-selected={companyFilter === 'all'}
-                                onClick={() => {
-                                  setCompanyFilter('all');
-                                  setIsCompanyMenuOpen(false);
-                                }}
-                                className={cn(
-                                  'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
-                                  companyFilter === 'all' &&
-                                    'bg-accent font-medium text-accent-foreground',
-                                )}
-                              >
-                                <span className="flex min-w-0 items-center gap-2 truncate">
-                                  <Check
-                                    className={cn(
-                                      'size-3.5 shrink-0 text-primary',
-                                      companyFilter === 'all'
-                                        ? 'opacity-100'
-                                        : 'opacity-0',
-                                    )}
-                                    aria-hidden="true"
-                                  />
-                                  <span className="truncate">Đơn vị: Tất cả</span>
-                                </span>
-                                <Badge
-                                  variant="secondary"
-                                  className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
-                                >
-                                  {rows.length}
-                                </Badge>
-                              </button>
+                          {companyTriggerMeta.count}
+                        </Badge>
+                        <ChevronsUpDown
+                          className="size-3.5 shrink-0 opacity-50"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
 
-                              <button
-                                type="button"
-                                role="option"
-                                aria-selected={companyFilter === '__individual__'}
-                                onClick={() => {
-                                  setCompanyFilter('__individual__');
-                                  setIsCompanyMenuOpen(false);
-                                }}
-                                className={cn(
-                                  'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
-                                  companyFilter === '__individual__' &&
-                                    'bg-accent font-medium text-accent-foreground',
-                                )}
-                              >
-                                <span className="flex min-w-0 items-center gap-2 truncate">
-                                  <Check
-                                    className={cn(
-                                      'size-3.5 shrink-0 text-primary',
-                                      companyFilter === '__individual__'
-                                        ? 'opacity-100'
-                                        : 'opacity-0',
-                                    )}
-                                    aria-hidden="true"
-                                  />
-                                  <span className="truncate">Khách cá nhân</span>
-                                </span>
-                                <Badge
-                                  variant="secondary"
-                                  className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
-                                >
-                                  {companyFilterData.individualCount}
-                                </Badge>
-                              </button>
-                            </>
-                          )}
-
-                          {filteredCompanyOptions.length > 0 ? (
-                            filteredCompanyOptions.map((c) => {
-                              const isSelected = companyFilter === c.name;
-                              return (
-                                <button
-                                  key={c.name}
-                                  type="button"
-                                  role="option"
-                                  aria-selected={isSelected}
-                                  title={c.name}
-                                  onClick={() => {
-                                    setCompanyFilter(c.name);
-                                    setIsCompanyMenuOpen(false);
-                                  }}
-                                  className={cn(
-                                    'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
-                                    isSelected &&
-                                      'bg-accent font-medium text-accent-foreground',
-                                  )}
-                                >
-                                  <span className="flex min-w-0 items-center gap-2 truncate">
-                                    <Check
-                                      className={cn(
-                                        'size-3.5 shrink-0 text-primary',
-                                        isSelected ? 'opacity-100' : 'opacity-0',
-                                      )}
-                                      aria-hidden="true"
-                                    />
-                                    <span className="truncate">{c.name}</span>
-                                  </span>
-                                  <Badge
-                                    variant="secondary"
-                                    className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
-                                  >
-                                    {c.count}
-                                  </Badge>
-                                </button>
-                              );
-                            })
-                          ) : companySearchQuery.trim() ? (
-                            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                              Không tìm thấy đơn vị phù hợp
-                            </div>
-                          ) : null}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-                    <div className="relative w-full sm:w-64 lg:w-72">
-                      <label htmlFor={searchInputId} className="sr-only">
-                        Tìm kiếm hồ sơ khách hàng
-                      </label>
+                  <PopoverContent align="end" className="w-72 p-0">
+                    <div className="relative flex items-center border-b border-border p-2">
                       <Search
-                        className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                        className="pointer-events-none absolute left-4 size-3.5 text-muted-foreground"
                         aria-hidden="true"
                       />
                       <Input
-                        id={searchInputId}
-                        type="search"
-                        placeholder="Tìm tên, SĐT, CCCD, công ty..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                        ref={companySearchInputRef}
+                        type="text"
+                        value={companySearchQuery}
+                        onChange={(e) => setCompanySearchQuery(e.target.value)}
+                        placeholder="Tìm tên công ty / đơn vị..."
+                        className="h-8 bg-background pl-8 pr-7 text-xs shadow-none"
                       />
-                      {query ? (
+                      {companySearchQuery && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          onClick={() => setQuery('')}
-                          aria-label="Xóa từ khóa tìm kiếm"
-                          className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setCompanySearchQuery('')}
+                          aria-label="Xóa tìm kiếm công ty"
+                          className="absolute right-3 size-6 text-muted-foreground hover:text-foreground"
                         >
                           <X aria-hidden="true" />
                         </Button>
-                      ) : (
-                        <kbd
-                          className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                          title="Phím tắt: /"
-                        >
-                          /
-                        </kbd>
                       )}
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Data Table Content */}
-              {isLoading ? (
-                <div
-                  className="dym-table-scroller"
-                  aria-busy="true"
-                  aria-live="polite"
-                  aria-label="Đang tải danh sách đăng ký"
-                >
-                  <table className="dym-table-precision">
-                    <thead>
-                      <tr>
-                        <th scope="col">Số Phiếu & Giờ</th>
-                        <th scope="col">Tên Khách Hàng</th>
-                        <th scope="col">Liên Hệ & Định Danh</th>
-                        <th scope="col">Đơn Vị & Địa Chỉ</th>
-                        <th scope="col">Trạng Thái</th>
-                        <th scope="col">Trạng Thái In</th>
-                        <th scope="col" className="text-right">Hồ Sơ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 6 }).map((_, index) => (
-                        <tr key={index}>
-                          <td className="col-ticket">
-                            <div className="flex flex-col items-start gap-1.5">
-                              <Skeleton className="h-6 w-14 rounded-md" />
-                              <Skeleton className="h-3 w-11" />
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-2">
-                                <Skeleton className="h-4 w-36" />
-                                <Skeleton className="h-4 w-9 rounded" />
-                              </div>
-                              <Skeleton className="h-3 w-28" />
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex flex-col gap-1.5">
-                              <Skeleton className="h-4 w-24" />
-                              <Skeleton className="h-3 w-28" />
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex flex-col gap-1.5">
-                              <Skeleton className="h-4 w-44" />
-                              <Skeleton className="h-3 w-52" />
-                            </div>
-                          </td>
-                          <td>
-                            <Skeleton className="h-6 w-20 rounded-full" />
-                          </td>
-                          <td>
-                            <Skeleton className="h-6 w-20 rounded-full" />
-                          </td>
-                          <td className="text-right">
-                            <div className="dym-table-actions-group">
-                              <Skeleton className="h-7 w-16 rounded-md" />
-                              <Skeleton className="h-7 w-24 rounded-md" />
-                              <Skeleton className="h-7 w-16 rounded-md" />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : filteredRows.length === 0 ? (
-                <div className="dym-table-empty-box">
-                  <div className="dym-empty-icon-wrap">
-                    <UserGroupIcon className="w-7 h-7 text-muted-foreground" aria-hidden="true" />
-                  </div>
-                  <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
-                  <p className="dym-empty-desc">
-                    Không có khách hàng nào phù hợp với bộ lọc hiện tại. Hãy thử đổi ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
-                  </p>
-                  {(query ||
-                    statusFilter !== 'all' ||
-                    printFilter !== 'all' ||
-                    companyFilter !== 'all') && (
-                    <button
-                      type="button"
-                      className="dym-btn-reset-filter"
-                      onClick={() => {
-                        setQuery('');
-                        setStatusFilter('all');
-                        setPrintFilter('all');
-                        setCompanyFilter('all');
-                      }}
+                    <div
+                      role="listbox"
+                      aria-label="Chọn đơn vị hoặc công ty"
+                      className="flex max-h-60 flex-col gap-0.5 overflow-y-auto p-1.5"
                     >
-                      Đặt lại bộ lọc
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                <div
-                  className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5 text-xs"
-                  role="toolbar"
-                  aria-label="In hàng loạt"
-                >
-                  <Printer className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="font-medium">
-                    {checkedIds.size > 0
-                      ? `Đã chọn ${checkedIds.size} hồ sơ`
-                      : 'In hàng loạt'}
-                  </span>
-                  {checkedIds.size < filteredRows.length && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-7 px-1 text-xs"
-                      onClick={() => toggleChecked(filteredRows.map((r) => r.id), true)}
-                    >
-                      Chọn tất cả
-                    </Button>
-                  )}
-                  {checkedIds.size > 0 && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setCheckedIds(new Set())}
-                      >
-                        Bỏ chọn
-                      </Button>
-                      <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          className="size-3.5 accent-primary"
-                          checked={padForDuplex}
-                          onChange={(e) => setPadForDuplex(e.target.checked)}
-                        />
-                        In 2 mặt (chèn trang trắng)
-                      </label>
-                      {bulkProgress ? (
-                        <span className="font-medium text-foreground" role="status">
-                          {bulkProgress}
-                        </span>
-                      ) : (
+                      {!companySearchQuery.trim() && (
                         <>
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 bg-card px-3 text-xs"
-                            onClick={() => void handleBulkPrint('consent')}
+                            role="option"
+                            aria-selected={companyFilter === 'all'}
+                            onClick={() => {
+                              setCompanyFilter('all');
+                              setIsCompanyMenuOpen(false);
+                            }}
+                            className={cn(
+                              'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                              companyFilter === 'all' &&
+                                'bg-accent font-medium text-accent-foreground',
+                            )}
                           >
-                            In Đồng thuận
-                          </Button>
-                          <Button
+                            <span className="flex min-w-0 items-center gap-2 truncate">
+                              <Check
+                                className={cn(
+                                  'size-3.5 shrink-0 text-primary',
+                                  companyFilter === 'all'
+                                    ? 'opacity-100'
+                                    : 'opacity-0',
+                                )}
+                                aria-hidden="true"
+                              />
+                              <span className="truncate">Đơn vị: Tất cả</span>
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                            >
+                              {rows.length}
+                            </Badge>
+                          </button>
+
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 bg-card px-3 text-xs"
-                            onClick={() => void handleBulkPrint('tt25')}
+                            role="option"
+                            aria-selected={companyFilter === '__individual__'}
+                            onClick={() => {
+                              setCompanyFilter('__individual__');
+                              setIsCompanyMenuOpen(false);
+                            }}
+                            className={cn(
+                              'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                              companyFilter === '__individual__' &&
+                                'bg-accent font-medium text-accent-foreground',
+                            )}
                           >
-                            In TT25
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => void handleBulkPrint('both')}
-                            title="Mỗi khách: phiếu Đồng thuận rồi phiếu TT25, theo thứ tự số phiếu"
-                          >
-                            In trọn bộ ({checkedIds.size})
-                          </Button>
+                            <span className="flex min-w-0 items-center gap-2 truncate">
+                              <Check
+                                className={cn(
+                                  'size-3.5 shrink-0 text-primary',
+                                  companyFilter === '__individual__'
+                                    ? 'opacity-100'
+                                    : 'opacity-0',
+                                )}
+                                aria-hidden="true"
+                              />
+                              <span className="truncate">Khách cá nhân</span>
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                            >
+                              {companyFilterData.individualCount}
+                            </Badge>
+                          </button>
                         </>
                       )}
-                    </>
+
+                      {filteredCompanyOptions.length > 0 ? (
+                        filteredCompanyOptions.map((c) => {
+                          const isSelected = companyFilter === c.name;
+                          return (
+                            <button
+                              key={c.name}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              title={c.name}
+                              onClick={() => {
+                                setCompanyFilter(c.name);
+                                setIsCompanyMenuOpen(false);
+                              }}
+                              className={cn(
+                                'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                                isSelected &&
+                                  'bg-accent font-medium text-accent-foreground',
+                              )}
+                            >
+                              <span className="flex min-w-0 items-center gap-2 truncate">
+                                <Check
+                                  className={cn(
+                                    'size-3.5 shrink-0 text-primary',
+                                    isSelected ? 'opacity-100' : 'opacity-0',
+                                  )}
+                                  aria-hidden="true"
+                                />
+                                <span className="truncate">{c.name}</span>
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className="h-5 rounded px-1.5 text-[11px] font-semibold tabular-nums"
+                              >
+                                {c.count}
+                              </Badge>
+                            </button>
+                          );
+                        })
+                      ) : companySearchQuery.trim() ? (
+                        <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                          Không tìm thấy đơn vị phù hợp
+                        </div>
+                      ) : null}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Search Field (shadcn Input + Clear Button / Kbd) */}
+                <div className="relative w-full sm:w-64 lg:w-72">
+                  <label htmlFor={searchInputId} className="sr-only">
+                    Tìm kiếm hồ sơ khách hàng
+                  </label>
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id={searchInputId}
+                    type="search"
+                    placeholder="Tìm tên, SĐT, CCCD, công ty..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                  />
+                  {query ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setQuery('')}
+                      aria-label="Xóa từ khóa tìm kiếm"
+                      className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X aria-hidden="true" />
+                    </Button>
+                  ) : (
+                    <kbd
+                      className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                      title="Phím tắt: /"
+                    >
+                      /
+                    </kbd>
                   )}
                 </div>
-                {bulkPrintError && (
-                  <p role="alert" className="p-4 text-sm text-red-600">{bulkPrintError}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Table Content */}
+          {isLoading ? (
+            <div
+              className="dym-table-scroller"
+              aria-busy="true"
+              aria-live="polite"
+              aria-label="Đang tải danh sách đăng ký"
+            >
+              <table className="dym-table-precision">
+                <thead>
+                  <tr>
+                    <th scope="col">Số Phiếu & Giờ</th>
+                    <th scope="col">Tên Khách Hàng</th>
+                    <th scope="col">Liên Hệ & Định Danh</th>
+                    <th scope="col">Đơn Vị & Địa Chỉ</th>
+                    <th scope="col">Ghi chú / STT HIS</th>
+                    <th scope="col">Trạng Thái</th>
+                    <th scope="col">Trạng Thái In</th>
+                    <th scope="col" className="text-right">
+                      Hồ Sơ
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={index}>
+                      <td className="col-ticket">
+                        <div className="flex flex-col items-start gap-1.5">
+                          <Skeleton className="h-6 w-14 rounded-md" />
+                          <Skeleton className="h-3 w-11" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-36" />
+                            <Skeleton className="h-4 w-9 rounded" />
+                          </div>
+                          <Skeleton className="h-3 w-28" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-1.5">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-28" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-1.5">
+                          <Skeleton className="h-4 w-44" />
+                          <Skeleton className="h-3 w-52" />
+                        </div>
+                      </td>
+                      <td><Skeleton className="h-8 w-52 rounded" /></td>
+                      <td>
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                      </td>
+                      <td>
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                      </td>
+                      <td className="text-right">
+                        <div className="dym-table-actions-group">
+                          <Skeleton className="h-7 w-16 rounded-md" />
+                          <Skeleton className="h-7 w-24 rounded-md" />
+                          <Skeleton className="h-7 w-16 rounded-md" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="dym-table-empty-box">
+              <div className="dym-empty-icon-wrap">
+                <UserGroupIcon
+                  className="w-7 h-7 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </div>
+              <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
+              <p className="dym-empty-desc">
+                Không có khách hàng nào phù hợp với bộ lọc hiện tại. Hãy thử đổi
+                ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
+              </p>
+              {(query ||
+                statusFilter !== 'all' ||
+                printFilter !== 'all' ||
+                companyFilter !== 'all') && (
+                <button
+                  type="button"
+                  className="dym-btn-reset-filter"
+                  onClick={() => {
+                    setQuery('');
+                    setStatusFilter('all');
+                    setPrintFilter('all');
+                    setCompanyFilter('all');
+                  }}
+                >
+                  Đặt lại bộ lọc
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div
+                className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5 text-xs"
+                role="toolbar"
+                aria-label="In hàng loạt"
+              >
+                <Printer
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <span className="font-medium">
+                  {checkedIds.size > 0
+                    ? `Đã chọn ${checkedIds.size} hồ sơ`
+                    : 'In hàng loạt'}
+                </span>
+                {checkedIds.size < filteredRows.length && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-7 px-1 text-xs"
+                    onClick={() =>
+                      toggleChecked(
+                        filteredRows.map((r) => r.id),
+                        true,
+                      )
+                    }
+                  >
+                    Chọn tất cả
+                  </Button>
                 )}
-                <RegistrationsTable
-                  rows={paginatedRows}
-                  searchQuery={query}
-                  checkedIds={checkedIds}
-                  onToggleChecked={toggleChecked}
-                  onSelectRow={(row) => setSelectedRow(row)}
-                  onPrintRow={(row) => {
-                    setPrintModalRow(row);
-                  }}
-                  onPrintConsentRow={(row) => {
-                    setConsentModalRow(row);
-                  }}
-                />
-                </>
-              )}
-
-              {/* Pagination Bar */}
-              {!isLoading && filteredRows.length > 0 && (
-                <div className="dym-pagination-bar">
-                  <span className="dym-pagination-summary">
-                    Hiển thị <strong>{firstVisibleRow}</strong>–<strong>{lastVisibleRow}</strong> trong <strong>{filteredRows.length}</strong> đăng ký
-                  </span>
-                  <div className="dym-pagination-pager">
-                    <button
+                {checkedIds.size > 0 && (
+                  <>
+                    <Button
                       type="button"
-                      className="dym-page-btn"
-                      disabled={visiblePage === 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      aria-label="Trang trước"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setCheckedIds(new Set())}
                     >
-                      <ChevronLeftIcon className="w-3.5 h-3.5" />
-                      <span>Trước</span>
-                    </button>
-                    <span className="dym-page-indicator">
-                      Trang <strong>{visiblePage}</strong> / {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      className="dym-page-btn"
-                      disabled={visiblePage === totalPages}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      aria-label="Trang sau"
-                    >
-                      <span>Sau</span>
-                      <ChevronRightIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+                      Bỏ chọn
+                    </Button>
+                    <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        className="size-3.5 accent-primary"
+                        checked={padForDuplex}
+                        onChange={(e) => setPadForDuplex(e.target.checked)}
+                      />
+                      In 2 mặt (chèn trang trắng)
+                    </label>
+                    {bulkProgress ? (
+                      <span
+                        className="font-medium text-foreground"
+                        role="status"
+                      >
+                        {bulkProgress}
+                      </span>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 bg-card px-3 text-xs"
+                          onClick={() => void handleBulkPrint('consent')}
+                        >
+                          In Đồng thuận
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 bg-card px-3 text-xs"
+                          onClick={() => void handleBulkPrint('tt25')}
+                        >
+                          In TT25
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          onClick={() => void handleBulkPrint('both')}
+                          title="Mỗi khách: phiếu Đồng thuận rồi phiếu TT25, theo thứ tự số phiếu"
+                        >
+                          In trọn bộ ({checkedIds.size})
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+              {bulkPrintError && (
+                <p role="alert" className="p-4 text-sm text-red-600">
+                  {bulkPrintError}
+                </p>
               )}
-            </section>
+              <RegistrationsTable
+                rows={paginatedRows}
+                onNoteSaved={(id, note) => {
+                  queryClient.setQueryData<RegistrationDetails[]>(['registrationDetails', branch, date],
+                    (current) => current?.map((row) => row.id === id ? { ...row, reception_note: note } : row));
+                  void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
+                }}
+                searchQuery={query}
+                checkedIds={checkedIds}
+                onToggleChecked={toggleChecked}
+                onSelectRow={(row) => setSelectedRow(row)}
+                onPrintRow={(row) => {
+                  setPrintModalRow(row);
+                }}
+                onPrintConsentRow={(row) => {
+                  setConsentModalRow(row);
+                }}
+              />
+            </>
+          )}
 
-            {/* Patient Detail Drawer */}
-            <RegistrationDetailModal
-              selectedRow={rows.find((row) => row.id === selectedRow?.id) ?? null}
-              branch={branch}
-              onClose={() => setSelectedRow(null)}
-              onUpdated={(updated) => {
-                queryClient.setQueryData<RegistrationDetails[]>(
-                  ['registrationDetails', branch, date],
-                  (current) => current?.map((row) => row.id === updated.id ? updated : row),
-                );
-                void queryClient.invalidateQueries({ queryKey: ['dashboardQueue', branch, date] });
-                void queryClient.invalidateQueries({
-                  queryKey: ['registrationDetails', branch, date],
-                });
-              }}
-              onPrint={(row) => {
-                setPrintModalRow(row);
-              }}
-              onPrintConsent={(row) => {
-                setConsentModalRow(row);
-              }}
+          {/* Pagination Bar */}
+          {!isLoading && filteredRows.length > 0 && (
+            <div className="dym-pagination-bar">
+              <span className="dym-pagination-summary">
+                Hiển thị <strong>{firstVisibleRow}</strong>–
+                <strong>{lastVisibleRow}</strong> trong{' '}
+                <strong>{filteredRows.length}</strong> đăng ký
+              </span>
+              <div className="dym-pagination-pager">
+                <button
+                  type="button"
+                  className="dym-page-btn"
+                  disabled={visiblePage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeftIcon className="w-3.5 h-3.5" />
+                  <span>Trước</span>
+                </button>
+                <span className="dym-page-indicator">
+                  Trang <strong>{visiblePage}</strong> / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="dym-page-btn"
+                  disabled={visiblePage === totalPages}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  aria-label="Trang sau"
+                >
+                  <span>Sau</span>
+                  <ChevronRightIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Patient Detail Drawer */}
+        <RegistrationDetailModal
+          selectedRow={rows.find((row) => row.id === selectedRow?.id) ?? null}
+          branch={branch}
+          onClose={() => setSelectedRow(null)}
+          onUpdated={(updated) => {
+            queryClient.setQueryData<RegistrationDetails[]>(
+              ['registrationDetails', branch, date],
+              (current) =>
+                current?.map((row) => (row.id === updated.id ? updated : row)),
+            );
+            void queryClient.invalidateQueries({
+              queryKey: ['dashboardQueue', branch, date],
+            });
+            void queryClient.invalidateQueries({
+              queryKey: ['registrationDetails', branch, date],
+            });
+          }}
+          onPrint={(row) => {
+            setPrintModalRow(row);
+          }}
+          onPrintConsent={(row) => {
+            setConsentModalRow(row);
+          }}
+        />
+
+        {/* TT25 Print Preview Modal */}
+        {printModalRow && printModalData && (
+          <Suspense fallback={null}>
+            <TT25PrintModal
+              key={printModalRow.id}
+              isOpen={Boolean(printModalRow)}
+              onClose={() => setPrintModalRow(null)}
+              data={printModalData}
+              onPrinted={() =>
+                markRegistrationPrinted(printModalRow.id, 'tt25')
+              }
             />
+          </Suspense>
+        )}
 
-            {/* TT25 Print Preview Modal */}
-            {printModalRow && printModalData && (
-              <Suspense fallback={null}>
-                <TT25PrintModal
-                  key={printModalRow.id}
-                  isOpen={Boolean(printModalRow)}
-                  onClose={() => setPrintModalRow(null)}
-                  data={printModalData}
-                  onPrinted={() => markRegistrationPrinted(printModalRow.id, 'tt25')}
-                />
-              </Suspense>
-            )}
-
-            {/* Consent Print Preview Modal */}
-            {consentModalRow && printModalData && (
-              <Suspense fallback={null}>
-                <ConsentPrintModal
-                  key={consentModalRow.id}
-                  isOpen={Boolean(consentModalRow)}
-                  onClose={() => setConsentModalRow(null)}
-                  data={printModalData}
-                  onPrinted={() => markRegistrationPrinted(consentModalRow.id, 'consent')}
-                />
-              </Suspense>
-            )}
-          </main>
-        </div>
-      </div>
-    </Theme>
+        {/* Consent Print Preview Modal */}
+        {consentModalRow && printModalData && (
+          <Suspense fallback={null}>
+            <ConsentPrintModal
+              key={consentModalRow.id}
+              isOpen={Boolean(consentModalRow)}
+              onClose={() => setConsentModalRow(null)}
+              data={printModalData}
+              onPrinted={() =>
+                markRegistrationPrinted(consentModalRow.id, 'consent')
+              }
+            />
+          </Suspense>
+        )}
+      </main>
+    </AdminLayout>
   );
 }
 

@@ -26,6 +26,8 @@ import {
   ETHNIC_GROUPS,
   BLOOD_GROUPS,
   CHECKUP_REASONS,
+  requiresCompanyName,
+  getRegistrationCompanyName,
 } from './tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
 import { BirthDateInput } from './BirthDateInput';
@@ -68,7 +70,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [ward, setWard] = useState('');
   const [addressDetail, setAddressDetail] = useState('');
   const [occupation, setOccupation] = useState('');
-  const [workplace, setWorkplace] = useState('');
+  const [workplace, setWorkplace] = useState(() => getRegistrationCompanyName(initialCheckupReason || CHECKUP_REASONS[0], ''));
   const [workplaceProvince, setWorkplaceProvince] = useState('');
   const [workplaceWard, setWorkplaceWard] = useState('');
   const [workplaceWards, setWorkplaceWards] = useState<Ward[]>([]);
@@ -76,10 +78,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [checkupReason, setCheckupReason] = useState(
     initialCheckupReason || CHECKUP_REASONS[0] || '',
   );
+  const companyRequired = requiresCompanyName(checkupReason);
+  const companyName = getRegistrationCompanyName(checkupReason, workplace);
 
   useEffect(() => {
     if (initialCheckupReason) {
       setCheckupReason(initialCheckupReason);
+      setWorkplace((current) => !current.trim() || current === 'Lao động tự do'
+        ? getRegistrationCompanyName(initialCheckupReason, '') : current);
       setTargetPayment(getDefaultTargetPaymentByReason(initialCheckupReason));
     }
   }, [initialCheckupReason]);
@@ -170,6 +176,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   // Validate Step 1
   const validateStep1 = (): boolean => {
     const newErrors: Record<string, string> = {};
+
+    if (companyRequired && !workplace.trim()) {
+      newErrors.workplace = isEn ? 'Please enter your company name' : 'Vui lòng nhập tên công ty';
+    }
 
     if (!fullName.trim()) {
       newErrors.fullName = isEn ? 'Please enter your full name' : 'Vui lòng nhập họ và tên';
@@ -268,7 +278,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       ward,
       addressDetail: addressDetail.trim(),
       occupation: occupation.trim() || 'Tự do',
-      workplace: workplace.trim(),
+      workplace: companyName,
       workplaceWard: formattedWorkplaceLocation,
       phoneNumber: phoneNumber.replace(/[^0-9]/g, ''),
       checkupReason: checkupReason || 'Khám sức khỏe tổng quát',
@@ -645,18 +655,28 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 {isEn
                   ? '10. Workplace / School (Full company/school name)'
                   : '10. Nơi làm việc, học tập (Tên đầy đủ công ty/trường)'}
+                {companyRequired && <span className="text-red-500"> *</span>}
               </label>
               <input
                 type="text"
                 value={workplace}
-                onChange={(e) => setWorkplace(e.target.value)}
+                required={companyRequired}
+                aria-required={companyRequired}
+                aria-invalid={Boolean(errors.workplace)}
+                aria-describedby={errors.workplace ? 'workplace-error' : undefined}
+                maxLength={150}
+                onChange={(e) => {
+                  setWorkplace(e.target.value);
+                  if (errors.workplace) setErrors((prev) => ({ ...prev, workplace: '' }));
+                }}
                 placeholder={
                   isEn
                     ? 'Enter company or school name...'
                     : 'Nhập tên đầy đủ công ty hoặc trường học...'
                 }
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors"
+                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${errors.workplace ? 'border-red-400 bg-red-50/30' : 'border-slate-200'}`}
               />
+              {errors.workplace && <p id="workplace-error" className="text-xs text-red-500 mt-1">{errors.workplace}</p>}
             </div>
 
             <div>
@@ -1363,13 +1383,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   {addressDetail}, {ward}, {province}
                 </span>
               </div>
-              {(workplace || formattedWorkplaceLocation) && (
+              {(companyName || formattedWorkplaceLocation) && (
                 <div className="col-span-2">
                   <span className="text-slate-500 block text-[11px]">
                     {isEn ? 'Workplace / School:' : 'Nơi làm việc, học tập:'}
                   </span>
                   <span className="font-medium text-slate-700">
-                    {workplace}{' '}
+                    {companyName}{' '}
                     {formattedWorkplaceLocation ? `(${formattedWorkplaceLocation})` : ''}
                   </span>
                 </div>

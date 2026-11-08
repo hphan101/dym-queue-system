@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,10 +9,10 @@ const root = path.resolve(__dirname, '../..');
 const directory = path.join(root, 'frontend/src/features/admin/roster');
 function load(file, imports = {}) {
   const result = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(directory, file), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  new Function('exports', 'require', code)(result, (name) => {
+  new Function('exports', 'require', code)(result, (name) => { name = rosterImport(name);
     if (!(name in imports)) throw new Error(`Unexpected import: ${name}`);
     return imports[name];
   });
@@ -199,7 +200,7 @@ test('database defaults preserve existing records and reject unknown specialties
 });
 
 test('daily Excel includes a separate provisional row and monthly provisional sheets never assign it to a person', () => {
-  const source = fs.readFileSync(path.join(directory, 'exportRosterExcel.ts'), 'utf8');
+  const source = fs.readFileSync(rosterPath('exportRosterExcel.ts'), 'utf8');
   const ast = ts.createSourceFile('excel.ts', source, ts.ScriptTarget.Latest, true);
   const functions = ast.statements.filter((node) => ts.isFunctionDeclaration(node) && ['renderRowXml', 'exportScheduleCostExcel', 'buildProvisionalSheet', 'buildActualCostSheet'].includes(node.name?.text));
   const xlsx = {};

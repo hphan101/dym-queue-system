@@ -67,6 +67,7 @@ export function exportRegistrationsToExcel({
     'Địa chỉ hiện tại',
     'Lý do khám',
     'Đối tượng & Chi trả',
+    'Ghi chú / STT HIS',
   ];
 
   const colWidths = [
@@ -89,6 +90,7 @@ export function exportRegistrationsToExcel({
     38, // Địa chỉ hiện tại
     28, // Lý do khám
     28, // Đối tượng & Chi trả
+    35, // Ghi chú / STT HIS
   ];
 
   const colsXml = colWidths
@@ -151,6 +153,7 @@ export function exportRegistrationsToExcel({
       },
       { val: resolvedReason },
       { val: formatTargetPaymentText(row) },
+      { val: row.reception_note || '' },
     ];
 
     const rowCells = values

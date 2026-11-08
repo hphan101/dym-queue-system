@@ -21,6 +21,7 @@ import {
 } from '../../registration/locationService';
 import { CHECKUP_REASONS } from '../../registration/tt25Constants';
 import { validateVietnamCccd } from '../../registration/cccdValidator';
+import { BirthDateInput } from '../../registration/BirthDateInput';
 import {
   type TT25PaymentSource,
   type TT25TargetGroup,
@@ -389,13 +390,12 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   <label className="dym-detail-label" htmlFor="edit-birth-date">
                     Ngày sinh
                   </label>
-                  <input
+                  <BirthDateInput
                     id="edit-birth-date"
-                    type="date"
                     className="dym-drawer-input"
                     value={form.birth_date}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, birth_date: e.target.value }))
+                    onChange={(birth_date) =>
+                      setForm((prev) => ({ ...prev, birth_date }))
                     }
                   />
                 </div>

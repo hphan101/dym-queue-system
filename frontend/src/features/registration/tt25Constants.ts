@@ -28,3 +28,11 @@ export const CHECKUP_REASON_OPTIONS = [
 
 export const CHECKUP_REASONS = CHECKUP_REASON_OPTIONS.map((option) => option.value);
 
+export function requiresCompanyName(reason: string): boolean {
+  return /công ty|doanh nghiệp/i.test(reason);
+}
+
+export function getRegistrationCompanyName(reason: string, company: string): string {
+  return company.trim() || (requiresCompanyName(reason) ? '' : 'Lao động tự do');
+}
+

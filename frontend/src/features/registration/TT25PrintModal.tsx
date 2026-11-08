@@ -5,6 +5,7 @@ import type { TT25RegistrationData } from './tt25Types';
 import { generateTT25OriginalPdf, getTT25TemplateInfo } from './tt25HcmPdfService';
 import { downloadPdf, printPdf } from './pdfBrowser';
 import { usePrintModalDismiss } from './usePrintModalDismiss';
+import { PdfPreview } from './PdfPreview';
 import './tt25Print.css';
 
 interface TT25PrintModalProps {
@@ -71,7 +72,7 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-[#525659]">
       {isLoading && <div role="status" className="flex items-center gap-3 p-8 text-sm text-white"><Loader2 className="size-5 animate-spin motion-reduce:animate-none" />Đang điền thông tin vào mẫu TT25 gốc...</div>}
       {error && <div role="alert" className="flex flex-col items-center gap-4 p-8 text-sm text-white"><p>{error}</p><button type="button" onClick={() => setAttempt((value) => value + 1)} className="inline-flex items-center gap-2 rounded border border-slate-400 px-3 py-2"><RefreshCw className="size-4" />Thử lại</button></div>}
-      {!isLoading && !error && pdfUrl && <iframe ref={iframeRef} src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} title="Phiếu TT25 theo mẫu Word gốc" onLoad={() => setIsPreviewReady(true)} className="h-full min-h-0 w-full flex-1 border-0" />}
+      {!isLoading && !error && pdfUrl && <PdfPreview key={pdfUrl} url={pdfUrl} iframeRef={iframeRef} title="Phiếu TT25 theo mẫu Word gốc" onReady={() => setIsPreviewReady(true)} />}
     </div>
   </div>, document.body);
 }

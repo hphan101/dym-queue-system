@@ -27,6 +27,14 @@ const cryptoHelpers = load('supabase/functions/_shared/registrationAccess.ts');
 const now = Date.UTC(2026, 10, 1, 9, 0, 0);
 const secret = 'test-only-server-signing-secret';
 
+test('moving the frontend permits only its exact configured origin and preserves existing origins', () => {
+  const env = { ALLOWED_ORIGINS: 'https://old.example.test,http://localhost:5173', PUBLIC_APP_ORIGIN: 'https://queue.pages.dev' };
+  const http = load('supabase/functions/_shared/http.ts', {}, { Deno: { env: { get: (key) => env[key] } } });
+  for (const origin of ['https://queue.pages.dev', 'https://old.example.test', 'http://localhost:5173']) assert.equal(http.isOriginAllowed(origin), true);
+  for (const origin of ['https://queue.pages.dev.attacker.test', 'https://other.pages.dev', 'http://queue.pages.dev']) assert.equal(http.isOriginAllowed(origin), false);
+  assert.equal(http.responseHeaders('https://queue.pages.dev').get('Access-Control-Allow-Origin'), 'https://queue.pages.dev');
+});
+
 test('shared Bearer parsing preserves staff and QR authorization header handling', () => {
   const { getBearerToken } = load('supabase/functions/_shared/http.ts');
   for (const [header, expected] of [[undefined, null], ['Basic token', null], ['Bearer', null],

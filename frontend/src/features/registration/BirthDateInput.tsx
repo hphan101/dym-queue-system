@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Calendar } from 'lucide-react';
 
 export interface BirthDateInputProps {
+  id?: string;
+  className?: string;
   value: string; // ISO format 'YYYY-MM-DD'
   onChange: (isoDate: string) => void;
   error?: string;
@@ -54,6 +56,8 @@ function formatDigits(val: string): string {
 const DEFAULT_BIRTH_DATE = '1990-01-01';
 
 export const BirthDateInput: React.FC<BirthDateInputProps> = ({
+  id,
+  className,
   value,
   onChange,
   error,
@@ -119,13 +123,14 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
   return (
     <div className="relative flex items-center w-full min-w-0">
       <input
+        id={id}
         type="text"
         inputMode="numeric"
         value={displayValue}
         onChange={handleTextChange}
         placeholder="01/01/1990"
         maxLength={10}
-        className={`w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
+        className={className ?? `w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
           error ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
         }`}
       />

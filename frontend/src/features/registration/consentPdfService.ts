@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
 import { formatDateForPrint, getTodayInVietnam } from '../../lib/date';
 import { drawPdfCheck } from './pdfDrawing';
 import layouts from './consentTemplateFields.json';
@@ -35,23 +35,19 @@ export function getConsentPageIndices(language: ConsentFormLanguage, option: Con
     : Array.from({ length: layout.pageCount }, (_, index) => index);
 }
 
-export async function generateConsentPdf(
-  data: TT25RegistrationData,
-  pageOption: ConsentPageOption = 'all',
-): Promise<{ blob: Blob; url: string }> {
+export async function appendConsentPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {
   const language = getConsentFormLanguage(data);
   const layout = layouts[language];
   const [template, regular, bold, italic, boldItalic] = await Promise.all([
     loadAsset(`/templates/${layout.template}`), loadAsset('/fonts/arial.ttf'),
     loadAsset('/fonts/arialbd.ttf'), loadAsset('/fonts/ariali.ttf'), loadAsset('/fonts/arialbi.ttf'),
   ]);
-  const pdf = await PDFDocument.load(template.slice(0));
-  if (pdf.getPageCount() !== layout.pageCount) throw new Error('Số trang mẫu đồng thuận không đúng với mẫu gốc.');
-  pdf.registerFontkit(fontkit);
+  const pages = await appendTemplate(session, layout.template, template);
+  if (pages.length !== layout.pageCount) throw new Error('Số trang mẫu đồng thuận không đúng với mẫu gốc.');
   const fontBytes = { regular, bold, italic, boldItalic };
   const fonts: Record<string, PDFFont> = {};
   await Promise.all(Object.entries(fontBytes).map(async ([name, bytes]) => {
-    fonts[name] = await pdf.embedFont(bytes.slice(0), { subset: true });
+    fonts[name] = await getPrintFont(session, `arial:${name}`, bytes);
   }));
   const checkupDate = formatDateForPrint(data.checkupDate || getTodayInVietnam());
   const [checkupDay = '', checkupMonth = '', checkupYear = ''] = checkupDate.split('/');
@@ -61,7 +57,6 @@ export async function generateConsentPdf(
     phoneNumber: (data.phoneNumber || '').trim(), email: (data.email || '').trim(),
     workplace: (data.workplace || '').trim(), checkupDate, checkupDay, checkupMonth, checkupYear,
   };
-  const pages = pdf.getPages();
   const queueNumber = (data.queueNumber || '').trim();
   if (queueNumber) {
     const label = 'Số thứ tự';
@@ -95,6 +90,13 @@ export async function generateConsentPdf(
   const mark = layout.genderMarks[data.gender];
   if (mark) drawPdfCheck(pages[0], mark.x, mark.y);
 
+}
+
+export async function generateConsentPdf(data: TT25RegistrationData, pageOption: ConsentPageOption = 'all'): Promise<{ blob: Blob; url: string }> {
+  const session = await createPdfPrintSession();
+  await appendConsentPdf(data, session);
+  const pdf = session.pdf;
+  const language = getConsentFormLanguage(data);
   let output = pdf;
   if (pageOption !== 'all') {
     output = await PDFDocument.create();

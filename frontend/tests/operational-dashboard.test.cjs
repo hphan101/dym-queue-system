@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,9 +7,9 @@ const ts = require('typescript');
 const directory = path.resolve(__dirname, '../src/features/admin/roster');
 function load(file, imports) {
   const result = {};
-  const source = fs.readFileSync(path.join(directory, file), 'utf8');
+  const source = fs.readFileSync(rosterPath(file), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('exports', 'require', code)(result, name => imports[name] ?? {});
+  new Function('exports', 'require', code)(result, name => imports[rosterImport(name)] ?? {});
   return result;
 }
 const service = load('rosterService.ts', { '../../../lib/supabaseClient': { supabase: {} } });

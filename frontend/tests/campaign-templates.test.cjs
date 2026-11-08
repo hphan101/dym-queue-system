@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,10 +8,10 @@ const { PGlite } = require('@electric-sql/pglite');
 const root = path.resolve(__dirname, '../..');
 function load(file, imports) {
   const exports = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(root, 'frontend/src/features/admin/roster', file), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  new Function('exports', 'require', code)(exports, (name) => imports[name]);
+  new Function('exports', 'require', code)(exports, (name) => imports[rosterImport(name)]);
   return exports;
 }
 const specialties = load('doctorSpecialties.ts', {});

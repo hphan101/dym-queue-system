@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +7,7 @@ const ts = require('typescript');
 const directory = path.resolve(__dirname, '../src/features/admin/roster');
 function load(file, resolve) {
   const result = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(directory, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('exports', 'require', code)(result, resolve);
   return result;
 }
@@ -44,7 +45,7 @@ function gesture({ fail = false, disabled = false } = {}) {
     useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = initial; return [slots[index], (value) => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }]; },
     useLayoutEffect() {},
   };
-  const module = load('useCampaignPositionDrag.ts', (name) => name === 'react' ? react : order);
+  const module = load('useCampaignPositionDrag.ts', (name) => rosterImport(name) === 'react' ? react : order);
   const view = { scrollY: 0, innerHeight: 1000, scrollBy(x, y) { this.scrollY += y; } };
   const body = {
     ownerDocument: { defaultView: view },

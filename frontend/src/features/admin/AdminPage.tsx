@@ -1,22 +1,19 @@
+import { AdminLayout } from './components/AdminLayout';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Theme } from '@astryxdesign/core/theme';
-import '@astryxdesign/core/astryx.css';
+
 import { BRANCH_NAMES } from '../../config/branches';
 import { getTodayInVietnam } from '../../lib/date';
 import { formatQueueNumber } from '../../lib/queueNumber';
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
-import { AdminSidebar } from './AdminSidebar';
-import { signOutAdminSession } from './adminIdentity';
+
 import {
   REALTIME_REGISTRATION_COLUMNS,
   type RealtimeConnectionState,
 } from './constants/queueConstants';
-import { dymAdminTheme } from './theme';
+
 import './admin.css';
 
-import { useAdminTheme } from './hooks/useAdminTheme';
-import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useDashboardQueueQuery } from './hooks/useDashboardQueueQuery';
 import { useAdminScope } from './hooks/useAdminScope';
@@ -29,14 +26,8 @@ import {
   CustomerNoticeModal,
   type CustomerNotificationItem,
 } from './components/CustomerNoticeModal';
-import {
-  QueueMetrics,
-  type QueueStatus,
-} from './components/QueueMetrics';
-import {
-  QueueTable,
-  type RegistrationRow,
-} from './components/QueueTable';
+import { QueueMetrics, type QueueStatus } from './components/QueueMetrics';
+import { QueueTable, type RegistrationRow } from './components/QueueTable';
 import { RealtimeConnectionAlert } from './components/RealtimeConnectionAlert';
 
 type PendingQueueAction = 'next' | 'recall' | null;
@@ -66,8 +57,7 @@ export function AdminPage({
   isActiveTab?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { themeMode, setThemeMode } = useAdminTheme();
-  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
+
   const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
     useStaffIdentity();
   const { branch, setBranch, date, setDate } = useAdminScope();
@@ -115,9 +105,8 @@ export function AdminPage({
     date,
   });
 
-  const [syncedDashboardData, setSyncedDashboardData] = useState<
-    typeof dashboardData
-  >(undefined);
+  const [syncedDashboardData, setSyncedDashboardData] =
+    useState<typeof dashboardData>(undefined);
   if (dashboardData !== syncedDashboardData) {
     setSyncedDashboardData(dashboardData);
     if (dashboardData) {
@@ -138,7 +127,8 @@ export function AdminPage({
       !queryError &&
       (isQueryPending || (isQueryFetching && !dashboardData)));
 
-  const dataError = actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
+  const dataError =
+    actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
 
   useEffect(() => {
     if (!actionError) return;
@@ -311,7 +301,14 @@ export function AdminPage({
       }
       void channel.unsubscribe();
     };
-  }, [branch, branchId, date, queryClient, refetchDashboard, showCustomerNotification]);
+  }, [
+    branch,
+    branchId,
+    date,
+    queryClient,
+    refetchDashboard,
+    showCustomerNotification,
+  ]);
 
   const rowsForDay = useMemo(
     () => rows.filter((row) => row.branch === branch && row.date === date),
@@ -356,10 +353,7 @@ export function AdminPage({
   const pageStartIndex = (visiblePage - 1) * DASHBOARD_PAGE_SIZE;
   const paginatedRows = useMemo(
     () =>
-      filteredRows.slice(
-        pageStartIndex,
-        pageStartIndex + DASHBOARD_PAGE_SIZE,
-      ),
+      filteredRows.slice(pageStartIndex, pageStartIndex + DASHBOARD_PAGE_SIZE),
     [filteredRows, pageStartIndex],
   );
   const firstVisibleRow = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
@@ -386,8 +380,7 @@ export function AdminPage({
     });
 
     const result = (Array.isArray(data) ? data[0] : data) as
-      | QueueActionResult
-      | undefined;
+      QueueActionResult | undefined;
 
     if (error) {
       setActionError('Không thể gọi số tiếp theo.');
@@ -426,8 +419,7 @@ export function AdminPage({
       p_branch_code: branch,
     });
     const result = (Array.isArray(data) ? data[0] : data) as
-      | QueueActionResult
-      | undefined;
+      QueueActionResult | undefined;
 
     if (error) {
       setActionError('Không thể gọi lại số hiện tại.');
@@ -458,8 +450,7 @@ export function AdminPage({
       },
     );
     const result = (Array.isArray(data) ? data[0] : data) as
-      | UndoQueueResult
-      | undefined;
+      UndoQueueResult | undefined;
 
     if (error) {
       if (error.message.includes('ALREADY_WAITING')) {
@@ -518,7 +509,8 @@ export function AdminPage({
       // Focus search on '/'
       if (event.key === '/' && !isInput) {
         event.preventDefault();
-        const searchInput = document.querySelector<HTMLInputElement>('.dym-search-field');
+        const searchInput =
+          document.querySelector<HTMLInputElement>('.dym-search-field');
         searchInput?.focus();
         return;
       }
@@ -565,87 +557,77 @@ export function AdminPage({
   );
 
   return (
-    <Theme theme={dymAdminTheme} mode={themeMode}>
-      <div className="dym-admin-shell" data-color-mode={themeMode}>
-        <AdminSidebar
-          activePage="dashboard"
-          branch={branch}
-          date={date}
-          staffName={staffName}
-          isAdmin={authorizedIsAdmin}
-          staffRole={authorizedIsAdmin ? 'admin' : staffRole}
-          themeMode={themeMode}
-          isCollapsed={isSidebarCollapsed}
-          onCollapsedChange={setIsSidebarCollapsed}
-          onThemeToggle={() =>
-            setThemeMode((current) =>
-              current === 'dark' ? 'light' : 'dark',
-            )
-          }
-          onLogout={() => void signOutAdminSession()}
+    <AdminLayout
+      activePage="dashboard"
+      branch={branch}
+      date={date}
+      staffName={staffName}
+      isAdmin={authorizedIsAdmin}
+      staffRole={authorizedIsAdmin ? 'admin' : staffRole}
+    >
+      <AdminHeader
+        registrationHref={
+          !isLoadingIdentity &&
+          (authorizedIsAdmin || staffRole === 'receptionist')
+            ? `/?branch=${branch}&staff=1`
+            : undefined
+        }
+        branch={branch}
+        branchOptions={branchOptions}
+        onBranchChange={handleBranchChange}
+        date={date}
+        onDateChange={handleDateChange}
+        isNotificationSoundEnabled={isNotificationSoundEnabled}
+        onToggleNotificationSound={() => void toggleNotificationSound()}
+      />
+
+      <CustomerNoticeModal
+        notification={customerNotification}
+        onClose={() => setCustomerNotification(null)}
+      />
+
+      <main id="overview" className="dym-admin-content">
+        <RealtimeConnectionAlert state={connectionState} />
+        {(dataError || identityError) && (
+          <div className="dym-data-error" role="alert" aria-live="polite">
+            {dataError || identityError}
+          </div>
+        )}
+
+        <QueueMetrics
+          currentQueue={currentQueue}
+          currentPatient={currentPatient}
+          branchName={BRANCH_NAMES[branch]}
+          announcement={announcement}
+          isMutating={isMutating}
+          isDataLoading={isDataLoading}
+          counts={counts}
+          totalDayCount={rowsForDay.length}
+          pendingAction={pendingQueueAction}
+          onCallNext={() => void callNext()}
+          onRecallCurrent={() => void recallCurrent()}
         />
 
-        <div className="dym-admin-workspace">
-          <AdminHeader
-            registrationHref={!isLoadingIdentity && (authorizedIsAdmin || staffRole === 'receptionist') ? `/?branch=${branch}&staff=1` : undefined}
-            branch={branch}
-            branchOptions={branchOptions}
-            onBranchChange={handleBranchChange}
-            date={date}
-            onDateChange={handleDateChange}
-            isNotificationSoundEnabled={isNotificationSoundEnabled}
-            onToggleNotificationSound={() => void toggleNotificationSound()}
-          />
-
-          <CustomerNoticeModal
-            notification={customerNotification}
-            onClose={() => setCustomerNotification(null)}
-          />
-
-          <main id="overview" className="dym-admin-content">
-            <RealtimeConnectionAlert state={connectionState} />
-            {(dataError || identityError) && (
-              <div className="dym-data-error" role="alert" aria-live="polite">
-                {dataError || identityError}
-              </div>
-            )}
-
-            <QueueMetrics
-              currentQueue={currentQueue}
-              currentPatient={currentPatient}
-              branchName={BRANCH_NAMES[branch]}
-              announcement={announcement}
-              isMutating={isMutating}
-              isDataLoading={isDataLoading}
-              counts={counts}
-              totalDayCount={rowsForDay.length}
-              pendingAction={pendingQueueAction}
-              onCallNext={() => void callNext()}
-              onRecallCurrent={() => void recallCurrent()}
-            />
-
-            <QueueTable
-              filteredRows={filteredRows}
-              paginatedRows={paginatedRows}
-              query={query}
-              onQueryChange={setQuery}
-              isDataLoading={isDataLoading}
-              isMutating={isMutating}
-              pendingUndoId={pendingUndoId}
-              branchName={BRANCH_NAMES[branch]}
-              date={date}
-              today={getTodayInVietnam()}
-              visiblePage={visiblePage}
-              totalPages={totalPages}
-              firstVisibleRow={firstVisibleRow}
-              lastVisibleRow={lastVisibleRow}
-              onPageChange={setCurrentPage}
-              onReturnToWaiting={(row) => void returnToWaiting(row)}
-            />
-          </main>
-        </div>
-      </div>
-    </Theme>
+        <QueueTable
+          filteredRows={filteredRows}
+          paginatedRows={paginatedRows}
+          query={query}
+          onQueryChange={setQuery}
+          isDataLoading={isDataLoading}
+          isMutating={isMutating}
+          pendingUndoId={pendingUndoId}
+          branchName={BRANCH_NAMES[branch]}
+          date={date}
+          today={getTodayInVietnam()}
+          visiblePage={visiblePage}
+          totalPages={totalPages}
+          firstVisibleRow={firstVisibleRow}
+          lastVisibleRow={lastVisibleRow}
+          onPageChange={setCurrentPage}
+          onReturnToWaiting={(row) => void returnToWaiting(row)}
+        />
+      </main>
+    </AdminLayout>
   );
 }
 

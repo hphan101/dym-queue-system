@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +7,7 @@ const ts = require('typescript');
 const directory = path.resolve(__dirname, '../src/features/admin/roster');
 function load(file, imports) {
   const result = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(directory, file), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   new Function('exports', 'require', code)(result, () => imports);
@@ -82,14 +83,14 @@ test('range loading requests both ends of a cross-month week, while monthly call
 });
 
 test('the week view hides previous data when the date, branch or refresh changes', () => {
-  const code = ts.transpileModule(fs.readFileSync(path.join(directory, 'RosterInsiteWeek.tsx'), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(rosterPath('RosterInsiteWeek.tsx'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   const cached = { key: '2026-11-02-2026-11-08-q1-0-0', value: { schedules: [], assignments: [], dailyRoomOverrides: [] } };
   function render(date, branch, refreshKey) {
     const state = [cached, null, 0];
     const result = {};
-    new Function('exports', 'require', code)(result, (name) => {
+    new Function('exports', 'require', code)(result, (name) => { name = rosterImport(name);
       if (name === 'react') return { useState: () => [state.shift(), () => {}], useEffect: () => {} };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === './rosterService') return service;

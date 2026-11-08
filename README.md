@@ -11,8 +11,38 @@ Hệ thống đăng ký số thứ tự, điều phối tại lễ tân và màn
 - Supabase Auth: đăng nhập nhân viên.
 - Supabase Realtime: đồng bộ danh sách và màn hình gọi số.
 - Vercel: hosting frontend và security headers.
+- Cloudflare Pages: phương án hosting frontend, cấu hình trong `frontend/wrangler.toml`.
 
 Google Apps Script và Google Sheet không còn nằm trong luồng chạy hiện tại.
+
+Hướng dẫn triển khai Cloudflare Pages: [docs/cloudflare-pages.md](docs/cloudflare-pages.md).
+
+### Cấu trúc frontend
+
+Các trang quản trị dùng chung `features/admin/components/AdminLayout.tsx` cho
+sidebar, theme và vùng nội dung. `RosterShell` bổ sung tiêu đề và trạng thái riêng
+của điều phối. Các module điều phối nằm trong `frontend/src/features/admin/roster/`:
+
+```text
+roster/
+  clinic/       Lịch tuần, lịch ngày và phòng khám
+  onsite/       Đoàn khám, lịch đoàn, set-up và vị trí mẫu
+  dashboard/    Tổng quan vận hành và biểu đồ
+  personnel/    Danh mục nhân sự và hồ sơ đính kèm
+  settlement/   Quyết toán chi phí
+  shared/       Khung trang, phân công, kéo thả, dự phòng và xuất Excel
+  data/         Context, service Supabase và các kiểu dữ liệu
+  index.ts      Điểm nhập cho ứng dụng quản trị
+```
+
+Đặt thành phần chỉ dùng bởi một trang vào thư mục chức năng của trang đó;
+chuyển sang `shared/` khi có nhiều chức năng cùng sử dụng. Các kiểu dữ liệu nằm
+trong `data/types.ts`; `rosterService.ts` giữ API truy cập dữ liệu và tiếp tục
+export các kiểu để tương thích với những nơi đang dùng.
+
+Bộ kiểm thử nằm trong `frontend/tests/`. Helper `tests/helpers/roster-modules.cjs`
+định vị module và chuẩn hóa tên dependency giả lập khi thay đổi cấu trúc thư mục;
+TypeScript và Vite kiểm tra các đường dẫn import thực tế khi build.
 
 ## Chạy local
 

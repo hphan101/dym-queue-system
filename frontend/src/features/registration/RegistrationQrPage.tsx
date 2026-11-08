@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { ArrowLeft, LockKeyhole, LogIn, Maximize2, RefreshCw, ShieldCheck, WifiOff } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -154,18 +153,15 @@ function QrScreen({ onSessionExpired }: { onSessionExpired: () => void }) {
         <CardContent>
           <Separator />
           <div className="registration-qr-content">
-            <div>
-              <Badge variant="secondary">{activeQr ? 'Đang nhận đăng ký' : 'Đang kết nối'}</Badge>
-              <h1 className="registration-qr-title">Quét mã QR<br />để lấy số khám</h1>
-              <p className="max-w-sm text-muted-foreground">Dùng camera điện thoại để bắt đầu đăng ký. Không cần cài đặt ứng dụng.</p>
+            <section className="registration-qr-instructions" aria-label="Hướng dẫn khám sức khỏe">
               <ol className="registration-qr-steps">
-                <li><span>1</span>Mở camera và quét mã QR</li>
-                <li><span>2</span>Điền thông tin khám sức khỏe</li>
-                <li><span>3</span>Nhận số thứ tự và chờ gọi</li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">1</span><div><p className="registration-qr-step-vietnamese">Bước 1: Quét mã QR để lấy số thứ tự.</p><p className="registration-qr-step-english" lang="en">Step 1: Scan the QR code to get your queue number.</p></div></li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">2</span><div><p className="registration-qr-step-vietnamese">Bước 2: Chờ gọi tên khám và ký tên theo số thứ tự.</p><p className="registration-qr-step-english" lang="en">Step 2: Wait for your name to be called for your health check and sign the forms in queue order.</p></div></li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">3</span><div><p className="registration-qr-step-vietnamese">Bước 3: Hoàn thành khám và gửi hồ sơ lại quầy lễ tân.</p><p className="registration-qr-step-english" lang="en">Step 3: After your health check, return your documents to the reception desk.</p></div></li>
               </ol>
-            </div>
+            </section>
             <div className="registration-qr-scan">
-              {activeQr ? <div className="registration-qr-code"><QRCodeSVG value={registrationUrl} size={320} level="M" marginSize={4} bgColor="#ffffff" fgColor="#17324d" title={`Quét để đăng ký tại ${BRANCH_NAMES[branch]}`} /></div>
+              {activeQr ? <div className="registration-qr-code"><QRCodeSVG value={registrationUrl} size={640} level="M" marginSize={4} bgColor="#ffffff" fgColor="#17324d" title={`Quét để đăng ký tại ${BRANCH_NAMES[branch]}`} /></div>
                 : <div className="registration-qr-code-placeholder">{isLoading ? <Skeleton className="size-full aspect-square" /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><WifiOff /></EmptyMedia><EmptyTitle>Đang chờ mã mới</EmptyTitle><EmptyDescription>Vui lòng chờ kết nối hoặc liên hệ lễ tân.</EmptyDescription></EmptyHeader></Empty>}</div>}
               <p className="registration-qr-countdown">{activeQr ? <>Mã mới sau <strong>00:{String(seconds).padStart(2, '0')}</strong></> : 'QR hết hạn sẽ tự ẩn để tránh khách quét nhầm.'}</p>
               <div className="registration-qr-track" aria-hidden="true"><div style={{ width: `${Math.min(100, seconds / 60 * 100)}%` }} /></div>
@@ -173,10 +169,7 @@ function QrScreen({ onSessionExpired }: { onSessionExpired: () => void }) {
           </div>
           {error && <Alert variant="destructive"><WifiOff className="size-4" /><AlertTitle>Chưa cập nhật được mã QR</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
         </CardContent>
-        <CardFooter className="flex-wrap justify-between gap-3">
-          <p className="flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="size-4" aria-hidden="true" />Mỗi lượt quét hợp lệ có 20 phút điền thông tin.</p>
-          {error && <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}><RefreshCw data-icon="inline-start" />Kết nối lại</Button>}
-        </CardFooter>
+        {error && <CardFooter><Button variant="outline" onClick={() => setAttempt((value) => value + 1)}><RefreshCw data-icon="inline-start" />Kết nối lại</Button></CardFooter>}
       </Card>
     </div>
   );

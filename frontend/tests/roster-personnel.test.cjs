@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +13,7 @@ function compile(source) {
 }
 function loadService(supabase = {}) {
   const result = {};
-  new Function('exports', 'require', compile(fs.readFileSync(path.join(directory, 'rosterService.ts'), 'utf8')))(
+  new Function('exports', 'require', compile(fs.readFileSync(rosterPath('rosterService.ts'), 'utf8')))(
     result, () => ({ supabase }),
   );
   return result;
@@ -20,7 +21,7 @@ function loadService(supabase = {}) {
 
 // Execute the actual import callback without mounting the authenticated React page.
 function parseRows(rows, personnelList = []) {
-  const source = fs.readFileSync(path.join(directory, 'RosterPersonnelPage.tsx'), 'utf8');
+  const source = fs.readFileSync(rosterPath('RosterPersonnelPage.tsx'), 'utf8');
   const ast = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const helpers = ast.statements.filter((node) => ts.isFunctionDeclaration(node) &&
     ['normalizePhone', 'normalizeName', 'inferRoleFromText'].includes(node.name?.text));
@@ -94,7 +95,7 @@ test('personnel CRUD persists trimmed identifiers and rejects malformed identity
 });
 
 test('downloaded Excel template matches the new import order and keeps CCCD as text', () => {
-  const source = fs.readFileSync(path.join(directory, 'exportRosterExcel.ts'), 'utf8');
+  const source = fs.readFileSync(rosterPath('exportRosterExcel.ts'), 'utf8');
   const ast = ts.createSourceFile('excel.ts', source, ts.ScriptTarget.Latest, true);
   const functions = ast.statements.filter((node) => ts.isFunctionDeclaration(node) &&
     ['renderRowXml', 'exportPersonnelTemplateExcel'].includes(node.name?.text));

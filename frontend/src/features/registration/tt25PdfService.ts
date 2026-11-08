@@ -1,6 +1,6 @@
-import { PDFDocument, rgb, LineCapStyle } from 'pdf-lib';
+import { rgb, LineCapStyle } from 'pdf-lib';
 import type { PDFPage } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
 import type { TT25RegistrationData } from './tt25Types';
 
 // Cached font & template buffers to avoid re-fetching on every modal open
@@ -67,15 +67,11 @@ async function loadAssets() {
   };
 }
 
-export async function generateTT25OriginalPdf(
-  data: TT25RegistrationData,
-): Promise<{ blob: Blob; url: string }> {
+export async function appendTT25OriginalPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {
   const { templateBytes, fontRegBytes, fontBldBytes } = await loadAssets();
 
   // Create fresh copy of bytes so ArrayBuffer is never detached or mutated across runs
   const templateUint8 = new Uint8Array(templateBytes.slice(0));
-  const fontRegUint8 = new Uint8Array(fontRegBytes.slice(0));
-  const fontBldUint8 = new Uint8Array(fontBldBytes.slice(0));
 
   // Check PDF magic header '%PDF'
   const header = String.fromCharCode(templateUint8[0], templateUint8[1], templateUint8[2], templateUint8[3]);
@@ -83,19 +79,12 @@ export async function generateTT25OriginalPdf(
     throw new Error(`Invalid PDF header: expected '%PDF' but received '${header}' (length ${templateUint8.length})`);
   }
 
-  // Handle both ESM and CJS fontkit module shapes
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fk = (fontkit as any)?.default || fontkit;
-
-  const outDoc = await PDFDocument.load(templateUint8);
-  outDoc.registerFontkit(fk);
-
-  const pages = outDoc.getPages();
+  const pages = await appendTemplate(session, 'mau-03-tt25.pdf', templateBytes);
   const page1 = pages[0];
   const page2 = pages[1];
 
-  const fontReg = await outDoc.embedFont(fontRegUint8);
-  const fontBld = await outDoc.embedFont(fontBldUint8);
+  const fontReg = await getPrintFont(session, 'times:regular', fontRegBytes, false);
+  const fontBld = await getPrintFont(session, 'times:bold', fontBldBytes, false);
 
   const black = rgb(0, 0, 0);
   const white = rgb(1, 1, 1);
@@ -462,7 +451,12 @@ export async function generateTT25OriginalPdf(
     });
   }
 
-  const pdfBytes = await outDoc.save();
+}
+
+export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promise<{ blob: Blob; url: string }> {
+  const session = await createPdfPrintSession();
+  await appendTT25OriginalPdf(data, session);
+  const pdfBytes = await session.pdf.save();
   const safeArrayBuffer = pdfBytes.buffer.slice(
     pdfBytes.byteOffset,
     pdfBytes.byteOffset + pdfBytes.byteLength,

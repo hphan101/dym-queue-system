@@ -1,0 +1,30 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('typescript');
+
+test('birth date editing displays day/month/year and saves ISO without swapping day and month', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/BirthDateInput.tsx'), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const exports = {};
+  const react = { useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}], useRef: () => ({ current: null }), useEffect() {} };
+  const mocks = { react, 'react/jsx-runtime': require('react/jsx-runtime'), 'lucide-react': { Calendar: 'Calendar' } };
+  new Function('exports', 'require', code)(exports, (name) => mocks[name]);
+  const changes = [];
+  const tree = exports.BirthDateInput({ id: 'edit-birth-date', className: 'dym-drawer-input', value: '2003-08-18', onChange: (value) => changes.push(value) });
+  const input = tree.props.children[0];
+  assert.equal(input.props.type, 'text');
+  assert.equal(input.props.id, 'edit-birth-date');
+  assert.equal(input.props.className, 'dym-drawer-input');
+  assert.equal(input.props.value, '18/08/2003');
+  input.props.onChange({ target: { value: '07082003' } });
+  assert.equal(changes.pop(), '2003-08-07');
+  input.props.onChange({ target: { value: '29/02/2004' } });
+  assert.equal(changes.pop(), '2004-02-29');
+  input.props.onChange({ target: { value: '31/02/2003' } });
+  assert.equal(changes.pop(), '');
+  const picker = tree.props.children[1].props.children[1];
+  picker.props.onChange({ target: { value: '2001-12-25' } });
+  assert.equal(changes.pop(), '2001-12-25');
+});

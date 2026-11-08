@@ -28,6 +28,7 @@ function loadService() {
     './consentTemplateFields.json': layout,
     '../../lib/date': { ...date, getTodayInVietnam: () => '2026-11-01' },
     './pdfDrawing': drawing,
+    './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
   };
   const execute = new Function('exports', 'require', 'fetch', 'Blob', 'URL', code);
   execute(exports, (name) => dependencies[name], async (url) => {

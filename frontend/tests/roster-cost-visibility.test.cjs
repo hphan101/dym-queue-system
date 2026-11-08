@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +7,7 @@ const ts = require('typescript');
 const directory = path.resolve(__dirname, '../src/features/admin/roster');
 function compile(file, requireForTest) {
   const result = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(directory, file), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   new Function('exports', 'require', code)(result, requireForTest);
@@ -15,13 +16,13 @@ function compile(file, requireForTest) {
 const specialties = compile('doctorSpecialties.ts', () => ({}));
 const campaignGroups = compile('campaignGroups.ts', () => ({}));
 const positionOrder = compile('campaignPositionOrder.ts', () => ({}));
-const service = compile('rosterService.ts', (name) => name === './doctorSpecialties' ? specialties : { supabase: {} });
-const templates = compile('campaignTemplates.ts', (name) => name === './rosterService' ? service : { supabase: {} });
+const service = compile('rosterService.ts', (name) => rosterImport(name) === './doctorSpecialties' ? specialties : { supabase: {} });
+const templates = compile('campaignTemplates.ts', (name) => rosterImport(name) === './rosterService' ? service : { supabase: {} });
 const person = { id: 'person', personnel_code: 'BS-001', full_name: 'Bác sĩ An', role_type: 'doctor', fixed_cost: 1234567 };
 const assignment = { id: 'assignment', schedule_id: 'campaign', personnel_id: person.id, position_label: 'Khám Nội', shift_period: 'FULL', base_cost_snapshot: 1234567, allowance_cost: 7654321 };
 function loadComponent(file, stateValues, context, category = 'onsite', onStateChange = () => {}) {
   let index = 0;
-  return compile(file, (name) => {
+  return compile(file, (name) => { name = rosterImport(name);
     if (name === 'react/jsx-runtime') return require(name);
     if (name === 'react') return {
       useState(initial) { const current = index++; return [current in stateValues ? stateValues[current] : (initial === 'week' ? 'details' : initial === 'onsite' ? category : typeof initial === 'function' ? initial() : initial), (value) => onStateChange(current, value)]; },

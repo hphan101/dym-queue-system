@@ -5,12 +5,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fix layout property animation: prevent animating padding on toast wrapper */
-.xjshnde:not(#\#):not(#\#):not(#\#),
-.xjshnde {
-  transition-property: grid-template-rows !important;
-}
-
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;

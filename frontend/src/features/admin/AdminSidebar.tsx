@@ -216,7 +216,7 @@ export function AdminSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                tooltip={`Mở màn hình chờ — ${BRANCH_NAMES[branch]}`}
+                tooltip={`Mở màn hình chờ: ${BRANCH_NAMES[branch]}`}
                 className="border border-sidebar-border bg-sidebar-accent/35 hover:bg-sidebar-accent"
               >
                 <a
@@ -406,7 +406,7 @@ export function AdminSidebar({
                 )}
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton disabled tooltip="Cài đặt — Sắp có">
+                  <SidebarMenuButton disabled tooltip="Cài đặt (sắp có)">
                     <Settings2 aria-hidden="true" />
                     <span>Cài đặt</span>
                   </SidebarMenuButton>
@@ -436,7 +436,7 @@ export function AdminSidebar({
                 sideOffset={8}
                 hidden={!isCollapsed}
               >
-                {staffName} — {roleLabel}
+                {staffName} ({roleLabel})
               </TooltipContent>
             </Tooltip>
             <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">

@@ -1,3 +1,4 @@
+const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,7 +9,7 @@ const root = path.resolve(__dirname, '../..');
 const personnelId = '00000000-0000-4000-8000-000000000001';
 function load(supabase = {}) {
   const result = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(root, 'frontend/src/features/admin/roster/personnelDocuments.ts'), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, 'frontend/src/features/admin/roster/personnel/personnelDocuments.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   new Function('exports', 'require', code)(result, () => ({ supabase }));

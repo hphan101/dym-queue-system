@@ -1,5 +1,5 @@
-import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import { rgb, type PDFFont } from 'pdf-lib';
+import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
 import { formatDateForPrint, getTodayInVietnam } from '../../lib/date';
 import { drawPdfCheck } from './pdfDrawing';
 import { getDefaultTargetPaymentByReason, type TT25RegistrationData, type TT25TargetPaymentInfo } from './tt25Types';
@@ -41,21 +41,21 @@ function loadAsset(path: string) {
   return request;
 }
 
-export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promise<{ blob: Blob; url: string }> {
+export async function appendTT25OriginalPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {
   const info = getTT25TemplateInfo(data);
   if (info.key === 'legacy') {
     const legacy = await import('./tt25PdfService');
-    return legacy.generateTT25OriginalPdf(data);
+    await legacy.appendTT25OriginalPdf(data, session);
+    return;
   }
   const layout = layouts[info.key];
   const fontNames = ['regular', 'bold', 'italic', 'boldItalic'] as const;
   const bytes = await Promise.all([loadAsset(`/templates/${layout.template}`),
     ...['arial.ttf', 'arialbd.ttf', 'ariali.ttf', 'arialbi.ttf'].map((file) => loadAsset(`/fonts/${file}`))]);
-  const pdf = await PDFDocument.load(bytes[0].slice(0));
-  if (pdf.getPageCount() !== layout.pageCount) throw new Error('Số trang mẫu TT25 không khớp bản gốc.');
-  pdf.registerFontkit(fontkit);
+  const pages = await appendTemplate(session, layout.template, bytes[0]);
+  if (pages.length !== layout.pageCount) throw new Error('Số trang mẫu TT25 không khớp bản gốc.');
   const fonts: Record<string, PDFFont> = {};
-  await Promise.all(fontNames.map(async (name, index) => { fonts[name] = await pdf.embedFont(bytes[index + 1].slice(0), { subset: true }); }));
+  await Promise.all(fontNames.map(async (name, index) => { fonts[name] = await getPrintFont(session, `arial:${name}`, bytes[index + 1]); }));
   const checkupDate = formatDateForPrint(data.checkupDate || getTodayInVietnam());
   const targetPayment = data.targetPayment ?? getDefaultTargetPaymentByReason(data.checkupReason, Boolean(data.workplace));
   const fullName = (data.fullName || '').trim().toUpperCase();
@@ -77,7 +77,6 @@ export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promi
     pregnancyDetails: data.gender === 'Nữ' && history?.pregnancyHistory?.hasHistory ? history.pregnancyHistory.details : '',
     personalOtherDetails: history?.personalHistory?.[22] ? history.personalOtherDetails : '',
   };
-  const pages = pdf.getPages();
   for (const field of layout.fields) {
     const text = (values[field.field] || '').replace(/\s+/g, ' ').trim();
     if (!text) continue;
@@ -100,7 +99,16 @@ export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promi
     tick(layout.checks.currentTreatment[history.currentTreatment.isTreating ? 'yes' : 'no']);
     if (data.gender === 'Nữ' && history.pregnancyHistory) tick(layout.checks.pregnancyHistory[history.pregnancyHistory.hasHistory ? 'yes' : 'no']);
   }
-  const output = await pdf.save();
+}
+
+export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promise<{ blob: Blob; url: string }> {
+  if (getTT25TemplateInfo(data).key === 'legacy') {
+    const legacy = await import('./tt25PdfService');
+    return legacy.generateTT25OriginalPdf(data);
+  }
+  const session = await createPdfPrintSession();
+  await appendTT25OriginalPdf(data, session);
+  const output = await session.pdf.save();
   const blob = new Blob([output as BlobPart], { type: 'application/pdf' });
   return { blob, url: URL.createObjectURL(blob) };
 }

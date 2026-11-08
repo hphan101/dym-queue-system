@@ -12,6 +12,7 @@ import {
   getRegistrationDisplayState,
 } from '../utils/adminFormatters';
 import { HighlightText } from './HighlightText';
+import { ReceptionNoteCell } from './ReceptionNoteCell';
 
 export interface RegistrationsTableProps {
   rows: RegistrationDetails[];
@@ -21,6 +22,7 @@ export interface RegistrationsTableProps {
   onPrintConsentRow?: (row: RegistrationDetails) => void;
   checkedIds?: Set<string>;
   onToggleChecked?: (ids: string[], checked: boolean) => void;
+  onNoteSaved: (id: string, note: string) => void;
 }
 
 export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
@@ -31,6 +33,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
   onPrintConsentRow,
   checkedIds,
   onToggleChecked,
+  onNoteSaved,
 }) => {
   const { getStatus } = usePrintStatus();
   const isSelectable = Boolean(checkedIds && onToggleChecked);
@@ -59,6 +62,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
             <th scope="col">Tên Khách Hàng</th>
             <th scope="col">Liên Hệ & Định Danh</th>
             <th scope="col">Đơn Vị & Địa Chỉ</th>
+            <th scope="col">Ghi chú / STT HIS</th>
             <th scope="col">Trạng Thái</th>
             <th scope="col">Trạng Thái In</th>
             <th scope="col" className="text-right">Hồ Sơ</th>
@@ -196,6 +200,9 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 </td>
 
                 {/* Status */}
+                <td className="min-w-[240px] max-w-xs">
+                  <ReceptionNoteCell id={row.id} name={row.full_name} value={row.reception_note ?? ''} query={searchQuery} onSaved={(note) => onNoteSaved(row.id, note)} />
+                </td>
                 <td>
                   <span className={`dym-status-badge ${displayState.cls}`}>
                     <span className="dym-status-indicator-dot" />

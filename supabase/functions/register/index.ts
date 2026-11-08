@@ -221,7 +221,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     province,
     ward,
     addressDetail,
-    companyName,
+    companyName: companyName || (/work permit|khám sức khỏe khác/i.test(String(tt25Extras.checkupReason ?? '')) ? 'Lao động tự do' : ''),
     honeypot,
     tt25Extras,
   };
@@ -289,7 +289,7 @@ function isValidPayload(payload: RegistrationPayload): boolean {
     isValidDate(payload.birthDate) &&
     GENDERS.has(payload.gender) &&
     isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate) &&
-    isSafeText(payload.companyName, 0, 150) &&
+    isSafeText(payload.companyName, /công ty|doanh nghiệp/i.test(String(payload.tt25Extras.checkupReason ?? '')) ? 1 : 0, 150) &&
     isSafeText(payload.province, 1, 120) &&
     isSafeText(payload.ward, 1, 120) &&
     isSafeText(payload.addressDetail, 3, 250) &&

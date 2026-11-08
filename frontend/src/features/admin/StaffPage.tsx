@@ -1,3 +1,4 @@
+import { AdminLayout } from './components/AdminLayout';
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
@@ -6,8 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
 import { Avatar } from '@astryxdesign/core/Avatar';
-import { Theme } from '@astryxdesign/core/theme';
-import '@astryxdesign/core/astryx.css';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,25 +16,15 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { supabase } from '../../lib/supabaseClient';
 import type { BranchCode } from '../../types/domain';
-import { AdminSidebar } from './AdminSidebar';
-import {
-  getInitialStaffName,
-  rememberStaffName,
-  signOutAdminSession,
-} from './adminIdentity';
-import { dymAdminTheme } from './theme';
+
+import { getInitialStaffName, rememberStaffName } from './adminIdentity';
+
 import './admin.css';
 import './staff.css';
 
-import { useAdminTheme } from './hooks/useAdminTheme';
-import { useSidebarResponsive } from './hooks/useSidebarResponsive';
 import { formatDateTime, normalizeSearch } from './utils/adminFormatters';
 import { AdminHeader } from './components/AdminHeader';
-import type {
-  StaffAccount,
-  StaffFormState,
-  StaffStatusTab,
-} from './types';
+import type { StaffAccount, StaffFormState, StaffStatusTab } from './types';
 import { StaffFormModal } from './components/StaffFormModal';
 import { StaffLockConfirmModal } from './components/StaffLockConfirmModal';
 import { StaffDeleteConfirmModal } from './components/StaffDeleteConfirmModal';
@@ -151,7 +141,8 @@ async function requestStaffApi(
   }
 
   if (!response.ok || !result?.success) {
-    const fallbackCode = response.status === 403 ? 'ORIGIN_NOT_ALLOWED' : 'REQUEST_FAILED';
+    const fallbackCode =
+      response.status === 403 ? 'ORIGIN_NOT_ALLOWED' : 'REQUEST_FAILED';
     throw new Error(result?.code ?? fallbackCode);
   }
   return result;
@@ -162,8 +153,6 @@ export function StaffPage({
 }: {
   isActiveTab?: boolean;
 } = {}) {
-  const { themeMode, setThemeMode } = useAdminTheme();
-  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
   const { branch: scopeBranch, date: scopeDate } = useAdminScope();
   const [staffName, setStaffName] = useState(getInitialStaffName);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -195,10 +184,13 @@ export function StaffPage({
     useState<StaffAccount | null>(null);
   const [accountPendingDeletion, setAccountPendingDeletion] =
     useState<StaffAccount | null>(null);
-  const [passwordResetAccount, setPasswordResetAccount] = useState<StaffAccount | null>(null);
+  const [passwordResetAccount, setPasswordResetAccount] =
+    useState<StaffAccount | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmedPassword, setConfirmedPassword] = useState('');
-  const [passwordResetError, setPasswordResetError] = useState<string | null>(null);
+  const [passwordResetError, setPasswordResetError] = useState<string | null>(
+    null,
+  );
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const searchInputId = useId();
@@ -276,7 +268,8 @@ export function StaffPage({
       cachedStaffAccounts = nextStaff;
       setStaff(nextStaff);
     } catch (requestError) {
-      const code = requestError instanceof Error ? requestError.message : undefined;
+      const code =
+        requestError instanceof Error ? requestError.message : undefined;
       showError(apiErrorMessage(code));
     } finally {
       if (showLoading) setIsLoading(false);
@@ -420,7 +413,8 @@ export function StaffPage({
       setIsFormOpen(false);
       await loadStaff(false);
     } catch (requestError) {
-      const code = requestError instanceof Error ? requestError.message : undefined;
+      const code =
+        requestError instanceof Error ? requestError.message : undefined;
       setFormError(apiErrorMessage(code));
     } finally {
       setIsSaving(false);
@@ -467,7 +461,8 @@ export function StaffPage({
       cachedStaffAccounts = previousStaff;
       setStaff(previousStaff);
       showSuccess(null);
-      const code = requestError instanceof Error ? requestError.message : undefined;
+      const code =
+        requestError instanceof Error ? requestError.message : undefined;
       showError(apiErrorMessage(code));
     } finally {
       setPendingAccountId(null);
@@ -521,7 +516,8 @@ export function StaffPage({
       cachedStaffAccounts = previousStaff;
       setStaff(previousStaff);
       showSuccess(null);
-      const code = requestError instanceof Error ? requestError.message : undefined;
+      const code =
+        requestError instanceof Error ? requestError.message : undefined;
       showError(apiErrorMessage(code));
     } finally {
       setPendingAccountId(null);
@@ -568,7 +564,8 @@ export function StaffPage({
       showSuccess(`Đã đổi mật khẩu cho ${passwordResetAccount.displayName}.`);
       setPasswordResetAccount(null);
     } catch (requestError) {
-      const code = requestError instanceof Error ? requestError.message : undefined;
+      const code =
+        requestError instanceof Error ? requestError.message : undefined;
       setPasswordResetError(apiErrorMessage(code));
     } finally {
       setIsResettingPassword(false);
@@ -576,484 +573,503 @@ export function StaffPage({
   };
 
   return (
-    <Theme theme={dymAdminTheme} mode={themeMode}>
-      <div className="dym-admin-shell dym-staff-page" data-color-mode={themeMode}>
-        <AdminSidebar
-          activePage="staff"
-          branch={scopeBranch}
-          date={scopeDate}
-          staffName={staffName}
-          isAdmin={true}
-          themeMode={themeMode}
-          isCollapsed={isSidebarCollapsed}
-          onCollapsedChange={setIsSidebarCollapsed}
-          onThemeToggle={() =>
-            setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))
-          }
-          onLogout={() => void signOutAdminSession()}
-        />
-
-        <div className="dym-admin-workspace">
-          {/* Unified Clinical Precision Header */}
-          <AdminHeader
-            title="Quản lý nhân viên"
-            actions={
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={openCreateForm}
-                  title="Thêm tài khoản nhân viên mới"
-                  className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
-                >
-                  <PlusIcon className="size-3.5 shrink-0" />
-                  <span>Thêm nhân viên</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoading}
-                  onClick={() => void loadStaff()}
-                  title="Làm mới danh sách nhân viên (F5)"
-                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-                >
-                  <ArrowPathIcon
-                    className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
-                    aria-hidden="true"
-                  />
-                  <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-                </Button>
-              </div>
-            }
+    <AdminLayout
+      activePage="staff"
+      branch={scopeBranch}
+      date={scopeDate}
+      staffName={staffName}
+      isAdmin={true}
+      className="dym-staff-page"
+      overlays={
+        <>
+          {/* Modal 1: Create / Edit Staff Form */}
+          <StaffFormModal
+            isOpen={isFormOpen}
+            onClose={() => setIsFormOpen(false)}
+            form={form}
+            setForm={setForm}
+            isSaving={isSaving}
+            formError={formError}
+            onSave={saveStaff}
+            toggleBranch={toggleBranch}
           />
-
-          <main className="dym-admin-content">
-            {error && (
-              <div className="dym-data-error flex items-center justify-between gap-3" role="alert">
-                <span>{error}</span>
-                <button
-                  type="button"
-                  onClick={() => setError(null)}
-                  aria-label="Đóng thông báo lỗi"
-                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            )}
-            {success && (
-              <div className="dym-staff-success" role="status">
-                <span>{success}</span>
-                <button
-                  type="button"
-                  onClick={() => setSuccess(null)}
-                  aria-label="Đóng thông báo"
-                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            )}
-
-            {/* Precision Table Panel */}
-            <section
-              className="dym-registry-panel"
-              aria-labelledby="staff-list-title"
+          {/* Modal 2: Confirm Account Lock */}
+          <StaffLockConfirmModal
+            account={accountPendingConfirmation}
+            onClose={() => setAccountPendingConfirmation(null)}
+            onConfirm={(account) => {
+              setAccountPendingConfirmation(null);
+              void setAccountActive(account);
+            }}
+            isPending={Boolean(pendingAccountId)}
+          />
+          {/* Modal 3: Confirm Account Deletion */}
+          <StaffDeleteConfirmModal
+            account={accountPendingDeletion}
+            onClose={() => setAccountPendingDeletion(null)}
+            onConfirm={(account) => {
+              setAccountPendingDeletion(null);
+              void deleteStaffAccount(account);
+            }}
+            isPending={Boolean(pendingAccountId)}
+          />
+          {/* Modal 4: Password Reset */}
+          <StaffPasswordResetModal
+            account={passwordResetAccount}
+            onClose={() => setPasswordResetAccount(null)}
+            newPassword={newPassword}
+            setNewPassword={setNewPassword}
+            confirmedPassword={confirmedPassword}
+            setConfirmedPassword={setConfirmedPassword}
+            passwordResetError={passwordResetError}
+            isResetting={isResettingPassword}
+            onReset={resetPassword}
+          />
+        </>
+      }
+    >
+      {/* Unified Clinical Precision Header */}
+      <AdminHeader
+        title="Quản lý nhân viên"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={openCreateForm}
+              title="Thêm tài khoản nhân viên mới"
+              className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
             >
-              {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
-              <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
-                <div className="dym-registry-title-block">
-                  <h2 id="staff-list-title" className="dym-registry-title">
-                    Danh Sách Nhân Viên Phòng Khám
-                  </h2>
-                </div>
+              <PlusIcon className="size-3.5 shrink-0" />
+              <span>Thêm nhân viên</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => void loadStaff()}
+              title="Làm mới danh sách nhân viên (F5)"
+              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
+            >
+              <ArrowPathIcon
+                className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+            </Button>
+          </div>
+        }
+      />
 
-                {/* Filter Tabs & Search Controls */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  {/* Status Tabs (shadcn Tabs + Badge) */}
-                  <Tabs
-                    value={statusFilter}
-                    onValueChange={(value) =>
-                      setStatusFilter(value as StaffStatusTab)
-                    }
+      <main className="dym-admin-content">
+        {error && (
+          <div
+            className="dym-data-error flex items-center justify-between gap-3"
+            role="alert"
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              aria-label="Đóng thông báo lỗi"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        {success && (
+          <div className="dym-staff-success" role="status">
+            <span>{success}</span>
+            <button
+              type="button"
+              onClick={() => setSuccess(null)}
+              aria-label="Đóng thông báo"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
+        {/* Precision Table Panel */}
+        <section
+          className="dym-registry-panel"
+          aria-labelledby="staff-list-title"
+        >
+          {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
+          <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
+            <div className="dym-registry-title-block">
+              <h2 id="staff-list-title" className="dym-registry-title">
+                Danh Sách Nhân Viên Phòng Khám
+              </h2>
+            </div>
+
+            {/* Filter Tabs & Search Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Status Tabs (shadcn Tabs + Badge) */}
+              <Tabs
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(value as StaffStatusTab)
+                }
+              >
+                <TabsList
+                  aria-label="Lọc theo trạng thái tài khoản"
+                  className="h-9 bg-muted p-1"
+                >
+                  <TabsTrigger
+                    value="all"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
                   >
-                    <TabsList
-                      aria-label="Lọc theo trạng thái tài khoản"
-                      className="h-9 bg-muted p-1"
+                    <span>Tất cả</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
                     >
-                      <TabsTrigger
-                        value="all"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span>Tất cả</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.all}
-                        </Badge>
-                      </TabsTrigger>
+                      {tabCounts.all}
+                    </Badge>
+                  </TabsTrigger>
 
-                      <TabsTrigger
-                        value="active"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span
-                          className="size-1.5 rounded-full bg-current"
-                          aria-hidden="true"
-                        />
-                        <span>Hoạt động</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.active}
-                        </Badge>
-                      </TabsTrigger>
-
-                      <TabsTrigger
-                        value="locked"
-                        className="h-7 gap-1.5 px-3 text-xs font-medium"
-                      >
-                        <span
-                          className="size-1.5 rounded-full bg-current"
-                          aria-hidden="true"
-                        />
-                        <span>Đã khóa</span>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
-                        >
-                          {tabCounts.locked}
-                        </Badge>
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-
-                  {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-                  <div className="relative w-full sm:w-64 lg:w-72">
-                    <label htmlFor={searchInputId} className="sr-only">
-                      Tìm kiếm nhân viên
-                    </label>
-                    <Search
-                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  <TabsTrigger
+                    value="active"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
+                  >
+                    <span
+                      className="size-1.5 rounded-full bg-current"
                       aria-hidden="true"
                     />
-                    <Input
-                      id={searchInputId}
-                      type="search"
-                      placeholder="Tìm tên, tài khoản, chi nhánh..."
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
-                    />
-                    {query ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setQuery('')}
-                        aria-label="Xóa từ khóa tìm kiếm"
-                        className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        <X aria-hidden="true" />
-                      </Button>
-                    ) : (
-                      <kbd
-                        className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-xs font-medium text-muted-foreground"
-                        title="Phím tắt: /"
-                      >
-                        /
-                      </kbd>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Data Table */}
-              {isLoading ? (
-                <div
-                  className="dym-table-scroller"
-                  aria-busy="true"
-                  aria-live="polite"
-                  aria-label="Đang tải danh sách nhân viên"
-                >
-                  <table className="dym-table-precision">
-                    <thead>
-                      <tr>
-                        <th scope="col">Nhân Viên</th>
-                        <th scope="col">Vai Trò</th>
-                        <th scope="col">Cơ Sở Tiếp Nhận</th>
-                        <th scope="col">Đăng Nhập Gần Nhất</th>
-                        <th scope="col">Trạng Thái</th>
-                        <th scope="col" className="text-right">Thao Tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <tr key={index}>
-                          <td>
-                            <div className="flex items-center gap-3">
-                              <Skeleton className="size-9 shrink-0 rounded-full" />
-                              <div className="flex flex-col gap-1.5">
-                                <Skeleton className="h-4 w-36" />
-                                <Skeleton className="h-3 w-24" />
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <Skeleton className="h-5 w-24 rounded-md" />
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-1.5">
-                              <Skeleton className="h-5 w-12 rounded-md" />
-                              <Skeleton className="h-5 w-12 rounded-md" />
-                            </div>
-                          </td>
-                          <td>
-                            <Skeleton className="h-3.5 w-28" />
-                          </td>
-                          <td>
-                            <Skeleton className="h-6 w-24 rounded-full" />
-                          </td>
-                          <td className="text-right">
-                            <div className="dym-table-actions-group">
-                              <Skeleton className="h-7 w-14 rounded-md" />
-                              <Skeleton className="h-7 w-20 rounded-md" />
-                              <Skeleton className="h-7 w-16 rounded-md" />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : filteredStaff.length === 0 ? (
-                <div className="dym-table-empty-box">
-                  <div className="dym-empty-icon-wrap">
-                    <UserGroupIcon className="w-7 h-7 text-muted-foreground" aria-hidden="true" />
-                  </div>
-                  <h3 className="dym-empty-title">Không tìm thấy nhân viên</h3>
-                  <p className="dym-empty-desc">
-                    Không có tài khoản nào phù hợp với bộ lọc hiện tại. Hãy đổi từ khóa hoặc thêm nhân viên mới.
-                  </p>
-                  {(query || statusFilter !== 'all') && (
-                    <button
-                      type="button"
-                      className="dym-btn-reset-filter"
-                      onClick={() => {
-                        setQuery('');
-                        setStatusFilter('all');
-                      }}
+                    <span>Hoạt động</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
                     >
-                      Đặt lại bộ lọc
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="dym-table-scroller">
-                  <table className="dym-table-precision">
-                    <thead>
-                      <tr>
-                        <th scope="col">Nhân Viên</th>
-                        <th scope="col">Vai Trò</th>
-                        <th scope="col">Cơ Sở Tiếp Nhận</th>
-                        <th scope="col">Đăng Nhập Gần Nhất</th>
-                        <th scope="col">Trạng Thái</th>
-                        <th scope="col" className="text-right">Thao Tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredStaff.map((account) => (
-                        <tr key={account.userId}>
-                          {/* Staff Avatar + Name + Login */}
-                          <td>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="dym-staff-avatar" name={account.displayName} size="md" tooltip={false} />
-                              <div className="dym-patient-info">
-                                <span className="dym-patient-name">
-                                  <HighlightText text={account.displayName} query={query} />
-                                </span>
-                                <span className="dym-patient-meta tabular-nums">
-                                  @<HighlightText text={account.loginName || 'chưa_cài_tên'} query={query} />
-                                </span>
-                              </div>
-                            </div>
-                          </td>
+                      {tabCounts.active}
+                    </Badge>
+                  </TabsTrigger>
 
-                          {/* Role */}
-                          <td>
-                            <span
-                              className={`dym-role-badge ${
-                                account.role === 'admin'
-                                  ? 'role-admin'
-                                  : account.role === 'operator'
-                                    ? 'role-operator'
-                                    : 'role-receptionist'
-                              }`}
-                            >
-                              {account.role === 'admin'
-                                ? 'Quản trị viên'
-                                : account.role === 'operator'
-                                  ? 'Vận hành'
-                                  : 'Lễ tân'}
-                            </span>
-                          </td>
+                  <TabsTrigger
+                    value="locked"
+                    className="h-7 gap-1.5 px-3 text-xs font-medium"
+                  >
+                    <span
+                      className="size-1.5 rounded-full bg-current"
+                      aria-hidden="true"
+                    />
+                    <span>Đã khóa</span>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 min-w-5 justify-center rounded-full bg-foreground/[0.06] px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none group-data-[state=active]:bg-muted group-data-[state=active]:text-foreground"
+                    >
+                      {tabCounts.locked}
+                    </Badge>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-                          {/* Branches */}
-                          <td>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {account.role === 'admin' && account.branches.length === 0 ? (
-                                <span className="dym-branch-chip">Tất cả cơ sở</span>
-                              ) : account.branches.length === 0 ? (
-                                <span className="text-xs text-slate-400 italic">Chưa gán</span>
-                              ) : (
-                                account.branches.map((b) => (
-                                  <span key={b.code} className="dym-branch-chip">
-                                    {b.code.toUpperCase()}
-                                  </span>
-                                ))
-                              )}
-                            </div>
-                          </td>
+              {/* Search Field (shadcn Input + Clear Button / Kbd) */}
+              <div className="relative w-full sm:w-64 lg:w-72">
+                <label htmlFor={searchInputId} className="sr-only">
+                  Tìm kiếm nhân viên
+                </label>
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  id={searchInputId}
+                  type="search"
+                  placeholder="Tìm tên, tài khoản, chi nhánh..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                />
+                {query ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setQuery('')}
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X aria-hidden="true" />
+                  </Button>
+                ) : (
+                  <kbd
+                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-xs font-medium text-muted-foreground"
+                    title="Phím tắt: /"
+                  >
+                    /
+                  </kbd>
+                )}
+              </div>
+            </div>
+          </div>
 
-                          {/* Last Sign In */}
-                          <td>
-                            <span className="dym-patient-meta tabular-nums text-xs">
-                              {formatLastSignIn(account.lastSignInAt)}
-                            </span>
-                          </td>
-
-                          {/* Status */}
-                          <td>
-                            <span
-                              className={`dym-status-led-badge ${
-                                account.isActive ? 'is-active' : 'is-locked'
-                              }`}
-                            >
-                              <span className="dym-status-led-dot" aria-hidden="true" />
-                              {account.isActive ? 'Hoạt động' : 'Đã khóa'}
-                            </span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="text-right">
-                            <div className="dym-table-actions-group">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openEditForm(account)}
-                                title="Chỉnh sửa thông tin tài khoản"
-                                className="h-8 px-3 text-xs font-medium"
-                              >
-                                Sửa
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isResettingPassword}
-                                onClick={() => openPasswordReset(account)}
-                                title="Đặt lại mật khẩu cho tài khoản này"
-                                className="h-8 px-3 text-xs font-medium"
-                              >
-                                Mật khẩu
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={pendingAccountId === account.userId}
-                                onClick={() => requestAccountActiveChange(account)}
-                                title={
-                                  account.isActive
-                                    ? 'Khóa tài khoản này'
-                                    : 'Mở khóa kích hoạt lại tài khoản'
-                                }
-                                className="h-8 px-3 text-xs font-medium"
-                              >
-                                {pendingAccountId === account.userId
-                                  ? 'Đang lưu...'
-                                  : account.isActive
-                                    ? 'Khóa'
-                                    : 'Mở khóa'}
-                              </Button>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={pendingAccountId === account.userId}
-                                onClick={() => requestAccountDelete(account)}
-                                title="Xóa tài khoản này"
-                                className="dym-staff-delete-button h-8 px-3 text-xs font-medium"
-                              >
-                                Xóa
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+          {/* Data Table */}
+          {isLoading ? (
+            <div
+              className="dym-table-scroller"
+              aria-busy="true"
+              aria-live="polite"
+              aria-label="Đang tải danh sách nhân viên"
+            >
+              <table className="dym-table-precision">
+                <thead>
+                  <tr>
+                    <th scope="col">Nhân Viên</th>
+                    <th scope="col">Vai Trò</th>
+                    <th scope="col">Cơ Sở Tiếp Nhận</th>
+                    <th scope="col">Đăng Nhập Gần Nhất</th>
+                    <th scope="col">Trạng Thái</th>
+                    <th scope="col" className="text-right">
+                      Thao Tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <tr key={index}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="size-9 shrink-0 rounded-full" />
+                          <div className="flex flex-col gap-1.5">
+                            <Skeleton className="h-4 w-36" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <Skeleton className="h-5 w-24 rounded-md" />
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <Skeleton className="h-5 w-12 rounded-md" />
+                          <Skeleton className="h-5 w-12 rounded-md" />
+                        </div>
+                      </td>
+                      <td>
+                        <Skeleton className="h-3.5 w-28" />
+                      </td>
+                      <td>
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                      </td>
+                      <td className="text-right">
+                        <div className="dym-table-actions-group">
+                          <Skeleton className="h-7 w-14 rounded-md" />
+                          <Skeleton className="h-7 w-20 rounded-md" />
+                          <Skeleton className="h-7 w-16 rounded-md" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : filteredStaff.length === 0 ? (
+            <div className="dym-table-empty-box">
+              <div className="dym-empty-icon-wrap">
+                <UserGroupIcon
+                  className="w-7 h-7 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </div>
+              <h3 className="dym-empty-title">Không tìm thấy nhân viên</h3>
+              <p className="dym-empty-desc">
+                Không có tài khoản nào phù hợp với bộ lọc hiện tại. Hãy đổi từ
+                khóa hoặc thêm nhân viên mới.
+              </p>
+              {(query || statusFilter !== 'all') && (
+                <button
+                  type="button"
+                  className="dym-btn-reset-filter"
+                  onClick={() => {
+                    setQuery('');
+                    setStatusFilter('all');
+                  }}
+                >
+                  Đặt lại bộ lọc
+                </button>
               )}
-            </section>
-          </main>
-        </div>
+            </div>
+          ) : (
+            <div className="dym-table-scroller">
+              <table className="dym-table-precision">
+                <thead>
+                  <tr>
+                    <th scope="col">Nhân Viên</th>
+                    <th scope="col">Vai Trò</th>
+                    <th scope="col">Cơ Sở Tiếp Nhận</th>
+                    <th scope="col">Đăng Nhập Gần Nhất</th>
+                    <th scope="col">Trạng Thái</th>
+                    <th scope="col" className="text-right">
+                      Thao Tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStaff.map((account) => (
+                    <tr key={account.userId}>
+                      {/* Staff Avatar + Name + Login */}
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            className="dym-staff-avatar"
+                            name={account.displayName}
+                            size="md"
+                            tooltip={false}
+                          />
+                          <div className="dym-patient-info">
+                            <span className="dym-patient-name">
+                              <HighlightText
+                                text={account.displayName}
+                                query={query}
+                              />
+                            </span>
+                            <span className="dym-patient-meta tabular-nums">
+                              @
+                              <HighlightText
+                                text={account.loginName || 'chưa_cài_tên'}
+                                query={query}
+                              />
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-        {/* Modal 1: Create / Edit Staff Form */}
-        <StaffFormModal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          form={form}
-          setForm={setForm}
-          isSaving={isSaving}
-          formError={formError}
-          onSave={saveStaff}
-          toggleBranch={toggleBranch}
-        />
+                      {/* Role */}
+                      <td>
+                        <span
+                          className={`dym-role-badge ${
+                            account.role === 'admin'
+                              ? 'role-admin'
+                              : account.role === 'operator'
+                                ? 'role-operator'
+                                : 'role-receptionist'
+                          }`}
+                        >
+                          {account.role === 'admin'
+                            ? 'Quản trị viên'
+                            : account.role === 'operator'
+                              ? 'Vận hành'
+                              : 'Lễ tân'}
+                        </span>
+                      </td>
 
-        {/* Modal 2: Confirm Account Lock */}
-        <StaffLockConfirmModal
-          account={accountPendingConfirmation}
-          onClose={() => setAccountPendingConfirmation(null)}
-          onConfirm={(account) => {
-            setAccountPendingConfirmation(null);
-            void setAccountActive(account);
-          }}
-          isPending={Boolean(pendingAccountId)}
-        />
+                      {/* Branches */}
+                      <td>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {account.role === 'admin' &&
+                          account.branches.length === 0 ? (
+                            <span className="dym-branch-chip">
+                              Tất cả cơ sở
+                            </span>
+                          ) : account.branches.length === 0 ? (
+                            <span className="text-xs text-slate-400 italic">
+                              Chưa gán
+                            </span>
+                          ) : (
+                            account.branches.map((b) => (
+                              <span key={b.code} className="dym-branch-chip">
+                                {b.code.toUpperCase()}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
 
-        {/* Modal 3: Confirm Account Deletion */}
-        <StaffDeleteConfirmModal
-          account={accountPendingDeletion}
-          onClose={() => setAccountPendingDeletion(null)}
-          onConfirm={(account) => {
-            setAccountPendingDeletion(null);
-            void deleteStaffAccount(account);
-          }}
-          isPending={Boolean(pendingAccountId)}
-        />
+                      {/* Last Sign In */}
+                      <td>
+                        <span className="dym-patient-meta tabular-nums text-xs">
+                          {formatLastSignIn(account.lastSignInAt)}
+                        </span>
+                      </td>
 
-        {/* Modal 4: Password Reset */}
-        <StaffPasswordResetModal
-          account={passwordResetAccount}
-          onClose={() => setPasswordResetAccount(null)}
-          newPassword={newPassword}
-          setNewPassword={setNewPassword}
-          confirmedPassword={confirmedPassword}
-          setConfirmedPassword={setConfirmedPassword}
-          passwordResetError={passwordResetError}
-          isResetting={isResettingPassword}
-          onReset={resetPassword}
-        />
-      </div>
-    </Theme>
+                      {/* Status */}
+                      <td>
+                        <span
+                          className={`dym-status-led-badge ${
+                            account.isActive ? 'is-active' : 'is-locked'
+                          }`}
+                        >
+                          <span
+                            className="dym-status-led-dot"
+                            aria-hidden="true"
+                          />
+                          {account.isActive ? 'Hoạt động' : 'Đã khóa'}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="text-right">
+                        <div className="dym-table-actions-group">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditForm(account)}
+                            title="Chỉnh sửa thông tin tài khoản"
+                            className="h-8 px-3 text-xs font-medium"
+                          >
+                            Sửa
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isResettingPassword}
+                            onClick={() => openPasswordReset(account)}
+                            title="Đặt lại mật khẩu cho tài khoản này"
+                            className="h-8 px-3 text-xs font-medium"
+                          >
+                            Mật khẩu
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={pendingAccountId === account.userId}
+                            onClick={() => requestAccountActiveChange(account)}
+                            title={
+                              account.isActive
+                                ? 'Khóa tài khoản này'
+                                : 'Mở khóa kích hoạt lại tài khoản'
+                            }
+                            className="h-8 px-3 text-xs font-medium"
+                          >
+                            {pendingAccountId === account.userId
+                              ? 'Đang lưu...'
+                              : account.isActive
+                                ? 'Khóa'
+                                : 'Mở khóa'}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={pendingAccountId === account.userId}
+                            onClick={() => requestAccountDelete(account)}
+                            title="Xóa tài khoản này"
+                            className="dym-staff-delete-button h-8 px-3 text-xs font-medium"
+                          >
+                            Xóa
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
+    </AdminLayout>
   );
 }
 

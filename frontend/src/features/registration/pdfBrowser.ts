@@ -7,10 +7,13 @@ export function downloadPdf(url: string, filename: string): void {
   document.body.removeChild(link);
 }
 
-export function printPdf(url: string, frame: HTMLIFrameElement | null, download: () => void): void {
-  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+export function isMobilePdfViewer(): boolean {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
-  if (!mobile && frame?.contentWindow) {
+}
+
+export function printPdf(url: string, frame: HTMLIFrameElement | null, download: () => void): void {
+  if (!isMobilePdfViewer() && frame?.contentWindow) {
     try {
       frame.contentWindow.focus();
       frame.contentWindow.print();

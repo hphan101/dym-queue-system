@@ -25,6 +25,7 @@ function loadService() {
   return execute('src/features/registration/tt25HcmPdfService.ts', {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit, '../../lib/date': date,
     './pdfDrawing': drawing, './tt25Types': types, './tt25TemplateFields.json': layout,
+    './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
     './tt25PdfService': { generateTT25OriginalPdf: async () => ({ legacy: true }) },
   }, async (url) => {
     const bytes = fs.readFileSync(path.join(frontend, 'public', url.split('?')[0]));
@@ -88,6 +89,7 @@ test('mixed TT25 bulk printing pads each original template correctly for duplex'
   const service = loadService();
   const bulk = execute('src/features/registration/bulkPrintPdf.ts', {
     'pdf-lib': require('pdf-lib'), './tt25HcmPdfService': service,
+    './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
     './consentPdfService': { generateConsentPdf: () => { throw new Error('Consent is not selected'); } },
   });
   const result = await bulk.generateBulkPrintPdf([
