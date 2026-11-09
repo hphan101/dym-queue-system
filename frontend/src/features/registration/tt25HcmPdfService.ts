@@ -8,7 +8,7 @@ import layouts from './tt25TemplateFields.json';
 export { getTT25PrintCopies } from './tt25Types';
 
 export function getTT25TemplateInfo(data: TT25RegistrationData): { key: keyof typeof layouts | 'legacy'; label: string; pageCount: number } {
-  if (data.branch === 'hn') return { key: 'legacy', label: 'Hà Nội', pageCount: 7 };
+  if (data.branch === 'hn') return { key: 'legacy', label: 'Hà Nội', pageCount: 8 };
   if (/work\s*permit|\bwp\b/i.test(data.checkupReason || '')) {
     return { key: 'wp', label: 'Work Permit', pageCount: layouts.wp.pageCount };
   }
@@ -32,7 +32,7 @@ const assets = new Map<string, Promise<ArrayBuffer>>();
 function loadAsset(path: string) {
   let request = assets.get(path);
   if (!request) {
-    request = fetch(`${path}?v=20261103-tt25-continuous-document-number`).then(async (response) => {
+    request = fetch(`${path}?v=20261109-duplex-templates`).then(async (response) => {
       if (!response.ok) throw new Error('Không tải được mẫu TT25 gốc hoặc phông chữ.');
       const bytes = await response.arrayBuffer();
       if (!bytes.byteLength) throw new Error('File mẫu TT25 không có dữ liệu.');
@@ -103,16 +103,8 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   }
 }
 
-export async function appendTT25PrintPdf(data: TT25RegistrationData, session: PdfPrintSession, padForDuplex = false): Promise<void> {
-  const start = session.pdf.getPageCount();
-  await appendTT25OriginalPdf(data, session);
-  const count = session.pdf.getPageCount() - start;
-  for (let copy = 1; copy < getTT25PrintCopies(data); copy++) {
-    // Each complete copy starts on the front of a sheet when printing duplex.
-    if (padForDuplex && count % 2 === 1) {
-      const { width, height } = session.pdf.getPage(start).getSize();
-      session.pdf.addPage([width, height]);
-    }
+export async function appendTT25PrintPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {
+  for (let copy = 0; copy < getTT25PrintCopies(data); copy++) {
     // Copying from the output PDF flushes subset fonts before later customers add glyphs.
     await appendTT25OriginalPdf(data, session);
   }
@@ -124,7 +116,7 @@ export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promi
     return legacy.generateTT25OriginalPdf(data);
   }
   const session = await createPdfPrintSession();
-  await appendTT25PrintPdf(data, session, true);
+  await appendTT25PrintPdf(data, session);
   const output = await session.pdf.save();
   const blob = new Blob([output as BlobPart], { type: 'application/pdf' });
   return { blob, url: URL.createObjectURL(blob) };

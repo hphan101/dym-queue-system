@@ -27,5 +27,13 @@ exports.loadPdfFixtures = function (entry = 'bulkPrintPdf') {
       async (url) => ({ ok: true, arrayBuffer: async () => asset(url) }), LocalXHR);
     return result;
   }
+  if (entry === 'bulkPrintPdf') {
+    const builder = load(path.join(root, 'src/features/registration/bulkPrintPdfDocument.ts'));
+    return {
+      generateBulkPrintPdf: async (...args) => URL.createObjectURL(new Blob(
+        [await builder.generateBulkPrintPdfBytes(...args)], { type: 'application/pdf' },
+      )),
+    };
+  }
   return load(path.join(root, `src/features/registration/${entry}.ts`));
 };

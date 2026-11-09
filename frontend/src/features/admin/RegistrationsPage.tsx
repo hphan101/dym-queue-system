@@ -182,7 +182,6 @@ export function RegistrationsPage({
 
   // Bulk print (Consent / TT25 merged into one PDF)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
-  const [padForDuplex, setPadForDuplex] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
 
   useEffect(() => {
@@ -218,7 +217,6 @@ export function RegistrationsPage({
       const url = await generateBulkPrintPdf(
         targets.map((row) => buildPrintData(row, branch)),
         mode,
-        padForDuplex,
         (done, total) => {
           const message = done === total ? `Đang hoàn tất PDF cho ${total} khách…` : `Đang tạo ${done}/${total}...`;
           setBulkProgress(message);
@@ -1173,15 +1171,6 @@ export function RegistrationsPage({
                     >
                       Bỏ chọn
                     </Button>
-                    <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        className="size-3.5 accent-primary"
-                        checked={padForDuplex}
-                        onChange={(e) => setPadForDuplex(e.target.checked)}
-                      />
-                      In 2 mặt (chèn trang trắng)
-                    </label>
                     {bulkProgress ? (
                       <span
                         className="font-medium text-foreground"

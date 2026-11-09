@@ -5,18 +5,19 @@ export interface PdfPrintSession {
   pdf: PDFDocument;
   templates: Map<string, Promise<PDFDocument>>;
   fonts: Map<string, Promise<PDFFont>>;
+  parseSpeed?: number;
 }
 
-export async function createPdfPrintSession(): Promise<PdfPrintSession> {
+export async function createPdfPrintSession(parseSpeed?: number): Promise<PdfPrintSession> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
-  return { pdf, templates: new Map(), fonts: new Map() };
+  return { pdf, templates: new Map(), fonts: new Map(), parseSpeed };
 }
 
 export async function appendTemplate(session: PdfPrintSession, key: string, bytes: ArrayBuffer) {
   let template = session.templates.get(key);
   if (!template) {
-    template = PDFDocument.load(bytes.slice(0));
+    template = PDFDocument.load(bytes.slice(0), { parseSpeed: session.parseSpeed });
     session.templates.set(key, template);
   }
   const source = await template;

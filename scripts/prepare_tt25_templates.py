@@ -240,11 +240,14 @@ for name, count, history_pages, family_page, questions_page in [
     for x0, y0, x1, y1 in segments:
         doc[0].draw_line(pymupdf.Point(x0, y0), pymupdf.Point(x1, y1), color=(.5, .5, .5), width=.35)
     filename = f'tt25-hcm-{name}.pdf'
+    if len(doc) % 2:
+        size = doc[-1].rect
+        doc.new_page(width=size.width, height=size.height)
     doc.save(root / 'frontend/public/templates' / filename, garbage=4, deflate=True)
     doc.close()
-    layouts[name] = {'template': filename, 'pageCount': count, 'fields': fields, 'checks': checks}
+    layouts[name] = {'template': filename, 'pageCount': count + count % 2, 'fields': fields, 'checks': checks}
     (args.input_dir / f'{name}-masks.json').write_text(json.dumps(masks), encoding='utf-8')
-    print(f'{name}: {len(fields)} fields, 22 personal history check pairs, {count} pages')
+    print(f'{name}: {len(fields)} fields, 22 personal history check pairs, {count + count % 2} pages')
 
 (root / 'frontend/src/features/registration/tt25TemplateFields.json').write_text(
     json.dumps(layouts, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

@@ -1,7 +1,7 @@
 {
   "vnm": {
     "template": "tt25-hcm-vnm.pdf",
-    "pageCount": 9,
+    "pageCount": 10,
     "fields": [
       {
         "page": 0,
@@ -743,7 +743,7 @@
   },
   "bilingual": {
     "template": "tt25-hcm-bilingual.pdf",
-    "pageCount": 13,
+    "pageCount": 14,
     "fields": [
       {
         "page": 0,

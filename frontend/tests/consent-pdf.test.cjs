@@ -54,8 +54,8 @@ test('consent form follows the selected language, including Vietnamese passport 
   assert.equal(service.getConsentFormLanguage({}), 'vi');
 });
 
-test('original templates keep the Vietnamese 2-page and bilingual 4-page structure', async () => {
-  for (const [language, pages] of [['vi', 2], ['bilingual', 4]]) {
+test('consent templates include an even number of pages for each separate form', async () => {
+  for (const [language, pages] of [['vi', 4], ['bilingual', 4]]) {
     const pdf = await PDFDocument.load(fs.readFileSync(path.join(frontend, 'public/templates', layout[language].template)));
     assert.equal(pdf.getPageCount(), pages);
     assert.equal(service.getConsentPageIndices(language, 'consent').length, pages / 2);
@@ -67,11 +67,21 @@ test('consent generation uses original PDFs, with correct page selection', async
   for (const language of ['vi', 'en']) {
     const complete = await service.generateConsentPdf({ ...customer, language });
     const selected = await service.generateConsentPdf({ ...customer, language }, 'refusal');
+    const consent = await service.generateConsentPdf({ ...customer, language }, 'consent');
     try {
-      assert.equal((await PDFDocument.load(await complete.blob.arrayBuffer())).getPageCount(), language === 'vi' ? 2 : 4);
-      assert.equal((await PDFDocument.load(await selected.blob.arrayBuffer())).getPageCount(), language === 'vi' ? 1 : 2);
+      assert.equal((await PDFDocument.load(await complete.blob.arrayBuffer())).getPageCount(), 4);
+      assert.equal((await PDFDocument.load(await selected.blob.arrayBuffer())).getPageCount(), 2);
+      assert.equal((await PDFDocument.load(await consent.blob.arrayBuffer())).getPageCount(), 2);
+      if (language === 'vi') {
+        const all = await PDFDocument.load(await complete.blob.arrayBuffer());
+        for (const index of [1, 3]) assert.equal(all.getPage(index).node.Contents(), undefined, 'blank template pages remain unfilled');
+        for (const result of [consent, selected]) {
+          const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+          assert.equal(pdf.getPage(1).node.Contents(), undefined, 'each separate form ends with a blank page');
+        }
+      }
       assert.equal(complete.blob.type, 'application/pdf');
-    } finally { URL.revokeObjectURL(complete.url); URL.revokeObjectURL(selected.url); }
+    } finally { URL.revokeObjectURL(complete.url); URL.revokeObjectURL(selected.url); URL.revokeObjectURL(consent.url); }
   }
   assert.equal(service.fetched.filter((url) => url.startsWith('/fonts/arial.ttf?')).length, 1);
   assert.equal(service.fetched.some((url) => url.startsWith('/templates/dong-thuan-kham.pdf')), false);

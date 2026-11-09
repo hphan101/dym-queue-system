@@ -1,5 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+
+test('registration time can omit the date while other date-time displays retain it', () => {
+  const { formatRegistrationTime } = load('features/admin/utils/adminFormatters.ts', {});
+  assert.equal(formatRegistrationTime('2026-11-09T03:38:00Z', false), '10:38');
+  assert.match(formatRegistrationTime('2026-11-09T03:38:00Z'), /09\/11\/2026/);
+});
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');

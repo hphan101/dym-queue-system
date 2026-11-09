@@ -62,7 +62,7 @@ test('TT25 selects original HCM templates by language and Work Permit, preservin
     assert.equal(service.getTT25PrintCopies({ checkupReason }), 2);
   }
 });
-test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without changing source assets', async () => {
+test('TT25 fills padded 10/14/12-page PDFs and all 22 history answers', async () => {
   const service = loadService();
   const drawn = [];
   const segments = [];
@@ -72,7 +72,7 @@ test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without c
   PDFPage.prototype.drawText = function (text, options) { drawn.push({ text, options }); return drawText.call(this, text, options); };
   PDFPage.prototype.drawLine = function (options) { lines++; segments.push(options); return drawLine.call(this, options); };
   try {
-    for (const [language, reason, pages] of [['vi', customer.checkupReason, 9], ['en', customer.checkupReason, 13], ['vi', 'Work Permit', 24]]) {
+    for (const [language, reason, pages] of [['vi', customer.checkupReason, 10], ['en', customer.checkupReason, 14], ['vi', 'Work Permit', 24]]) {
       drawn.length = 0; segments.length = 0; lines = 0;
       const result = await service.generateTT25OriginalPdf({ ...customer, language, checkupReason: reason });
       try {
@@ -93,18 +93,16 @@ test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without c
 });
 test('mixed TT25 bulk printing pads each original template correctly for duplex', async () => {
   const service = loadService();
-  const bulk = execute('src/features/registration/bulkPrintPdf.ts', {
+  const bulk = execute('src/features/registration/bulkPrintPdfDocument.ts', {
     'pdf-lib': require('pdf-lib'), './tt25HcmPdfService': service,
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
     './consentPdfService': { generateConsentPdf: () => { throw new Error('Consent is not selected'); } },
   });
-  const result = await bulk.generateBulkPrintPdf([
+  const result = await bulk.generateBulkPrintPdfBytes([
     customer, { ...customer, language: 'en' }, { ...customer, checkupReason: 'Work Permit' },
-  ], 'tt25', true);
-  try {
-    const pdf = await PDFDocument.load(await (await fetch(result)).arrayBuffer());
-    assert.equal(pdf.getPageCount(), 48, '9+blank, 13+blank, two WP copies of 12 pages');
-  } finally { URL.revokeObjectURL(result); }
+  ], 'tt25');
+  const pdf = await PDFDocument.load(result);
+  assert.equal(pdf.getPageCount(), 48, '10, 14, two WP copies of 12 pages');
 });
 }
 module.exports = { loadService, customer };

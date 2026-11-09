@@ -9,7 +9,7 @@ export type ConsentFormLanguage = 'vi' | 'bilingual';
 export type ConsentPageOption = 'all' | 'consent' | 'refusal';
 
 const assets = new Map<string, Promise<ArrayBuffer>>();
-const ASSET_VERSION = '20261101-restored-table-borders';
+const ASSET_VERSION = '20261109-duplex-templates';
 
 function loadAsset(path: string): Promise<ArrayBuffer> {
   let pending = assets.get(path);

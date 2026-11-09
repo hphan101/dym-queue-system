@@ -103,7 +103,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       />
                     </span>
                     <div className="dym-time-cell">
-                      <span>{formatRegistrationTime(row.registered_at)}</span>
+                      <span>{formatRegistrationTime(row.registered_at, false)}</span>
                     </div>
                   </div>
                 </td>

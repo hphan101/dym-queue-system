@@ -16,10 +16,14 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   hour12: false,
 });
 
-export function formatRegistrationTime(value: string | null | undefined): string {
+const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
+export function formatRegistrationTime(value: string | null | undefined, includeDate = true): string {
   if (!value) return '—';
   try {
-    return dateTimeFormatter.format(new Date(value));
+    return (includeDate ? dateTimeFormatter : timeFormatter).format(new Date(value));
   } catch {
     return String(value);
   }

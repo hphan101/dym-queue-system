@@ -52,7 +52,7 @@ async function fetchAssetBuffer(url: string, description: string): Promise<Array
 
 async function loadAssets() {
   if (!cachedTemplateBytes) {
-    cachedTemplateBytes = await fetchAssetBuffer('/templates/mau-03-tt25.pdf?v=4', 'Mau 03 DYM 7-page PDF template');
+    cachedTemplateBytes = await fetchAssetBuffer('/templates/mau-03-tt25.pdf?v=5', 'Mau 03 DYM 8-page PDF template');
   }
   if (!cachedFontRegBytes) {
     cachedFontRegBytes = await fetchAssetBuffer('/fonts/times.ttf', 'Times font regular');
@@ -423,7 +423,7 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
     drawVectorCheck(page2, 464.3, 106.9, 6.2);
   }
 
-  // ========================== FOOTER (ALL PAGES) ==========================
+  // ========================== FOOTER (CONTENT PAGES) ==========================
   // Trái: [Họ tên khách] – [Ngày sinh khách] (tại x = 72.024, y = 38.52)
   // Phải: [CCCD/ngaythangnamkham]/GKSK - DYM (căn phải tại x = 538.2, y = 38.52)
   const footerLeftText = [(data.fullName || '').trim().toUpperCase(), birthDateFormatted]
@@ -432,7 +432,7 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   const footerRightWidth = fontReg.widthOfTextAtSize(soNumberText, 11);
   const footerRightX = Math.max(320, 538.2 - footerRightWidth);
 
-  for (const p of pages) {
+  for (const p of pages.slice(0, -1)) {
     if (footerLeftText) {
       p.drawText(footerLeftText, {
         x: 72.024,

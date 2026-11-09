@@ -1,12 +1,14 @@
 {
   "vi": {
     "template": "dong-thuan-vnm.pdf",
-    "pageCount": 2,
+    "pageCount": 4,
     "consentPages": [
-      0
+      0,
+      1
     ],
     "refusalPages": [
-      1
+      2,
+      3
     ],
     "fields": [
       {
@@ -100,7 +102,7 @@
         "align": "left"
       },
       {
-        "page": 1,
+        "page": 2,
         "field": "fullName",
         "x": 125.3,
         "y": 685.54,
@@ -110,7 +112,7 @@
         "align": "left"
       },
       {
-        "page": 1,
+        "page": 2,
         "field": "birthDate",
         "x": 345.43,
         "y": 685.54,
@@ -120,7 +122,7 @@
         "align": "left"
       },
       {
-        "page": 1,
+        "page": 2,
         "field": "identityDocument",
         "x": 242.69,
         "y": 669.94,
@@ -130,7 +132,7 @@
         "align": "left"
       },
       {
-        "page": 1,
+        "page": 2,
         "field": "fullName",
         "x": 410.294,
         "y": 40.344,
@@ -140,7 +142,7 @@
         "align": "center"
       },
       {
-        "page": 1,
+        "page": 2,
         "field": "checkupDate",
         "x": 409.224,
         "y": 128.9,
