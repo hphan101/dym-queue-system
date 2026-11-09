@@ -107,15 +107,14 @@ export async function appendTT25PrintPdf(data: TT25RegistrationData, session: Pd
   const start = session.pdf.getPageCount();
   await appendTT25OriginalPdf(data, session);
   const count = session.pdf.getPageCount() - start;
-  const indices = Array.from({ length: count }, (_, index) => start + index);
   for (let copy = 1; copy < getTT25PrintCopies(data); copy++) {
     // Each complete copy starts on the front of a sheet when printing duplex.
     if (padForDuplex && count % 2 === 1) {
       const { width, height } = session.pdf.getPage(start).getSize();
       session.pdf.addPage([width, height]);
     }
-    const pages = await session.pdf.copyPages(session.pdf, indices);
-    for (const page of pages) session.pdf.addPage(page);
+    // Copying from the output PDF flushes subset fonts before later customers add glyphs.
+    await appendTT25OriginalPdf(data, session);
   }
 }
 

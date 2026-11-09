@@ -77,7 +77,7 @@ test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without c
       const result = await service.generateTT25OriginalPdf({ ...customer, language, checkupReason: reason });
       try {
         assert.equal((await PDFDocument.load(await result.blob.arrayBuffer())).getPageCount(), pages);
-        assert.equal(lines, 52);
+        assert.equal(lines, pages === 24 ? 104 : 52);
         assert.deepEqual(segments[0].end, segments[1].start, 'tick strokes must join instead of crossing');
         assert.ok(segments[0].start.y > segments[0].end.y && segments[1].end.y > segments[1].start.y);
         for (const text of ['NGUYỄN THỊ MINH ANH', '0901234567', 'khach@example.test', 'Dị ứng thời tiết', 'Sinh thường năm 2020']) assert.ok(drawn.some((item) => item.text === text), text);

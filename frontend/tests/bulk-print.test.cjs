@@ -1,8 +1,66 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { PDFDocument, PDFPage } = require('pdf-lib');
+const { PDFDocument, PDFPage, decodePDFRawStream } = require('pdf-lib');
 const { loadPdfFixtures } = require('./helpers/pdf-fixtures.cjs');
 const { customer } = require('./tt25-pdf.test.cjs');
+
+const profiles = {
+  viCompany: { branch: 'q1', language: 'vi', checkupReason: customer.checkupReason, pages: 9, copies: 1, consent: 2 },
+  viOther: { branch: 'q7', language: 'vi', checkupReason: 'Khám sức khỏe khác', pages: 9, copies: 2, consent: 2 },
+  enCompany: { branch: 'q7', language: 'en', checkupReason: customer.checkupReason, pages: 13, copies: 1, consent: 4 },
+  enOther: { branch: 'q1', language: 'en', checkupReason: 'Khám sức khỏe khác', pages: 13, copies: 2, consent: 4 },
+  viWp: { branch: 'q1', language: 'vi', checkupReason: 'Work Permit', pages: 12, copies: 2, consent: 2 },
+  enWp: { branch: 'q7', language: 'en', checkupReason: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit', pages: 12, copies: 2, consent: 4 },
+  hnCompany: { branch: 'hn', language: 'vi', checkupReason: customer.checkupReason, pages: 7, copies: 1, consent: 2 },
+  hnOther: { branch: 'hn', language: 'en', checkupReason: 'Khám sức khỏe cá nhân tự nguyện', pages: 7, copies: 2, consent: 4 },
+};
+
+for (const order of [
+  ['viOther', 'viCompany'], ['viCompany', 'viOther'], ['viOther', 'viOther'],
+  ['enOther', 'enCompany'], ['enCompany', 'enOther'], ['enOther', 'enOther'],
+  ['viWp', 'viCompany'], ['viCompany', 'viWp'], ['viWp', 'enWp'],
+  ['hnOther', 'hnCompany'], ['hnCompany', 'hnOther'],
+  ['viOther', 'enCompany', 'enWp', 'hnOther', 'viCompany'],
+]) {
+  test(`mixed print order ${order.join(' -> ')} across all modes and duplex settings`, async () => {
+    const bulk = loadPdfFixtures();
+    const items = order.map((key, index) => ({ ...customer, ...profiles[key], fullName: ['ĐỖ THỊ ÁNH', 'NGUYỄN VĂN QUÝ', 'TRẦN THỊ DIỄM', 'LÊ HỒNG PHƯỚC', 'VŨ THỊ HƯƠNG'][index] }));
+    for (const mode of ['consent', 'tt25', 'both']) {
+      for (const duplex of [false, true]) {
+        let expected = 0;
+        const blanks = [];
+        for (const key of order) {
+          const profile = profiles[key];
+          if (mode !== 'tt25') expected += profile.consent;
+          if (mode !== 'consent') {
+            for (let copy = 0; copy < profile.copies; copy++) {
+              expected += profile.pages;
+              if (duplex && profile.pages % 2) blanks.push(expected++);
+            }
+          }
+        }
+        const url = await bulk.generateBulkPrintPdf(items, mode, duplex);
+        try {
+          const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
+          assert.equal(pdf.getPageCount(), expected, `${mode}, duplex=${duplex}`);
+          for (const index of blanks) assert.equal(pdf.getPage(index).node.Contents()?.asArray().length ?? 0, 0, `blank separator ${index}`);
+        } finally { URL.revokeObjectURL(url); }
+      }
+    }
+  });
+}
+
+test('a two-copy customer can precede a one-copy customer using the same fonts', async () => {
+  const bulk = loadPdfFixtures();
+  const url = await bulk.generateBulkPrintPdf([
+    { ...customer, fullName: 'Patient A', checkupReason: 'Khám sức khỏe khác' },
+    { ...customer, fullName: 'Patient B' },
+  ], 'both', true);
+  try {
+    const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
+    assert.equal(pdf.getPageCount(), 34);
+  } finally { URL.revokeObjectURL(url); }
+});
 
 test('bulk printing shares fonts, saves once and retains mixed-template order and duplex blanks', async () => {
   const bulk = loadPdfFixtures();
@@ -45,7 +103,8 @@ test('non-corporate printing duplicates complete filled TT25 sets, keeping conse
   const service = loadPdfFixtures('tt25HcmPdfService');
   const bulk = loadPdfFixtures();
   const contents = (pdf, index) => (pdf.getPage(index).node.Contents()?.asArray() ?? [])
-    .map((ref) => pdf.context.lookup(ref).getContents());
+    .map((ref) => Buffer.from(decodePDFRawStream(pdf.context.lookup(ref)).decode()).toString('latin1')
+      .replace(/\/[^\s/]+(?=\s+[\d.]+\s+Tf\b)/g, '/FONT'));
   for (const [branch, language, checkupReason, pages, consentPages] of [
     ['q1', 'vi', 'Work Permit', 12, 2],
     ['q7', 'en', 'Work Permit', 12, 4],
