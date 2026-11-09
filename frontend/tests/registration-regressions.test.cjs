@@ -147,7 +147,10 @@ for (const name of ['TT25PrintModal', 'ConsentPrintModal']) {
       './consentPdfService': {
         getConsentFormLanguage: () => 'vi', getConsentPageIndices: () => [0, 1],
       },
-      './tt25HcmPdfService': { getTT25TemplateInfo: () => ({ key: 'vnm', label: 'Tiếng Việt', pageCount: 9 }) },
+      './tt25HcmPdfService': {
+        getTT25TemplateInfo: () => ({ key: 'vnm', label: 'Tiếng Việt', pageCount: 9 }),
+        getTT25PrintCopies: () => 1,
+      },
     }, {
       window: { print() {}, open: () => ({}), innerWidth: 1280 }, navigator: { userAgent: 'Desktop', maxTouchPoints: 0 },
       document: { body: { appendChild() {}, removeChild() {} }, createElement: () => ({ click() {} }) },

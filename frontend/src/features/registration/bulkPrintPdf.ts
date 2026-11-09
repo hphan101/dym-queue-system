@@ -1,5 +1,5 @@
 import { appendConsentPdf } from './consentPdfService';
-import { appendTT25OriginalPdf } from './tt25HcmPdfService';
+import { appendTT25PrintPdf } from './tt25HcmPdfService';
 import { createPdfPrintSession } from './pdfPrintSession';
 import type { TT25RegistrationData } from './tt25Types';
 
@@ -22,10 +22,10 @@ export async function generateBulkPrintPdf(
   for (let i = 0; i < items.length; i++) {
     for (const append of [
       ...(mode !== 'tt25' ? [appendConsentPdf] : []),
-      ...(mode !== 'consent' ? [appendTT25OriginalPdf] : []),
+      ...(mode !== 'consent' ? [appendTT25PrintPdf] : []),
     ]) {
       const start = out.getPageCount();
-      await append(items[i], session);
+      await append(items[i], session, padForDuplex);
       const count = out.getPageCount() - start;
       if (padForDuplex && count % 2 === 1) {
         const { width, height } = out.getPage(out.getPageCount() - 1).getSize();

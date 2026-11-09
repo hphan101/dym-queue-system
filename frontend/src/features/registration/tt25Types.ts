@@ -1,5 +1,9 @@
 import type { BranchCode } from '../../types/domain';
 
+export function getTT25PrintCopies(data: Pick<TT25RegistrationData, 'checkupReason'>): number {
+  return /work\s*permit|\bwp\b|khác|cá nhân|đi học|đi làm|khám lẻ/i.test(data.checkupReason || '') ? 2 : 1;
+}
+
 export interface TT25PersonalHistoryItem {
   id: number;
   name: string;

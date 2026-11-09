@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, FileText, Loader2, Printer, RefreshCw, X } from 'lucide-react';
 import type { TT25RegistrationData } from './tt25Types';
-import { generateTT25OriginalPdf, getTT25TemplateInfo } from './tt25HcmPdfService';
+import { generateTT25OriginalPdf, getTT25PrintCopies, getTT25TemplateInfo } from './tt25HcmPdfService';
 import { downloadPdf, printPdf } from './pdfBrowser';
 import { usePrintModalDismiss } from './usePrintModalDismiss';
 import { PdfPreview } from './PdfPreview';
@@ -26,6 +26,7 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   usePrintModalDismiss(isOpen, onClose);
   const info = getTT25TemplateInfo(data);
+  const copies = getTT25PrintCopies(data);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,7 +60,7 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
         <FileText className="size-5 shrink-0" aria-hidden="true" />
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="consent-preview-title">Phiếu khám sức khỏe TT25 (Mẫu 03)</h2>
-          <p className="consent-preview-subtitle">{data.fullName} · {info.label} · {info.pageCount} trang A4</p>
+          <p className="consent-preview-subtitle">{data.fullName} · {info.label} · {copies} bộ · {info.pageCount} trang A4/bộ</p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">

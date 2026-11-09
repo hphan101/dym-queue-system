@@ -7,18 +7,21 @@ import { formatQueueNumber } from '../../../lib/queueNumber';
 import type { BranchCode } from '../../../types/domain';
 import type { RegistrationDetails } from '../types';
 
+export function getRegistrationCheckupReason(row: Pick<RegistrationDetails, 'tt25_data' | 'company_name'>): string {
+  const reason = row.tt25_data?.checkupReason;
+  return reason && reason !== 'Khám sức khỏe tổng quát'
+    ? reason
+    : row.company_name?.trim()
+      ? 'Khám sức khỏe định kỳ theo công ty'
+      : 'Khám sức khỏe cá nhân tự nguyện';
+}
+
 export function buildPrintData(
   targetRow: RegistrationDetails,
   branch: BranchCode,
 ): TT25RegistrationData {
   const extras = targetRow.tt25_data ?? {};
-  const defaultReason = targetRow.company_name?.trim()
-    ? 'Khám sức khỏe định kỳ theo công ty'
-    : 'Khám sức khỏe cá nhân tự nguyện';
-  const resolvedReason =
-    extras.checkupReason && extras.checkupReason !== 'Khám sức khỏe tổng quát'
-      ? extras.checkupReason
-      : defaultReason;
+  const resolvedReason = getRegistrationCheckupReason(targetRow);
 
   const wpWard = extras.workplaceWard || '';
   const wpProv = extras.workplaceProvince || '';

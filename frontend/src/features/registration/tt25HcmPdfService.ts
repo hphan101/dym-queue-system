@@ -2,8 +2,10 @@ import { rgb, type PDFFont } from 'pdf-lib';
 import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
 import { formatDateForPrint, getTodayInVietnam } from '../../lib/date';
 import { drawPdfCheck } from './pdfDrawing';
-import { getDefaultTargetPaymentByReason, type TT25RegistrationData, type TT25TargetPaymentInfo } from './tt25Types';
+import { getDefaultTargetPaymentByReason, getTT25PrintCopies, type TT25RegistrationData, type TT25TargetPaymentInfo } from './tt25Types';
 import layouts from './tt25TemplateFields.json';
+
+export { getTT25PrintCopies } from './tt25Types';
 
 export function getTT25TemplateInfo(data: TT25RegistrationData): { key: keyof typeof layouts | 'legacy'; label: string; pageCount: number } {
   if (data.branch === 'hn') return { key: 'legacy', label: 'Hà Nội', pageCount: 7 };
@@ -101,13 +103,29 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   }
 }
 
+export async function appendTT25PrintPdf(data: TT25RegistrationData, session: PdfPrintSession, padForDuplex = false): Promise<void> {
+  const start = session.pdf.getPageCount();
+  await appendTT25OriginalPdf(data, session);
+  const count = session.pdf.getPageCount() - start;
+  const indices = Array.from({ length: count }, (_, index) => start + index);
+  for (let copy = 1; copy < getTT25PrintCopies(data); copy++) {
+    // Each complete copy starts on the front of a sheet when printing duplex.
+    if (padForDuplex && count % 2 === 1) {
+      const { width, height } = session.pdf.getPage(start).getSize();
+      session.pdf.addPage([width, height]);
+    }
+    const pages = await session.pdf.copyPages(session.pdf, indices);
+    for (const page of pages) session.pdf.addPage(page);
+  }
+}
+
 export async function generateTT25OriginalPdf(data: TT25RegistrationData): Promise<{ blob: Blob; url: string }> {
-  if (getTT25TemplateInfo(data).key === 'legacy') {
+  if (getTT25TemplateInfo(data).key === 'legacy' && getTT25PrintCopies(data) === 1) {
     const legacy = await import('./tt25PdfService');
     return legacy.generateTT25OriginalPdf(data);
   }
   const session = await createPdfPrintSession();
-  await appendTT25OriginalPdf(data, session);
+  await appendTT25PrintPdf(data, session, true);
   const output = await session.pdf.save();
   const blob = new Blob([output as BlobPart], { type: 'application/pdf' });
   return { blob, url: URL.createObjectURL(blob) };

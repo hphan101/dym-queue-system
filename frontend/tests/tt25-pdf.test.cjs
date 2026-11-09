@@ -55,6 +55,12 @@ test('TT25 selects original HCM templates by language and Work Permit, preservin
   for (const language of ['vi', 'en']) assert.equal(service.getTT25TemplateInfo({ ...customer, language, checkupReason: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit' }).key, 'wp');
   assert.equal(service.getTT25TemplateInfo({ ...customer, checkupReason: 'Khám sức khỏe khác' }).key, 'vnm');
   assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn' }).key, 'legacy');
+  for (const checkupReason of ['Khám sức khỏe định kì doanh nghiệp', 'Khám sức khỏe định kỳ theo công ty', '']) {
+    assert.equal(service.getTT25PrintCopies({ checkupReason }), 1);
+  }
+  for (const checkupReason of ['Work Permit', 'Khám sức khỏe khác', 'Khám sức khỏe cá nhân tự nguyện', 'Khám sức khỏe đi học/đi làm']) {
+    assert.equal(service.getTT25PrintCopies({ checkupReason }), 2);
+  }
 });
 test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without changing source assets', async () => {
   const service = loadService();
@@ -66,7 +72,7 @@ test('TT25 fills original 9/13/12-page PDFs and all 22 history answers without c
   PDFPage.prototype.drawText = function (text, options) { drawn.push({ text, options }); return drawText.call(this, text, options); };
   PDFPage.prototype.drawLine = function (options) { lines++; segments.push(options); return drawLine.call(this, options); };
   try {
-    for (const [language, reason, pages] of [['vi', customer.checkupReason, 9], ['en', customer.checkupReason, 13], ['vi', 'Work Permit', 12]]) {
+    for (const [language, reason, pages] of [['vi', customer.checkupReason, 9], ['en', customer.checkupReason, 13], ['vi', 'Work Permit', 24]]) {
       drawn.length = 0; segments.length = 0; lines = 0;
       const result = await service.generateTT25OriginalPdf({ ...customer, language, checkupReason: reason });
       try {
@@ -97,7 +103,7 @@ test('mixed TT25 bulk printing pads each original template correctly for duplex'
   ], 'tt25', true);
   try {
     const pdf = await PDFDocument.load(await (await fetch(result)).arrayBuffer());
-    assert.equal(pdf.getPageCount(), 36, '9+blank, 13+blank, 12');
+    assert.equal(pdf.getPageCount(), 48, '9+blank, 13+blank, two WP copies of 12 pages');
   } finally { URL.revokeObjectURL(result); }
 });
 }

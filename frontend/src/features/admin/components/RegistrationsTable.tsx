@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import { usePrintStatus } from '../hooks/usePrintStatus';
 import type { RegistrationDetails } from '../types';
+import { getTT25PrintCopies } from '../../registration/tt25Types';
+import { getRegistrationCheckupReason } from '../utils/buildPrintData';
 import {
   calculateAge,
   formatBirthDate,
@@ -76,6 +78,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
             );
             const age = calculateAge(row.birth_date);
             const printStatus = getStatus(row.id, row.tt25_data);
+            const tt25Copies = getTT25PrintCopies({ checkupReason: getRegistrationCheckupReason(row) });
 
             return (
               <tr key={row.id}>
@@ -243,7 +246,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                         onClick={() => onPrintConsentRow(row)}
                         title="In phiếu Đồng thuận khám sức khỏe"
                       >
-                        In Đồng thuận
+                        In Đồng thuận · 1 bộ
                       </Button>
                     )}
                     <Button
@@ -254,7 +257,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       onClick={() => onPrintRow(row)}
                       title="In phiếu khám sức khỏe TT25"
                     >
-                      In TT25
+                      In TT25 · {tt25Copies} bộ
                     </Button>
                   </div>
                 </td>

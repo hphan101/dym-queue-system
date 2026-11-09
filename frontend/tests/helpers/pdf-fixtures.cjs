@@ -3,7 +3,7 @@ const path = require('node:path');
 const ts = require('typescript');
 const root = path.resolve(__dirname, '../..');
 
-exports.loadPdfFixtures = function () {
+exports.loadPdfFixtures = function (entry = 'bulkPrintPdf') {
   const modules = new Map();
   function asset(url) {
     const bytes = fs.readFileSync(path.join(root, 'public', url.split('?')[0]));
@@ -27,5 +27,5 @@ exports.loadPdfFixtures = function () {
       async (url) => ({ ok: true, arrayBuffer: async () => asset(url) }), LocalXHR);
     return result;
   }
-  return load(path.join(root, 'src/features/registration/bulkPrintPdf.ts'));
+  return load(path.join(root, `src/features/registration/${entry}.ts`));
 };
