@@ -11,7 +11,7 @@ Hệ thống đăng ký số thứ tự, điều phối tại lễ tân và màn
 - Supabase Auth: đăng nhập nhân viên.
 - Supabase Realtime: đồng bộ danh sách và màn hình gọi số.
 - Vercel: hosting frontend và security headers.
-- Cloudflare Pages: phương án hosting frontend, cấu hình trong `frontend/wrangler.toml`.
+- Cloudflare Pages: hosting frontend, tự build từ GitHub; cấu hình trên dashboard Pages.
 
 Google Apps Script và Google Sheet không còn nằm trong luồng chạy hiện tại.
 

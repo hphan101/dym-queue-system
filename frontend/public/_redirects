@@ -1,7 +1,0 @@
-/login /index.html 200
-/admin /index.html 200
-/admin/* /index.html 200
-/registrations /index.html 200
-/staff /index.html 200
-/display /index.html 200
-/* /index.html 200

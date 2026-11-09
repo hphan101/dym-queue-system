@@ -1,9 +1,16 @@
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  if (command === 'build') {
+    const env = loadEnv(mode, __dirname, 'VITE_')
+    const missing = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_REGISTRATION_API_URL']
+      .filter((name) => !env[name]?.trim())
+    if (missing.length) throw new Error(`Missing frontend build variables: ${missing.join(', ')}`)
+  }
+  return {
   plugins: [react()],
   server: {
     host: true, // Lắng nghe trên mạng LAN nội bộ khi chạy dev server
@@ -43,4 +50,5 @@ export default defineConfig({
       '@tanstack/react-query',
     ],
   },
+  }
 })

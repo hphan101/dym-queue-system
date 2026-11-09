@@ -3,26 +3,28 @@
 Frontend React/Vite được build từ `frontend/`, xuất ra `frontend/dist/`.
 Database, Auth, Storage, Realtime và Edge Functions tiếp tục chạy trên Supabase.
 
-## Triển khai từ máy phát triển
+## Triển khai tự động từ GitHub
 
-```powershell
-cd frontend
-npx --yes wrangler@4.158.0 login
-npx --yes wrangler@4.158.0 pages project create dym-queue-system --production-branch main
-npm run deploy:pages
-```
+Project Pages kết nối repository hphan101/dym-queue-system, nhánh production main.
+Mỗi lần push main, Cloudflare tự build và deploy.
 
-Chỉ tải thư mục `dist`; không tải mã nguồn hay file `.env` lên Pages.
-Wrangler dùng cấu hình trong `frontend/wrangler.toml`. Tên project và địa chỉ
-`pages.dev` thực tế cần lấy từ kết quả tạo project nếu tên đã được sử dụng.
+Thiết lập trong Pages → Settings → Builds & deployments:
 
-Đây là project Direct Upload. Cloudflare không cho đổi trực tiếp project này
-sang Git integration; nếu muốn tự build từ Git thì tạo project Pages tích hợp
-Git riêng. Direct Upload vẫn có thể triển khai qua Wrangler trong CI sau này.
+- Root directory: frontend
+- Framework preset: React (Vite)
+- Build command: npm run build
+- Build output directory: dist
+- Production URL: https://dym-queue-system.pages.dev
+
+Không thêm wrangler.toml vào dự án Pages này. Nếu có file Wrangler, Cloudflare
+có thể lấy file đó làm nguồn cấu hình thay dashboard và bỏ qua các biến Vite
+đã nhập, làm bản build dừng với lỗi cấu hình Supabase khi mở trang.
 
 ## Biến môi trường build
 
-Vite đọc cấu hình local từ `frontend/.env`:
+Khi chạy local, Vite đọc `frontend/.env`. Khi build trên Cloudflare, khai báo
+ba biến sau trong Pages → Settings → Variables and Secrets cho Production
+và Preview (nếu dùng). Không commit file `.env`:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
@@ -48,4 +50,4 @@ Pages tự phục vụ `index.html` cho đường dẫn SPA không khớp file k
 `404.html` ở gốc. Các header bảo mật được lấy từ `public/_headers` và được Vite
 chép vào `dist/_headers`.
 
-Tài liệu: https://developers.cloudflare.com/pages/get-started/direct-upload/
+Tài liệu: https://developers.cloudflare.com/pages/get-started/git-integration/

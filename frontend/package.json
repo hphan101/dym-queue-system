@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "node --test tests/*.test.cjs",
-    "preview": "vite preview",
-    "deploy:pages": "npm run build && npx --yes wrangler@4.158.0 pages deploy --branch main --commit-dirty=true"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.1.9",
