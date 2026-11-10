@@ -132,14 +132,6 @@ for language, label, page_count, consent_pages, refusal_pages in [
                               pymupdf.Point(line['x1'], line['bottom']),
                               color=(0, 0, 0), width=line['linewidth'], dashes=dashes)
     filename = f'dong-thuan-{label}.pdf'
-    if language == 'vi':
-        size = document[0].rect
-        document.new_page(pno=1, width=size.width, height=size.height)
-        document.new_page(width=size.width, height=size.height)
-        for field in fields:
-            if field['page'] == 1:
-                field['page'] = 2
-        page_count, consent_pages, refusal_pages = 4, [0, 1], [2, 3]
     document.save(root / 'frontend/public/templates' / filename, garbage=4, deflate=True)
     document.close()
     result[language] = {'template': filename, 'pageCount': page_count,

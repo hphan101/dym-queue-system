@@ -54,10 +54,11 @@ test('consent form follows the selected language, including Vietnamese passport 
   assert.equal(service.getConsentFormLanguage({}), 'vi');
 });
 
-test('consent templates include an even number of pages for each separate form', async () => {
-  for (const [language, pages] of [['vi', 4], ['bilingual', 4]]) {
+test('consent templates retain original content pages without blank separators', async () => {
+  for (const [language, pages] of [['vi', 2], ['bilingual', 4]]) {
     const pdf = await PDFDocument.load(fs.readFileSync(path.join(frontend, 'public/templates', layout[language].template)));
     assert.equal(pdf.getPageCount(), pages);
+    for (const page of pdf.getPages()) assert.ok(page.node.Contents(), 'every page contains form content');
     assert.equal(service.getConsentPageIndices(language, 'consent').length, pages / 2);
     assert.equal(service.getConsentPageIndices(language, 'refusal').length, pages / 2);
   }
@@ -69,16 +70,13 @@ test('consent generation uses original PDFs, with correct page selection', async
     const selected = await service.generateConsentPdf({ ...customer, language }, 'refusal');
     const consent = await service.generateConsentPdf({ ...customer, language }, 'consent');
     try {
-      assert.equal((await PDFDocument.load(await complete.blob.arrayBuffer())).getPageCount(), 4);
-      assert.equal((await PDFDocument.load(await selected.blob.arrayBuffer())).getPageCount(), 2);
-      assert.equal((await PDFDocument.load(await consent.blob.arrayBuffer())).getPageCount(), 2);
-      if (language === 'vi') {
-        const all = await PDFDocument.load(await complete.blob.arrayBuffer());
-        for (const index of [1, 3]) assert.equal(all.getPage(index).node.Contents(), undefined, 'blank template pages remain unfilled');
-        for (const result of [consent, selected]) {
-          const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
-          assert.equal(pdf.getPage(1).node.Contents(), undefined, 'each separate form ends with a blank page');
-        }
+      const pagesPerForm = language === 'vi' ? 1 : 2;
+      assert.equal((await PDFDocument.load(await complete.blob.arrayBuffer())).getPageCount(), 2 * pagesPerForm);
+      assert.equal((await PDFDocument.load(await selected.blob.arrayBuffer())).getPageCount(), pagesPerForm);
+      assert.equal((await PDFDocument.load(await consent.blob.arrayBuffer())).getPageCount(), pagesPerForm);
+      for (const result of [complete, consent, selected]) {
+        const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+        for (const page of pdf.getPages()) assert.ok(page.node.Contents(), 'no blank page in printed consent/refusal');
       }
       assert.equal(complete.blob.type, 'application/pdf');
     } finally { URL.revokeObjectURL(complete.url); URL.revokeObjectURL(selected.url); URL.revokeObjectURL(consent.url); }

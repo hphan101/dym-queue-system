@@ -9,7 +9,7 @@ export type ConsentFormLanguage = 'vi' | 'bilingual';
 export type ConsentPageOption = 'all' | 'consent' | 'refusal';
 
 const assets = new Map<string, Promise<ArrayBuffer>>();
-const ASSET_VERSION = '20261109-duplex-templates';
+const ASSET_VERSION = '20261110-original-consent-pages';
 
 function loadAsset(path: string): Promise<ArrayBuffer> {
   let pending = assets.get(path);
