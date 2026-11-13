@@ -1,9 +1,61 @@
+.dym-sidebar-navigation {
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  --sidebar-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sidebar-selected-bg: #202e61;
+  --sidebar-selected-text: #ffffff;
+}
+.dark .dym-sidebar-navigation {
+  --sidebar-selected-bg: #33467b;
+  --sidebar-selected-text: #ffffff;
+}
+.dym-sidebar-navigation [data-sidebar="menu"],
+.dym-sidebar-navigation [data-sidebar="menu-sub"] { gap: 4px; }
+.dym-sidebar-navigation [data-sidebar="group"] { padding: 12px; }
+.dym-sidebar-navigation [data-sidebar="group-label"] {
+  height: 24px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.dym-sidebar-navigation [data-sidebar="menu-sub"] {
+  margin: 8px 0 0 16px;
+  padding: 0 0 0 8px;
+  transform: none;
+}
 .dym-sidebar-navigation [data-sidebar="menu-button"],
 .dym-sidebar-navigation [data-sidebar="menu-sub-button"] {
-  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+  transform: none;
+  transition: background-color 160ms var(--sidebar-motion-ease), color 160ms var(--sidebar-motion-ease);
+}
+.dym-sidebar-navigation [data-sidebar="menu-button"] > svg,
+.dym-sidebar-navigation [data-sidebar="menu-sub-button"] > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.5;
+  color: inherit;
+}
+.dym-sidebar-navigation [data-sidebar="menu-button"][data-active="true"],
+.dym-sidebar-navigation [data-sidebar="menu-sub-button"][data-active="true"] {
+  background: var(--sidebar-selected-bg);
+  color: var(--sidebar-selected-text);
+  font-weight: 500;
+}
+.dym-sidebar-navigation [data-sidebar="menu-button"]:focus-visible,
+.dym-sidebar-navigation [data-sidebar="menu-sub-button"]:focus-visible {
+  outline: 2px solid hsl(var(--sidebar-ring));
+  outline-offset: 2px;
+  box-shadow: none;
 }
 .dym-sidebar-navigation[data-roster-motion="pointer"] .dym-sidebar-roster-chevron {
-  transition: transform 200ms var(--ease-out);
+  transition: transform 180ms var(--sidebar-motion-ease);
 }
 html[data-navigation-motion="pointer"] .dym-admin-content {
   opacity: 1;

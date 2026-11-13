@@ -27,18 +27,19 @@ test('yesterday is locked even for admins without an explicit grant; historical 
   }
 });
 
-test('staff permission parsing validates the flag and never grants history editing to receptionists', () => {
+test('staff permission parsing validates the flag and allows history editing independently from the role preset', () => {
   const source = fs.readFileSync(path.join(root, 'supabase/functions/manage-staff/index.ts'), 'utf8');
   const ast = ts.createSourceFile('staff.ts', source, ts.ScriptTarget.Latest, true);
   const parser = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'parseStaffInput');
   const result = {};
-  new Function('exports', 'ALLOWED_ROLES', 'ALLOWED_BRANCH_CODES', 'isSafeText', compile(`${parser.getText(ast)}\nexports.parse = parseStaffInput;`))(
+  new Function('exports', 'ALLOWED_ROLES', 'ALLOWED_BRANCH_CODES', 'isSafeText', 'getDefaultPermissions', 'parsePermissions', compile(`${parser.getText(ast)}\nexports.parse = parseStaffInput;`))(
     result, new Set(['admin', 'operator', 'receptionist']), new Set(['q1', 'q7', 'hn']), (value, min, max) => value.length >= min && value.length <= max,
+    require('./helpers/staff-permissions.cjs').getDefaultPermissions, require('./helpers/staff-permissions.cjs').parsePermissions,
   );
   const input = { displayName: 'Test staff', role: 'operator', branchCodes: ['q1'] };
   assert.equal(result.parse(input).canEditRosterHistory, false);
   assert.equal(result.parse({ ...input, canEditRosterHistory: true }).canEditRosterHistory, true);
-  assert.equal(result.parse({ ...input, role: 'receptionist', canEditRosterHistory: true }).canEditRosterHistory, false);
+  assert.equal(result.parse({ ...input, role: 'receptionist', canEditRosterHistory: true }).canEditRosterHistory, true);
   assert.equal(result.parse({ ...input, canEditRosterHistory: 'true' }), null);
 });
 

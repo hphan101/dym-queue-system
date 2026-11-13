@@ -1,0 +1,36 @@
+/* Quiet feedback following unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-admin-shell :is([data-slot="button"], .dym-btn-table-action, .dym-btn-undo, .dym-btn-recall) {
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dym-admin-shell :is([data-slot="button"], .dym-btn-table-action, .dym-btn-undo, .dym-btn-recall) { transition: none; }
+}
+.dym-admin-shell :is([data-slot="button"], .dym-btn-table-action, .dym-btn-undo, .dym-btn-recall):is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-admin-shell [data-slot="button"][data-variant="outline"]:hover:not(:disabled):not([aria-disabled="true"]):not(.dym-staff-delete-button),
+  .dym-admin-shell [data-slot="button"][data-variant="ghost"]:hover:not(:disabled):not([aria-disabled="true"]),
+  .dym-admin-shell :is(.dym-btn-table-action, .dym-btn-undo, .dym-btn-recall):hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in srgb, hsl(var(--foreground)) 10%, hsl(var(--card)));
+    border-color: color-mix(in srgb, hsl(var(--foreground)) 45%, hsl(var(--border)));
+    color: hsl(var(--foreground));
+    box-shadow: none;
+  }
+  .dym-admin-shell [data-slot="button"][data-variant="secondary"]:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in srgb, hsl(var(--foreground)) 14%, hsl(var(--secondary)));
+    color: hsl(var(--secondary-foreground));
+    box-shadow: none;
+  }
+  .dym-admin-shell [data-slot="button"][data-variant="default"]:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in srgb, hsl(var(--primary)) 88%, hsl(var(--primary-foreground)));
+    color: hsl(var(--primary-foreground));
+    box-shadow: none;
+  }
+  .dym-admin-shell [data-slot="button"].dym-staff-delete-button:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in srgb, hsl(var(--destructive)) 12%, hsl(var(--card)));
+    border-color: hsl(var(--destructive));
+    box-shadow: none;
+  }
+}

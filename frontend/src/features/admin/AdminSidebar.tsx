@@ -1,3 +1,4 @@
+import { useStaffPermissions, DESTINATION_PERMISSIONS } from './hooks/useStaffPermissions';
 import { useState } from 'react';
 import {
   ArrowUpRight,
@@ -96,13 +97,13 @@ export function AdminSidebar({
   onThemeToggle,
   onLogout,
 }: AdminSidebarProps) {
+  const { can } = useStaffPermissions();
   const [isRosterOpen, setIsRosterOpen] = useState(true);
   const [isRosterPointerMotion, setIsRosterPointerMotion] = useState(false);
   const rosterMotion = useSidebarDisclosureMotion(isRosterOpen && !isCollapsed);
   const resolvedRole: StaffRole =
     staffRole ?? (isAdmin ? 'admin' : 'receptionist');
-  const canAccessRoster =
-    resolvedRole === 'admin' || resolvedRole === 'operator';
+  const canAccessRoster = ['overview','clinic','onsite','settlement','personnel'].some((key) => can(key as 'overview'));
 
   const scopeQuery = date ? `branch=${branch}&date=${date}` : `branch=${branch}`;
   const adminHref = `/?page=admin&${scopeQuery}`;
@@ -157,7 +158,7 @@ export function AdminSidebar({
       href: rosterOnsiteHref,
       icon: Truck,
     },
-    ...(isAdmin
+    ...(can('personnel')
       ? [
           {
             key: 'roster-personnel' as const,
@@ -167,7 +168,7 @@ export function AdminSidebar({
           },
         ]
       : []),
-  ];
+  ].filter((item) => can(DESTINATION_PERMISSIONS[item.key]));
 
   return (
     <SidebarProvider
@@ -175,7 +176,7 @@ export function AdminSidebar({
       onOpenChange={(open) => onCollapsedChange(!open)}
       className="min-h-0 w-auto flex-none"
     >
-      <Sidebar collapsible="icon" data-roster-motion={isRosterPointerMotion ? 'pointer' : 'instant'} className="dym-sidebar-navigation border-sidebar-border font-sans antialiased tracking-[-0.011em]">
+      <Sidebar collapsible="icon" data-roster-motion={isRosterPointerMotion ? 'pointer' : 'instant'} className="dym-sidebar-navigation border-sidebar-border antialiased">
         {/* DYM Brand Logo Header (centered like original) */}
         <SidebarHeader className="gap-2.5 border-b border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-2.5">
           {!isCollapsed ? (
@@ -201,7 +202,7 @@ export function AdminSidebar({
           )}
 
           <SidebarMenu>
-            <SidebarMenuItem>
+            {can('registration_qr') && <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Mở màn hình QR đăng ký">
                 <button
                   type="button"
@@ -212,7 +213,7 @@ export function AdminSidebar({
                   <span>QR đăng ký tại quầy</span>
                 </button>
               </SidebarMenuButton>
-            </SidebarMenuItem>
+            </SidebarMenuItem>}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -247,7 +248,7 @@ export function AdminSidebar({
             <SidebarGroupLabel>Tiếp đón & Hàng đợi</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
+                {can('reception') && <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
                     isActive={activePage === 'dashboard'}
@@ -262,9 +263,9 @@ export function AdminSidebar({
                       <span>Tiếp nhận</span>
                     </a>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem>}
 
-                <SidebarMenuItem>
+                {can('registrations') && <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
                     isActive={activePage === 'registrations'}
@@ -281,7 +282,7 @@ export function AdminSidebar({
                       <span>Danh sách tiếp nhận</span>
                     </a>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem>}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -304,6 +305,7 @@ export function AdminSidebar({
                             setIsRosterOpen((prev) => !prev);
                           }}
                           aria-expanded={isRosterOpen}
+                          aria-controls="dym-sidebar-roster-panel"
                         >
                           <CalendarRange aria-hidden="true" />
                           <span>Điều phối & Đoàn khám</span>
@@ -315,7 +317,7 @@ export function AdminSidebar({
                           />
                         </SidebarMenuButton>
 
-                        <div ref={rosterMotion.panelRef} inert={!isRosterOpen} aria-hidden={!isRosterOpen}
+                        <div id="dym-sidebar-roster-panel" ref={rosterMotion.panelRef} inert={!isRosterOpen} aria-hidden={!isRosterOpen}
                           style={{ height: isRosterOpen ? 'auto' : 0, opacity: isRosterOpen ? 1 : 0, overflow: 'hidden' }}>
                           <SidebarMenuSub>
                             {rosterItems.map((item) => {
@@ -384,7 +386,7 @@ export function AdminSidebar({
             <SidebarGroupLabel>Hệ thống</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {isAdmin && (
+                {can('staff') && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild

@@ -105,7 +105,7 @@ export function QueueMetrics({
             {isCallingActive && (
               <span className="dym-badge-serving">
                 <span className="dym-badge-serving-dot" />
-                ĐANG GỌI TẠI SẢNH
+                Đang gọi tại sảnh
               </span>
             )}
           </div>
@@ -136,7 +136,7 @@ export function QueueMetrics({
             </span>
             <div className="dym-btn-call-copy">
               <span className="dym-btn-call-title">
-                {pendingAction === 'next' ? 'Đang gọi số...' : 'GỌI SỐ TIẾP THEO'}
+                {pendingAction === 'next' ? 'Đang gọi số…' : 'Gọi số tiếp theo'}
               </span>
               <span className="dym-btn-call-sub">
                 {counts.waiting > 0

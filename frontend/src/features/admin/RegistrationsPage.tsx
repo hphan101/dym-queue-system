@@ -1,3 +1,4 @@
+import { NumberedPagination } from '@/components/numbered-pagination';
 import { AdminLayout } from './components/AdminLayout';
 import {
   lazy,
@@ -11,9 +12,6 @@ import {
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import {
   Building2,
@@ -26,7 +24,7 @@ import {
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { Input } from '@/components/ui/input';
 import {
   Popover,
@@ -64,6 +62,7 @@ import {
 } from './constants/queueConstants';
 
 import './admin.css';
+import './reception.css';
 import './registrations.css';
 
 import { useStaffIdentity } from './hooks/useStaffIdentity';
@@ -444,7 +443,7 @@ export function RegistrationsPage({
 
   const companyTriggerMeta = useMemo(() => {
     if (companyFilter === 'all') {
-      return { label: 'Đơn vị: Tất cả', count: rows.length };
+      return { label: 'Tất cả đơn vị', count: rows.length };
     }
     if (companyFilter === '__individual__') {
       return {
@@ -582,7 +581,7 @@ export function RegistrationsPage({
         }}
         actions={
           <div className="flex items-center gap-2">
-            <Button
+            <Button permissionAction="view" permissionModule="export"
               type="button"
               variant="outline"
               size="sm"
@@ -633,7 +632,7 @@ export function RegistrationsPage({
         onClose={() => setNewRegistrationNotice(null)}
       />
 
-      <main className="dym-admin-content">
+      <main className="dym-admin-content dym-reception-page dym-registrations-page">
         <RealtimeConnectionAlert state={connectionState} />
 
         {(error || identityError) && (
@@ -651,7 +650,7 @@ export function RegistrationsPage({
           <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
             <div className="dym-registry-title-block">
               <h2 id="registry-table-title" className="dym-registry-title">
-                Danh Sách Chi Tiết Khách Hàng
+                Danh sách khách hàng
               </h2>
             </div>
 
@@ -718,7 +717,7 @@ export function RegistrationsPage({
               </Tabs>
 
               {/* Right Filter & Search Controls */}
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
+              <div className="dym-registration-filters">
                 {/* Print Status Filter (shadcn Select + SelectGroup) */}
                 <Select
                   value={printFilter}
@@ -731,7 +730,7 @@ export function RegistrationsPage({
                   <SelectTrigger
                     aria-label="Lọc theo trạng thái in"
                     className={cn(
-                      'h-9 w-[215px] bg-card px-3 text-xs font-medium shadow-sm',
+                      'dym-registration-print-filter bg-card px-3 text-sm font-normal shadow-none',
                       printFilter !== 'all' &&
                         'border-ring bg-accent text-accent-foreground',
                     )}
@@ -744,10 +743,10 @@ export function RegistrationsPage({
                       <SelectValue placeholder="Trạng thái in" />
                     </div>
                   </SelectTrigger>
-                  <SelectContent align="end" className="w-[215px]">
+                  <SelectContent align="end" className="dym-registration-filter-menu min-w-[240px]">
                     <SelectGroup>
                       <SelectItem value="all" className="text-xs tabular-nums">
-                        Trạng thái in: Tất cả ({rows.length})
+                        Tất cả bản in ({rows.length})
                       </SelectItem>
                       <SelectItem
                         value="unprinted"
@@ -802,7 +801,7 @@ export function RegistrationsPage({
                       aria-expanded={isCompanyMenuOpen}
                       title={`${companyTriggerMeta.label} (${companyTriggerMeta.count})`}
                       className={cn(
-                        'h-9 min-w-[190px] max-w-[260px] justify-between gap-2 bg-card px-3 text-xs font-medium shadow-sm',
+                        'dym-registration-company-filter justify-between gap-2 bg-card px-3 text-sm font-normal shadow-none',
                         companyFilter !== 'all' &&
                           'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
                       )}
@@ -831,7 +830,7 @@ export function RegistrationsPage({
                     </Button>
                   </PopoverTrigger>
 
-                  <PopoverContent align="end" className="w-72 p-0">
+                  <PopoverContent align="end" className="dym-registration-filter-menu w-80 max-w-[calc(100vw-32px)] p-0">
                     <div className="relative flex items-center border-b border-border p-2">
                       <Search
                         className="pointer-events-none absolute left-4 size-3.5 text-muted-foreground"
@@ -842,8 +841,8 @@ export function RegistrationsPage({
                         type="text"
                         value={companySearchQuery}
                         onChange={(e) => setCompanySearchQuery(e.target.value)}
-                        placeholder="Tìm tên công ty / đơn vị..."
-                        className="h-8 bg-background pl-8 pr-7 text-xs shadow-none"
+                        placeholder="Tìm đơn vị…"
+                        className="h-9 bg-background pl-8 pr-7 text-sm shadow-none"
                       />
                       {companySearchQuery && (
                         <Button
@@ -890,7 +889,7 @@ export function RegistrationsPage({
                                 )}
                                 aria-hidden="true"
                               />
-                              <span className="truncate">Đơn vị: Tất cả</span>
+                              <span className="truncate">Tất cả đơn vị</span>
                             </span>
                             <Badge
                               variant="secondary"
@@ -985,7 +984,7 @@ export function RegistrationsPage({
                 </Popover>
 
                 {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-                <div className="relative w-full sm:w-64 lg:w-72">
+                <div className="dym-registration-search relative">
                   <label htmlFor={searchInputId} className="sr-only">
                     Tìm kiếm hồ sơ khách hàng
                   </label>
@@ -996,10 +995,10 @@ export function RegistrationsPage({
                   <Input
                     id={searchInputId}
                     type="search"
-                    placeholder="Tìm tên, SĐT, CCCD, công ty..."
+                    placeholder="Tìm tên, SĐT, CCCD, công ty…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                    className="dym-search-field h-9 bg-card pl-8 pr-8 text-sm shadow-none"
                   />
                   {query ? (
                     <Button
@@ -1040,7 +1039,7 @@ export function RegistrationsPage({
                     <th scope="col">Tên Khách Hàng</th>
                     <th scope="col">Liên Hệ & Định Danh</th>
                     <th scope="col">Đơn Vị & Địa Chỉ</th>
-                    <th scope="col">Ghi chú / STT HIS</th>
+                    <th scope="col">Ghi chú</th>
                     <th scope="col">Trạng Thái</th>
                     <th scope="col">Trạng Thái In</th>
                     <th scope="col" className="text-right">
@@ -1098,17 +1097,16 @@ export function RegistrationsPage({
               </table>
             </div>
           ) : filteredRows.length === 0 ? (
-            <div className="dym-table-empty-box">
-              <div className="dym-empty-icon-wrap">
-                <UserGroupIcon
-                  className="w-7 h-7 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </div>
-              <h3 className="dym-empty-title">Không tìm thấy hồ sơ đăng ký</h3>
+            <div className="dym-table-empty-box" role="status">
+              <h3 className="dym-empty-title">
+                {rows.length === 0
+                  ? 'Chưa có khách đăng ký trong ngày này'
+                  : 'Không có hồ sơ phù hợp'}
+              </h3>
               <p className="dym-empty-desc">
-                Không có khách hàng nào phù hợp với bộ lọc hiện tại. Hãy thử đổi
-                ngày, chi nhánh hoặc xóa từ khóa tìm kiếm.
+                {rows.length === 0
+                  ? 'Chọn ngày hoặc chi nhánh khác để xem danh sách tiếp nhận.'
+                  : 'Thử thay đổi bộ lọc hoặc xóa từ khóa để xem lại danh sách khách hàng.'}
               </p>
               {(query ||
                 statusFilter !== 'all' ||
@@ -1131,7 +1129,8 @@ export function RegistrationsPage({
           ) : (
             <>
               <div
-                className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-4 py-2.5 text-xs"
+                className="dym-bulk-toolbar flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm"
+                data-selected={checkedIds.size > 0}
                 role="toolbar"
                 aria-label="In hàng loạt"
               >
@@ -1180,7 +1179,7 @@ export function RegistrationsPage({
                       </span>
                     ) : (
                       <>
-                        <Button
+                        <Button permissionAction="view" permissionModule="printing"
                           type="button"
                           variant="outline"
                           size="sm"
@@ -1189,7 +1188,7 @@ export function RegistrationsPage({
                         >
                           In Đồng thuận
                         </Button>
-                        <Button
+                        <Button permissionAction="view" permissionModule="printing"
                           type="button"
                           variant="outline"
                           size="sm"
@@ -1198,10 +1197,10 @@ export function RegistrationsPage({
                         >
                           In TT25
                         </Button>
-                        <Button
+                        <Button permissionAction="view" permissionModule="printing"
                           type="button"
                           size="sm"
-                          className="h-8 px-3 text-xs"
+                          className="dym-bulk-print-primary h-9 px-3 text-sm"
                           onClick={() => void handleBulkPrint('both')}
                           title="Mỗi khách: phiếu Đồng thuận rồi phiếu TT25, theo thứ tự số phiếu"
                         >
@@ -1246,33 +1245,7 @@ export function RegistrationsPage({
                 <strong>{lastVisibleRow}</strong> trong{' '}
                 <strong>{filteredRows.length}</strong> đăng ký
               </span>
-              <div className="dym-pagination-pager">
-                <button
-                  type="button"
-                  className="dym-page-btn"
-                  disabled={visiblePage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  aria-label="Trang trước"
-                >
-                  <ChevronLeftIcon className="w-3.5 h-3.5" />
-                  <span>Trước</span>
-                </button>
-                <span className="dym-page-indicator">
-                  Trang <strong>{visiblePage}</strong> / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="dym-page-btn"
-                  disabled={visiblePage === totalPages}
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  aria-label="Trang sau"
-                >
-                  <span>Sau</span>
-                  <ChevronRightIcon className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <NumberedPagination currentPage={visiblePage} totalPages={totalPages} onPageChange={setCurrentPage} label="Phân trang danh sách tiếp nhận" />
             </div>
           )}
         </section>

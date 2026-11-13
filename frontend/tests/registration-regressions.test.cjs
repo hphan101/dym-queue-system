@@ -31,6 +31,7 @@ function load(file, mocks = {}, globals = {}) {
     exports, console, Date, ...globals,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === '@/features/admin/hooks/useStaffPermissions') return { useStaffPermissions: () => ({ can: () => true }) };
       if (name === './pdfBrowser' || name === './usePrintModalDismiss') {
         return load(path.join(path.dirname(file), `${name}.ts`), mocks, globals);
       }

@@ -15,7 +15,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -722,7 +722,7 @@ export function RosterInsitePage({
           {view === 'day' &&
             currentInsiteSchedule &&
             (visibleInsiteAssignments.length > 0 || provisionalCost > 0) && (
-              <Button
+              <Button permissionAction="view" permissionModule="export"
                 type="button"
                 size="sm"
                 onClick={() =>
@@ -884,7 +884,7 @@ export function RosterInsitePage({
                 Hôm nay
               </Button>
 
-              <Button
+              <Button permissionAction="create"
                 type="button"
                 variant="outline"
                 size="sm"
@@ -925,7 +925,7 @@ export function RosterInsitePage({
                 </div>
               </div>
 
-              <Button
+              <Button permissionAction="update"
                 type="button"
                 variant="outline"
                 size="icon"
@@ -1396,7 +1396,7 @@ export function RosterInsitePage({
             >
               Hủy
             </Button>
-            <Button
+            <Button permissionAction="delete"
               type="button"
               variant="destructive"
               size="sm"
@@ -1482,7 +1482,7 @@ export function RosterInsitePage({
                         }}
                         className="h-8 min-w-0 flex-1 text-sm"
                       />
-                      <Button
+                      <Button permissionAction="update"
                         type="button"
                         size="sm"
                         onClick={() => void handleSaveRoomEdit(room.id)}

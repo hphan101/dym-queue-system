@@ -276,13 +276,6 @@ export function RosterDashboardPage({
     >
       <div className="dym-roster-dashboard dym-onsite-page">
         <div className="roster-dashboard-toolbar">
-          <div>
-            <h2>Nhịp vận hành trong ngày</h2>
-            <p>
-              Phân công Clinic và các đoàn khám ·{' '}
-              {formatDisplayDate(selectedDate)}
-            </p>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             <DatePicker
               value={selectedDate}

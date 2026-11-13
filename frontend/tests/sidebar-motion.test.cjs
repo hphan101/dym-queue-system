@@ -13,7 +13,7 @@ function load(file, imports = {}, globals = {}) {
   return exports;
 }
 
-test('sidebar disclosure measures the visible height, reverses from the current frame and skips keyboard/reduced motion', () => {
+test('sidebar disclosure animates only opacity and transform on opening and skips keyboard/reduced motion', () => {
   const refs = [], animations = [];
   let cursor = 0, effect, height = 144, opacity = '1', reduce = false, cancelled = 0;
   const react = { useRef(value) { return refs[cursor++] ??= { current: value }; }, useLayoutEffect(fn) { effect = fn; } };
@@ -29,23 +29,23 @@ test('sidebar disclosure measures the visible height, reverses from the current 
   hook.prepare(1);
   hook = render(false);
   const cleanup = effect();
-  assert.equal(animations[0].frames[0].height, '144px');
-  assert.equal(animations[0].frames[1].height, '0px');
-  assert.equal(animations[0].options.duration, 200);
+  assert.equal(cleanup, undefined);
+  assert.equal(animations.length, 0);
   height = 60; opacity = '0.4';
   hook.prepare(1);
-  cleanup();
   hook = render(true);
   const stop = effect();
-  assert.equal(animations[1].frames[0].height, '60px');
-  assert.equal(animations[1].frames[0].opacity, '0.4');
-  assert.equal(animations[1].frames[1].height, '144px');
+  assert.deepEqual(animations[0].frames, [
+    { opacity: 0, transform: 'translateY(-4px)' },
+    { opacity: 1, transform: 'translateY(0)' },
+  ]);
+  assert.equal(animations[0].options.duration, 180);
   stop();
-  assert.equal(cancelled, 2);
+  assert.equal(cancelled, 1);
   hook.prepare(0); render(false); assert.equal(effect(), undefined);
   reduce = true;
   hook.prepare(1); render(true); assert.equal(effect(), undefined);
-  assert.equal(animations.length, 2);
+  assert.equal(animations.length, 1);
 });
 
 test('sidebar navigation opts into motion only for plain pointer clicks and retains native modified links', () => {
@@ -69,6 +69,7 @@ test('closed sidebar menus are inert and hidden from assistive technology while 
   const source = fs.readFileSync(path.join(root, 'features/admin/AdminSidebar.tsx'), 'utf8');
   const imports = Object.fromEntries([...source.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => [match[1], symbols]));
   imports.react = { useState: () => [false, () => {}] };
+  imports['./hooks/useStaffPermissions'] = { useStaffPermissions: () => ({ can: () => true }), DESTINATION_PERMISSIONS: new Proxy({}, { get: () => 'clinic' }) };
   imports['react/jsx-runtime'] = require('react/jsx-runtime');
   imports['./hooks/useSidebarDisclosureMotion'] = { useSidebarDisclosureMotion: () => ({ panelRef: { current: null }, prepare() {} }) };
   const { AdminSidebar } = load('features/admin/AdminSidebar.tsx', imports);

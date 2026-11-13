@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -1004,7 +1004,7 @@ export function RosterOnsitePage({
           {view === 'week' && (
             <div className="flex flex-wrap gap-2">
               {authorizedIsAdmin && (
-                <Button
+                <Button permissionAction="update"
                   type="button"
                   variant="outline"
                   onClick={() => void openTemplateDialog()}
@@ -1012,7 +1012,7 @@ export function RosterOnsitePage({
                   Vị trí mẫu
                 </Button>
               )}
-              <Button
+              <Button permissionAction="create"
                 type="button"
                 onClick={() => void openCreateCampaignModal()}
               >
@@ -1157,7 +1157,7 @@ export function RosterOnsitePage({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {authorizedIsAdmin && (
-                      <Button
+                      <Button permissionAction="update"
                         type="button"
                         size="sm"
                         variant="outline"
@@ -1166,7 +1166,7 @@ export function RosterOnsitePage({
                         Vị trí mẫu
                       </Button>
                     )}
-                    <Button
+                    <Button permissionAction="create"
                       type="button"
                       size="sm"
                       onClick={() => void openCreateCampaignModal()}
@@ -1346,7 +1346,7 @@ export function RosterOnsitePage({
                       </strong>{' '}
                       để khởi tạo danh sách vị trí và phân công nhân sự.
                     </span>
-                    <Button
+                    <Button permissionAction="create"
                       type="button"
                       size="sm"
                       onClick={() => void openCreateCampaignModal()}
@@ -1399,7 +1399,7 @@ export function RosterOnsitePage({
                             )}
                             {showCosts ? 'Ẩn chi phí' : 'Hiện chi phí'}
                           </Button>
-                          <Button
+                          <Button permissionAction="update"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -1417,7 +1417,7 @@ export function RosterOnsitePage({
                           </Button>
 
                           {showCosts && (
-                            <Button
+                            <Button permissionAction="view" permissionModule="export"
                               type="button"
                               variant="outline"
                               size="sm"
@@ -1765,7 +1765,7 @@ export function RosterOnsitePage({
                                       Bạn có thể nạp nhanh các vị trí mẫu hoặc
                                       tự thêm từng vị trí bên dưới.
                                     </span>
-                                    <Button
+                                    <Button permissionAction="update"
                                       type="button"
                                       variant="outline"
                                       size="sm"
@@ -2621,7 +2621,7 @@ export function RosterOnsitePage({
                     </span>
                   </label>
                   {authorizedIsAdmin && (
-                    <Button
+                    <Button permissionAction="update"
                       type="button"
                       variant="link"
                       size="sm"
@@ -2824,7 +2824,7 @@ export function RosterOnsitePage({
               >
                 Hủy
               </Button>
-              <Button
+              <Button permissionAction="delete"
                 type="button"
                 variant="destructive"
                 size="sm"
@@ -2881,7 +2881,7 @@ export function RosterOnsitePage({
               >
                 Hủy
               </Button>
-              <Button
+              <Button permissionAction="delete"
                 type="button"
                 variant="destructive"
                 size="sm"

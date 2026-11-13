@@ -10,16 +10,10 @@
 .roster-dashboard-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   flex-wrap: wrap;
 }
-.roster-dashboard-toolbar h2 {
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-}
-.roster-dashboard-toolbar p,
 .roster-dashboard-caption {
   color: hsl(var(--muted-foreground));
   font-size: 13px;
@@ -163,9 +157,6 @@
   .roster-dashboard-finances {
     grid-template-columns: 1fr;
     gap: 20px;
-  }
-  .roster-dashboard-toolbar h2 {
-    font-size: 19px;
   }
   .roster-dashboard-metrics {
     gap: 10px;

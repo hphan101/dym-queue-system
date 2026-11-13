@@ -1,3 +1,4 @@
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
 import React, { useEffect, useState } from 'react';
 import {
   CheckIcon,
@@ -58,6 +59,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   onPrintConsent,
   onUpdated,
 }) => {
+  const { can } = useStaffPermissions();
   const { getStatus } = usePrintStatus();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -188,6 +190,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const printStatus = getStatus(effectiveRow.id, effectiveRow.tt25_data);
 
   const handleStartEdit = () => {
+    if (!can('registrations', 'update')) return;
     setForm(buildInitialForm(effectiveRow));
     setFormError(null);
     setSaveSuccess(false);
@@ -288,7 +291,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               {!isEditing && (
                 <button
                   type="button"
-                  onClick={handleStartEdit}
+                  disabled={!can('registrations', 'update')} onClick={handleStartEdit}
                   className="dym-clinical-drawer-edit-btn"
                   title="Chỉnh sửa thông tin khách hàng"
                 >
@@ -312,7 +315,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             {onPrintConsent && (
               <button
                 type="button"
-                onClick={() => onPrintConsent(effectiveRow)}
+                disabled={!can('printing')} onClick={() => onPrintConsent(effectiveRow)}
                 className="dym-drawer-action-btn is-consent"
                 title="In phiếu Đồng thuận khám sức khỏe"
               >
@@ -322,7 +325,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             )}
             <button
               type="button"
-              onClick={() => onPrint(effectiveRow)}
+              disabled={!can('printing')} onClick={() => onPrint(effectiveRow)}
               className="dym-drawer-action-btn is-tt25"
               title="In phiếu khám sức khỏe theo mẫu Thông tư 25"
             >

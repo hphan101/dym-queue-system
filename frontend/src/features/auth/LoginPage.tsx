@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { ShieldCheck } from 'lucide-react';
 import { LoginForm } from '@/components/login-form';
 import dymLogo from '../../assets/dym-logo-dark.png';
 import { supabase } from '../../lib/supabaseClient';
 import { isBranchCode } from '../../config/branches';
+import './login.css';
 
 function getLoginErrorMessage(code?: string): string {
   switch (code) {
@@ -104,13 +104,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-svh w-full flex-col items-center justify-center bg-muted/40 p-6 md:p-10 font-sans antialiased">
-      <div className="flex w-full max-w-sm flex-col gap-6">
+    <div className="dym-login-page flex min-h-svh w-full flex-col items-center justify-center bg-muted/40 px-4 py-8 sm:p-10 antialiased">
+      <div className="flex w-full max-w-lg flex-col gap-8">
         <div className="flex flex-col items-center gap-2">
           <img
             src={dymLogo}
             alt="DYM Medical Center Vietnam"
-            className="h-auto w-44 object-contain"
+            className="h-auto w-52 object-contain sm:w-56"
           />
         </div>
 
@@ -133,9 +133,8 @@ export default function LoginPage() {
           onFormSubmit={handleSubmit}
         />
 
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-          <ShieldCheck className="size-3.5" aria-hidden="true" />
-          <span>Chỉ dành cho nhân viên được DYM cấp quyền.</span>
+        <p className="text-center text-sm text-muted-foreground">
+          Chỉ dành cho nhân viên được DYM cấp quyền
         </p>
       </div>
     </div>

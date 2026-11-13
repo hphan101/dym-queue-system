@@ -1,4 +1,5 @@
 import type { BranchCode } from '../../types/domain';
+import type { StaffPermissions } from '@/lib/staffPermissions';
 import type {
   TT25MedicalHistory,
   TT25TargetPaymentInfo,
@@ -13,6 +14,7 @@ export interface StaffBranch {
 }
 
 export interface StaffAccount {
+  permissions?: StaffPermissions | null;
   canEditRosterHistory: boolean;
   userId: string;
   loginName: string;
@@ -25,6 +27,7 @@ export interface StaffAccount {
 }
 
 export interface StaffFormState {
+  permissions: StaffPermissions;
   canEditRosterHistory: boolean;
   userId: string | null;
   displayName: string;

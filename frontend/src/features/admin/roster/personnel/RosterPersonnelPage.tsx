@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import {
   Dialog,
   DialogContent,
@@ -657,7 +657,7 @@ export function RosterPersonnelPage({
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
         <div className="flex flex-wrap items-center gap-2">
-          <Button
+          <Button permissionAction="create"
             type="button"
             size="sm"
             onClick={() => openCreateModal()}
@@ -1002,7 +1002,7 @@ export function RosterPersonnelPage({
                 <ArrowUpTrayIcon className="size-3.5 shrink-0" />
                 <span>Nhập từ Excel</span>
               </Button>
-              <Button
+              <Button permissionAction="create"
                 type="button"
                 size="sm"
                 onClick={() =>
@@ -1137,7 +1137,7 @@ export function RosterPersonnelPage({
                       </td>
                       <td className="text-right">
                         <div className="dym-table-actions-group">
-                          <Button
+                          <Button permissionAction="update"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -1151,6 +1151,7 @@ export function RosterPersonnelPage({
                             type="button"
                             variant="outline"
                             size="sm"
+                            permissionAction="view" permissionModule="personnel_documents"
                             onClick={() => setDocumentPerson(person)}
                             aria-label={`File hồ sơ của ${person.full_name}`}
                             className="h-8 px-3 text-xs font-medium"
@@ -1620,7 +1621,7 @@ export function RosterPersonnelPage({
             >
               Hủy
             </Button>
-            <Button
+            <Button permissionAction="delete"
               type="button"
               variant="destructive"
               size="sm"
@@ -1696,7 +1697,7 @@ export function RosterPersonnelPage({
                 )}
               </div>
 
-              <Button
+              <Button permissionAction="view" permissionModule="export"
                 type="button"
                 variant="ghost"
                 size="sm"
@@ -1830,7 +1831,7 @@ export function RosterPersonnelPage({
               >
                 Đóng
               </Button>
-              <Button
+              <Button permissionAction="create"
                 type="button"
                 size="sm"
                 disabled={isMutating || validImportRows.length === 0}

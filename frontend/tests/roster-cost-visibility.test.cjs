@@ -24,7 +24,9 @@ function loadComponent(file, stateValues, context, category = 'onsite', onStateC
   let index = 0;
   return compile(file, (name) => { name = rosterImport(name);
     if (name === 'react/jsx-runtime') return require(name);
+    if (name.includes('useStaffPermissions')) return { useStaffPermissions: () => ({ can: () => true }), PermissionModuleContext: {} };
     if (name === 'react') return {
+      useContext: () => 'onsite',
       useState(initial) { const current = index++; return [current in stateValues ? stateValues[current] : (initial === 'week' ? 'details' : initial === 'onsite' ? category : typeof initial === 'function' ? initial() : initial), (value) => onStateChange(current, value)]; },
       useMemo: (callback) => callback(), useEffect() {}, useId: () => 'test',
     };

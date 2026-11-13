@@ -1006,18 +1006,46 @@ body {
   font-variant-numeric: tabular-nums;
   padding: 0.25rem 0.625rem;
   border-radius: 0.25rem;
-  background: var(--color-paper-2);
-  border: 1px solid var(--color-rule);
-  color: var(--color-ink);
+  background: var(--ticket-background, var(--color-paper-2));
+  border: 1px solid var(--ticket-border, var(--color-rule));
+  color: var(--ticket-foreground, var(--color-ink));
   letter-spacing: -0.02em;
 }
 
 .dark .dym-ticket-tag,
 [data-color-mode="dark"] .dym-ticket-tag,
 .dym-admin-shell[data-color-mode="dark"] .dym-ticket-tag {
-  background: var(--color-paper-2);
-  border-color: var(--color-rule);
-  color: var(--color-ink);
+  background: var(--ticket-background, var(--color-paper-2));
+  border-color: var(--ticket-border, var(--color-rule));
+  color: var(--ticket-foreground, var(--color-ink));
+}
+
+.dym-ticket-tag[data-parity] {
+  box-sizing: border-box;
+  inline-size: 3.5rem;
+  block-size: 2rem;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.dym-ticket-tag[data-parity] > span {
+  /* Balance the numeral glyphs against the font's reserved descender space. */
+  transform: translateY(1px);
+}
+
+.dym-ticket-tag[data-parity="even"] {
+  --ticket-background: #e5f1f7;
+  --ticket-border: #c4dce8;
+  --ticket-foreground: #245773;
+}
+
+.dym-ticket-tag[data-parity="odd"] {
+  --ticket-background: #fff0df;
+  --ticket-border: #efd3b5;
+  --ticket-foreground: #874619;
 }
 
 /* Time Cell */
@@ -1412,54 +1440,6 @@ body {
 .dym-pagination-summary b {
   color: var(--color-ink);
   font-weight: 700;
-}
-
-.dym-pagination-pager {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.dym-page-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.3125rem 0.625rem;
-  border-radius: 0.25rem;
-  border: 1px solid var(--color-rule-2);
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-  transition:
-    border-color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
-    color 160ms cubic-bezier(0.165, 0.84, 0.44, 1),
-    transform 120ms cubic-bezier(0.165, 0.84, 0.44, 1);
-}
-
-@media (hover: hover) {
-  .dym-page-btn:hover:not(:disabled) {
-    border-color: var(--color-rule-2);
-    color: var(--color-ink);
-  }
-}
-
-.dym-page-btn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.dym-page-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.dym-page-indicator {
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-ink-2);
-  padding: 0 0.5rem;
 }
 
 /* Empty State Box */

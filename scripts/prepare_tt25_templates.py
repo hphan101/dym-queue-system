@@ -1,4 +1,4 @@
-"""Prepare the original Word-exported HCM TT25 PDFs and field coordinates.
+"""Prepare original Word-exported TT25 PDFs and field coordinates.
 
 Run with --input-dir tmp/tt25-forms; requires pdfplumber and PyMuPDF.
 Source Word files remain unchanged. Only highlighted placeholders are cleared.
@@ -11,6 +11,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('--input-dir', type=Path, required=True)
 parser.add_argument('--pymupdf-path')
+parser.add_argument('--site', choices=['hcm', 'hn'], default='hcm')
 args = parser.parse_args()
 if args.pymupdf_path:
     sys.path.insert(0, args.pymupdf_path)
@@ -22,7 +23,7 @@ layouts = {}
 for name, count, history_pages, family_page, questions_page in [
     ('vnm', 9, [0, 1], 0, 1),
     ('bilingual', 13, [1, 2], 1, 2),
-    ('wp', 12, [1, 2], 1, 3),
+    ('wp', 11 if args.site == 'hn' else 12, [1, 2], 1, 3),
 ]:
     source = args.input_dir / f'{name}-source.pdf'
     doc = pymupdf.open(source)
@@ -89,6 +90,9 @@ for name, count, history_pages, family_page, questions_page in [
                 elif 'nguồn khách' in text:
                     key = 'paymentSource'
                 else:
+                    if args.site == 'hn' and ('thông tin khách' in text):
+                        clear(index, [match['x0'], match['top'], match['x1'], match['bottom']])
+                        continue
                     raise ValueError(f'Unmapped placeholder: {text}')
                 if key == 'documentNumber':
                     baseline = match['chars'][0]['matrix'][5]
@@ -129,11 +133,37 @@ for name, count, history_pages, family_page, questions_page in [
 
             boxes = [c for c in page.chars if c['text'] in ['\u2610', '\uf0a8']]
             if index == 0:
-                gender = [c for c in boxes if c['text'] == '\uf0a8']
+                admin = page.find_tables()[0]
+                gender = [c for c in boxes if admin.bbox[1] < c['top'] < admin.bbox[3]] if args.site == 'hn' else [c for c in boxes if c['text'] == '\uf0a8']
                 assert len(gender) == 2
                 checks['gender'] = {g: mark(index, c) for g, c in zip(['Nam', 'Nữ'], gender)}
                 # Bilingual source forms intentionally contain blank fields.
-                if name != 'vnm':
+                if args.site == 'hn':
+                    rows = [r for r in admin.rows if r.bbox[3] - r.bbox[1] > 10]
+                    keys = ['fullName', None, 'birthDate', 'ethnicity', 'bloodGroup', 'cccd',
+                            'insuranceNumber', 'addressDetail', 'occupation', 'workplace', 'phoneNumber', 'checkupReason']
+                    if name == 'wp':
+                        keys = ['fullName', None, 'birthDate', 'cccd', None, 'ethnicity',
+                                'targetGroup', 'paymentSource', 'bloodGroup', 'addressDetail', 'occupation', 'workplace', 'checkupReason']
+                    assert len(rows) == len(keys), (name, len(rows))
+                    for row, key in zip(rows, keys):
+                        if key is None:
+                            continue
+                        chars = [c for c in page.chars if row.bbox[1] < c['top'] < row.bbox[3] and c['x0'] > 48]
+                        baseline = max(c['matrix'][5] for c in chars)
+                        if name != 'vnm' and key in ['fullName', 'cccd', 'checkupReason', 'ethnicity', 'bloodGroup', 'insuranceNumber', 'birthDate']:
+                            # Use the English label line; the bilingual ID row also has a foreigner-ID line below it.
+                            anchor = next((m for m in page.search(r'Passport No\.:') if row.bbox[1] < m['top'] < row.bbox[3]), None) if key == 'cccd' else None
+                            baseline = anchor['chars'][0]['matrix'][5] if anchor else min(c['matrix'][5] for c in chars)
+                        line = [c for c in chars if abs(c['matrix'][5] - baseline) < 1]
+                        x = max(c['x1'] for c in line) + 5
+                        field(index, key, x, baseline, 562 - x, 11, 'bold' if key == 'fullName' else 'regular')
+                        if key in ['addressDetail', 'workplace', 'phoneNumber']:
+                            lower = min(c['matrix'][5] for c in chars)
+                            subline = [c for c in chars if abs(c['matrix'][5] - lower) < 1]
+                            x = max(c['x1'] for c in subline) + 5
+                            field(index, {'addressDetail': 'homeWard', 'workplace': 'workplaceWard', 'phoneNumber': 'email'}[key], x, lower, 562 - x)
+                elif name != 'vnm':
                     table = page.find_tables()[0]
                     rows = [r for r in table.rows if r.bbox[3] - r.bbox[1] > 10]
                     assert len(rows) == 12
@@ -163,7 +193,7 @@ for name, count, history_pages, family_page, questions_page in [
                         rules.append(line)
 
             if index in history_pages:
-                table = next(t for t in page.find_tables() if len(t.rows[0].cells) == 8)
+                table = next(t for t in page.find_tables() if len(t.rows[0].cells) >= 8)
                 table_boxes = [c for c in boxes if table.bbox[1] < c['top'] < table.bbox[3] and c['x0'] > 180]
                 xs = sorted(set(round(c['x0'], 1) for c in table_boxes))
                 assert len(xs) == 4, (name, index, xs)
@@ -176,8 +206,22 @@ for name, count, history_pages, family_page, questions_page in [
                 yes = pair[1]
                 line = [c for c in page.chars if abs(c['matrix'][5] - yes['matrix'][5]) < 1]
                 x = max(c['x1'] for c in line) + 5
+                if args.site == 'hn':
+                    label = r'Có, ghi cụ thể tên bệnh:' if name == 'vnm' else r'please specify the disease:'
+                    x = page.search(label)[0]['x1'] + 5
                 field(index, 'familyDetails', x, yes['matrix'][5], 562 - x, 10)
-            if index == questions_page:
+            if args.site == 'hn' and name == 'wp' and index in [2, 3]:
+                pair = [c for c in boxes if 40 < c['x0'] < 60]
+                assert len(pair) == 2, (name, index, len(pair))
+                key = 'currentTreatment' if index == 2 else 'pregnancyHistory'
+                checks[key] = {'no': mark(index, pair[0]), 'yes': mark(index, pair[1])}
+                anchor = page.search(r'medications you are taking and their dosages:')[0]
+                dots = [c for c in page.chars if c['text'] in '.…' and anchor['bottom'] < c['top'] < anchor['bottom'] + 25]
+                assert dots
+                y = dots[0]['matrix'][5]
+                clear(index, [min(c['x0'] for c in dots), min(c['top'] for c in dots), max(c['x1'] for c in dots), max(c['bottom'] for c in dots)])
+                field(index, 'medications' if index == 2 else 'pregnancyDetails', 45, y, 510, 9)
+            elif index == questions_page:
                 pair = [c for c in boxes if 40 < c['x0'] < 60]
                 assert len(pair) == 4, (name, len(pair))
                 checks['currentTreatment'] = {'no': mark(index, pair[0]), 'yes': mark(index, pair[1])}
@@ -229,25 +273,36 @@ for name, count, history_pages, family_page, questions_page in [
         masks.append({'page': index, 'box': box})
     # Replace each administrative rule as one continuous stroke. Patching only
     # redacted fragments creates visible changes in dash phase and thickness.
-    left = min(line['x0'] for line in rules)
-    right = max(line['x1'] for line in rules)
-    top = min(line['top'] for line in rules)
-    bottom = max(line['top'] for line in rules)
-    segments = [(line['x0'], line['top'], line['x1'], line['bottom']) for line in rules]
-    segments.extend([(left, top, left, bottom), (right, top, right, bottom)])
-    for x0, y0, x1, y1 in segments:
-        doc[0].draw_line(pymupdf.Point(x0, y0), pymupdf.Point(x1, y1), color=(1, 1, 1), width=1.2)
-    for x0, y0, x1, y1 in segments:
-        doc[0].draw_line(pymupdf.Point(x0, y0), pymupdf.Point(x1, y1), color=(.5, .5, .5), width=.35)
-    filename = f'tt25-hcm-{name}.pdf'
-    if len(doc) % 2:
+    if args.site == 'hcm':
+        left = min(line['x0'] for line in rules)
+        right = max(line['x1'] for line in rules)
+        top = min(line['top'] for line in rules)
+        bottom = max(line['top'] for line in rules)
+        segments = [(line['x0'], line['top'], line['x1'], line['bottom']) for line in rules]
+        segments.extend([(left, top, left, bottom), (right, top, right, bottom)])
+        for x0, y0, x1, y1 in segments:
+            doc[0].draw_line(pymupdf.Point(x0, y0), pymupdf.Point(x1, y1), color=(1, 1, 1), width=1.2)
+        for x0, y0, x1, y1 in segments:
+            doc[0].draw_line(pymupdf.Point(x0, y0), pymupdf.Point(x1, y1), color=(.5, .5, .5), width=.35)
+    filename = f'tt25-{args.site}-{name}.pdf'
+    if name in ('vnm', 'bilingual'):
+        doc.delete_page(len(doc) - 1)
+        fields = [field for field in fields if field['page'] < len(doc)]
+        masks = [mask for mask in masks if mask['page'] < len(doc)]
+    elif len(doc) % 2:
         size = doc[-1].rect
         doc.new_page(width=size.width, height=size.height)
+    count = len(doc)
     doc.save(root / 'frontend/public/templates' / filename, garbage=4, deflate=True)
     doc.close()
-    layouts[name] = {'template': filename, 'pageCount': count + count % 2, 'fields': fields, 'checks': checks}
+    layouts[name] = {'template': filename, 'pageCount': count, 'fields': fields, 'checks': checks}
     (args.input_dir / f'{name}-masks.json').write_text(json.dumps(masks), encoding='utf-8')
-    print(f'{name}: {len(fields)} fields, 22 personal history check pairs, {count + count % 2} pages')
+    print(f'{name}: {len(fields)} fields, 22 personal history check pairs, {count} pages')
 
-(root / 'frontend/src/features/registration/tt25TemplateFields.json').write_text(
+metadata_path = root / 'frontend/src/features/registration/tt25TemplateFields.json'
+if args.site == 'hn':
+    layouts = {**json.loads(metadata_path.read_text(encoding='utf-8')), **{f'hn_{name}': layout for name, layout in layouts.items()}}
+elif metadata_path.exists():
+    layouts = {**{key: value for key, value in json.loads(metadata_path.read_text(encoding='utf-8')).items() if key.startswith('hn_')}, **layouts}
+metadata_path.write_text(
     json.dumps(layouts, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

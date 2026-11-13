@@ -1,3 +1,4 @@
+import { hasPermission } from "../_shared/staffPermissions.ts";
 import { getBearerToken, getClientIp, isOriginAllowed, isRecord, jsonResponse, responseHeaders } from "../_shared/http.ts";
 import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
 import {
@@ -34,13 +35,16 @@ Deno.serve(async (request: Request): Promise<Response> => {
       const { data: authData, error: authError } = await client.auth.getUser(token);
       if (authError || !authData.user) return jsonResponse({ code: "AUTH_REQUIRED" }, 401, origin);
       const [{ data: profile, error: profileError }, { data: branchRow, error: branchError }] = await Promise.all([
-        client.from("profiles").select("role, is_active").eq("user_id", authData.user.id).maybeSingle(),
+        client.from("profiles").select("role, is_active, permissions").eq("user_id", authData.user.id).maybeSingle(),
         client.from("branches").select("id").eq("code", branch).eq("is_active", true).maybeSingle(),
       ]);
-      if (profileError || branchError || !profile?.is_active || !branchRow) {
+      const permitted = profile && (body.purpose === 'staff'
+        ? hasPermission(profile.role, profile.permissions, 'registrations', 'create')
+        : hasPermission(profile.role, profile.permissions, 'registration_qr'));
+      if (profileError || branchError || !profile?.is_active || !branchRow || !permitted) {
         return jsonResponse({ code: "ACCESS_DENIED" }, 403, origin);
       }
-      if (profile.role !== "admin") {
+      if (profile.role !== "admin" || profile.permissions != null) {
         const { data: access, error } = await client.from("staff_branch_access")
           .select("branch_id").eq("user_id", authData.user.id).eq("branch_id", branchRow.id).maybeSingle();
         if (error || !access) return jsonResponse({ code: "ACCESS_DENIED" }, 403, origin);

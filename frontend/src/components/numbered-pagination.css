@@ -1,0 +1,35 @@
+.dym-numbered-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.dym-numbered-pagination button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  box-shadow: none;
+}
+
+.dym-numbered-pagination button[aria-current="page"] {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.dym-pagination-ellipsis {
+  width: 1rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+
+@media (min-width: 40rem) {
+  .dym-numbered-pagination { gap: 0.5rem; }
+  .dym-numbered-pagination button { width: 2.5rem; height: 2.5rem; }
+}

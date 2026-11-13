@@ -1,4 +1,5 @@
-import { useId, useState } from 'react';
+import { useContext, useId, useState } from 'react';
+import { PermissionModuleContext, useStaffPermissions } from '../../hooks/useStaffPermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,7 +18,7 @@ export function RosterProvisionalCost({
   amount,
   onSaved,
   disabled,
-  readOnly = false,
+  readOnly: historyReadOnly = false,
   historical = false,
 }: {
   branch: 'q1' | 'q7';
@@ -29,6 +30,9 @@ export function RosterProvisionalCost({
   readOnly?: boolean;
   historical?: boolean;
 }) {
+  const { can } = useStaffPermissions();
+  const module = useContext(PermissionModuleContext) ?? 'clinic';
+  const readOnly = historyReadOnly || !can(module, 'update');
   const inputId = useId();
   const [value, setValue] = useState(amount);
   const [busy, setBusy] = useState(false);

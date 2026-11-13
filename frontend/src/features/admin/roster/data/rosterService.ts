@@ -284,7 +284,6 @@ export async function fetchRosterHistoryPermission(): Promise<boolean> {
     return (
       !error &&
       profile?.is_active === true &&
-      ['admin', 'operator'].includes(profile.role) &&
       profile.can_edit_roster_history === true
     );
   } catch {

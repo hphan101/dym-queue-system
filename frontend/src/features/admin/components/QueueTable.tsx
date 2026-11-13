@@ -1,9 +1,8 @@
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
+import { NumberedPagination } from '@/components/numbered-pagination';
 import { lazy, Suspense, useId, useMemo, useState } from 'react';
 import {
   ArrowUturnLeftIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +80,7 @@ export function QueueTable({
   onPageChange,
   onReturnToWaiting,
 }: QueueTableProps) {
+  const { can } = useStaffPermissions();
   const searchInputId = useId();
   const [statusFilter, setStatusFilter] = useState<TableStatusFilter>('all');
   const [printModalData, setPrintModalData] = useState<TT25RegistrationData | null>(null);
@@ -91,6 +91,7 @@ export function QueueTable({
   const { getStatus, markPrinted } = usePrintStatus();
 
   const fetchRowPrintData = async (row: RegistrationRow): Promise<TT25RegistrationData> => {
+    if (!can('printing')) throw new Error('Tài khoản chưa được cấp quyền in hồ sơ.');
     try {
       const { data: detailsList, error } = await supabase.rpc(
         'get_registration_details',
@@ -171,7 +172,7 @@ export function QueueTable({
       <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
         <div className="dym-registry-title-block">
           <h2 id="registry-ledger-title" className="dym-registry-title">
-            Danh Sách Khám Tại {branchName}
+            Danh sách khám tại {branchName}
           </h2>
         </div>
 
@@ -289,7 +290,7 @@ export function QueueTable({
                 <th scope="col" className="col-ticket">MÃ SỐ</th>
                 <th scope="col" className="col-time">GIỜ VÀO</th>
                 <th scope="col" className="col-patient">TÊN KHÁCH HÀNG</th>
-                <th scope="col" className="col-contact">LIÊN HỆ</th>
+                <th scope="col" className="col-contact">SĐT</th>
                 <th scope="col" className="col-company">CÔNG TY</th>
                 <th scope="col" className="col-status">TRẠNG THÁI</th>
                 <th scope="col" className="col-print-status">TRẠNG THÁI IN</th>
@@ -335,21 +336,20 @@ export function QueueTable({
           </table>
         </div>
       ) : displayedRows.length === 0 ? (
-        <div className="dym-table-empty-box">
-          <div className="dym-empty-icon-wrap">
-            <UserGroupIcon className="w-8 h-8 text-slate-400" aria-hidden="true" />
-          </div>
+        <div className="dym-table-empty-box" role="status">
           <h3 className="dym-empty-title">
             {query
               ? 'Không tìm thấy kết quả phù hợp'
               : statusFilter !== 'all'
-                ? `Không có lượt nào ở trạng thái "${STATUS_META[statusFilter as QueueStatus].label}"`
-                : 'Chưa có lượt đăng ký nào trong ngày'}
+                ? statusFilter === 'called' ? 'Chưa có khách đã gọi' : 'Không có khách đang chờ'
+                : 'Chưa có khách đăng ký trong ngày này'}
           </h3>
           <p className="dym-empty-desc">
             {query
-              ? 'Vui lòng kiểm tra lại họ tên, số điện thoại hoặc mã số thứ tự.'
-              : 'Khách hàng quét mã QR tại phòng khám sẽ tự động hiển thị tại đây.'}
+              ? 'Kiểm tra lại tên, số điện thoại hoặc số thứ tự, hoặc đặt lại bộ lọc.'
+              : statusFilter !== 'all'
+                ? 'Chọn Tất cả để xem lại danh sách khách hàng trong ngày.'
+                : 'Khách đăng ký tại quầy hoặc qua mã QR sẽ xuất hiện tại đây.'}
           </p>
           {(query || statusFilter !== 'all') && (
             <button
@@ -370,14 +370,14 @@ export function QueueTable({
             <table className="dym-table-precision">
               <thead>
                 <tr>
-                  <th scope="col" className="col-ticket">MÃ SỐ</th>
-                  <th scope="col" className="col-time">GIỜ VÀO</th>
-                  <th scope="col" className="col-patient">TÊN KHÁCH HÀNG</th>
-                  <th scope="col" className="col-contact">LIÊN HỆ</th>
-                  <th scope="col" className="col-company">CÔNG TY</th>
-                  <th scope="col" className="col-status">TRẠNG THÁI</th>
-                  <th scope="col" className="col-print-status">TRẠNG THÁI IN</th>
-                  <th scope="col" className="col-actions text-right">THAO TÁC</th>
+                  <th scope="col" className="col-ticket">Mã số</th>
+                  <th scope="col" className="col-time">Giờ vào</th>
+                  <th scope="col" className="col-patient">Tên khách hàng</th>
+                  <th scope="col" className="col-contact">SĐT</th>
+                  <th scope="col" className="col-company">Công ty</th>
+                  <th scope="col" className="col-status">Trạng thái</th>
+                  <th scope="col" className="col-print-status">Trạng thái in</th>
+                  <th scope="col" className="col-actions text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -394,7 +394,7 @@ export function QueueTable({
                     >
                       {/* Ticket Code */}
                       <td className="col-ticket">
-                        <span className="dym-ticket-tag">
+                        <span className="dym-ticket-tag" data-parity={Number(row.queueNumber) % 2 === 0 ? 'even' : 'odd'}>
                           <HighlightText text={row.queueNumber} query={query} />
                         </span>
                       </td>
@@ -523,43 +523,14 @@ export function QueueTable({
           </div>
 
           {/* Table Pagination */}
-          <nav
-            className="dym-pagination-bar"
-            aria-label="Phân trang danh sách tại bàn tiếp nhận"
-          >
+          <div className="dym-pagination-bar">
             <div className="dym-pagination-summary">
               Hiển thị <strong className="font-semibold text-foreground">{firstVisibleRow}–{lastVisibleRow}</strong> trong tổng số{' '}
               <strong className="font-semibold text-foreground">{filteredRows.length}</strong> lượt khám
             </div>
 
-            <div className="dym-pagination-pager">
-              <button
-                type="button"
-                className="dym-page-btn"
-                aria-label="Trang trước"
-                disabled={visiblePage === 1}
-                onClick={() => onPageChange(Math.max(1, visiblePage - 1))}
-              >
-                <ChevronLeftIcon className="w-4 h-4" />
-                <span>Trước</span>
-              </button>
-
-              <span className="dym-page-indicator" aria-current="page">
-                Trang <strong>{visiblePage}</strong> / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                className="dym-page-btn"
-                aria-label="Trang sau"
-                disabled={visiblePage === totalPages}
-                onClick={() => onPageChange(Math.min(totalPages, visiblePage + 1))}
-              >
-                <span>Sau</span>
-                <ChevronRightIcon className="w-4 h-4" />
-              </button>
-            </div>
-          </nav>
+            <NumberedPagination currentPage={visiblePage} totalPages={totalPages} onPageChange={onPageChange} label="Phân trang danh sách tại bàn tiếp nhận" />
+          </div>
         </>
       )}
 

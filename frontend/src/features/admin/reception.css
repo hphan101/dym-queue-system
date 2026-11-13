@@ -1,0 +1,147 @@
+/* Reception polish, following unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-reception-page {
+  --color-paper: #f7f8fa;
+  --color-paper-2: #ffffff;
+  --color-paper-3: #f1f3f6;
+  --color-rule: #e2e5eb;
+  --color-rule-2: #cdd3de;
+  --color-ink: #182239;
+  --color-ink-2: #39465b;
+  --color-muted: #59667a;
+  --reception-accent: #202e61;
+  --reception-accent-hover: #2d407f;
+  font-family: var(--font-body);
+  font-size: 14px;
+  min-width: 0;
+  background: var(--color-paper);
+}
+.dark .dym-reception-page,
+[data-color-mode="dark"] .dym-reception-page {
+  --color-paper: #151a23;
+  --color-paper-2: #1b2230;
+  --color-paper-3: #252e3d;
+  --color-rule: #333d4e;
+  --color-rule-2: #4a566b;
+  --color-ink: #edf0f6;
+  --color-ink-2: #d0d7e3;
+  --color-muted: #aab6c8;
+  --reception-accent: #33467b;
+  --reception-accent-hover: #40578f;
+}
+.dym-reception-page .dym-clinical-terminal { gap: 16px; margin-bottom: 24px; }
+.dym-reception-page :is(.dym-terminal-hero, .dym-terminal-ledger, .dym-registry-panel) {
+  min-width: 0;
+  border-radius: 12px;
+  background: var(--color-paper-2);
+  border-color: var(--color-rule);
+  box-shadow: none;
+}
+.dym-reception-page :is(.dym-terminal-hero, .dym-terminal-ledger) { padding: 24px; }
+.dym-reception-page .dym-terminal-header { gap: 16px; margin-bottom: 8px; }
+.dym-reception-page .dym-terminal-radar { min-width: 0; }
+.dym-reception-page .dym-terminal-branch { font-weight: 500; border: 0; padding: 0; }
+.dym-reception-page .dym-terminal-clock { flex-shrink: 0; padding: 4px 8px; font-weight: 500; border: 0; background: transparent; }
+.dym-reception-page .dym-terminal-display { margin: 8px 0 16px; }
+.dym-reception-page .dym-display-number-card { padding: 8px 16px; max-width: none; }
+.dym-reception-page .dym-display-digits { font-size: 64px; font-weight: 600; line-height: 1; letter-spacing: 0; }
+.dym-reception-page .dym-display-patient-name { margin-top: 12px; font-size: 20px; line-height: 28px; font-weight: 500; overflow-wrap: anywhere; }
+.dym-reception-page .dym-badge-serving { font-size: 12px; font-weight: 500; letter-spacing: 0; padding: 4px 8px; }
+.dym-reception-page .dym-terminal-announcement { padding: 12px; margin-bottom: 16px; border: 0; border-radius: 8px; font-size: 12px; }
+.dym-reception-page .dym-announcement-text { white-space: normal; font-weight: 400; }
+.dym-reception-page :is(.dym-btn-call-next, .dym-btn-recall) { min-height: 64px; border-radius: 8px; box-shadow: none; padding: 12px 16px; }
+.dym-reception-page .dym-btn-call-next { background: var(--reception-accent); }
+.dym-reception-page .dym-btn-call-next:hover:not(:disabled) { background: var(--reception-accent-hover); box-shadow: none; }
+.dym-reception-page .dym-btn-call-icon { background: transparent; width: 24px; height: 24px; }
+.dym-reception-page .dym-btn-call-copy { margin-left: 12px; }
+.dym-reception-page .dym-btn-call-title { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0; }
+.dym-reception-page .dym-btn-call-sub { font-size: 12px; line-height: 20px; opacity: 1; }
+.dym-reception-page .dym-kbd-hint { font-size: 12px; font-weight: 400; padding: 4px; }
+.dym-reception-page .dym-btn-recall { font-size: 14px; font-weight: 500; }
+.dym-reception-page .dym-terminal-actions > button { min-width: 0; }
+.dym-reception-page .dym-ledger-header { gap: 12px; flex-wrap: wrap; }
+.dym-reception-page .dym-terminal-ledger { gap: 24px; justify-content: center; }
+.dym-reception-page :is(.dym-ledger-title, .dym-registry-title) { font-family: inherit; font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: 0; margin: 0; }
+.dym-reception-page .dym-ledger-total-pill { background: transparent; border: 0; padding: 4px 0; font-weight: 500; white-space: nowrap; }
+.dym-reception-page .dym-progress-card { background: transparent; border: 0; padding: 0; }
+.dym-reception-page .dym-progress-info { font-size: 14px; }
+.dym-reception-page .dym-progress-fill { background: var(--reception-accent); }
+.dym-reception-page .dym-status-cards { gap: 24px; }
+.dym-reception-page .dym-status-item { padding: 0; background: transparent; border: 0; border-radius: 0; }
+.dym-reception-page .dym-status-item + .dym-status-item { border-left: 1px solid var(--color-rule); padding-left: 24px; }
+.dym-reception-page .dym-status-item-header { font-size: 14px; font-weight: 400; text-transform: none; }
+.dym-reception-page .dym-status-number { font-size: 32px; line-height: 40px; font-weight: 500; }
+.dym-reception-page :is(.dym-status-unit, .dym-patient-meta, .dym-time-cell, .dym-pagination-summary) { font-size: 12px; line-height: 20px; }
+.dym-reception-page .dym-table-precision { min-width: 1100px; font-size: 14px; }
+.dym-reception-page .dym-table-precision th { font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; padding: 12px 16px; }
+.dym-reception-page .dym-table-precision td { padding: 16px; }
+.dym-reception-page .dym-table-precision .col-patient { min-width: 240px; }
+.dym-reception-page .dym-table-precision .col-contact { min-width: 144px; white-space: nowrap; }
+.dym-reception-page .dym-table-precision .col-company { min-width: 176px; }
+.dym-reception-page :is(.dym-patient-name, .dym-phone-text, .dym-company-pill) { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dym-reception-page .dym-status-badge { font-size: 12px; font-weight: 500; padding: 4px 8px; }
+.dym-reception-page :is(.badge-called, .badge-print-done) { color: #18734c; background: #edf7f0; border-color: #c9e3d2; }
+.dym-reception-page .badge-waiting { color: #8b510c; background: #fff6e9; border-color: #ecd7b6; }
+.dark .dym-reception-page :is(.badge-called, .badge-print-done),
+[data-color-mode="dark"] .dym-reception-page :is(.badge-called, .badge-print-done) { color: #a2dbb6; background: #203a2e; border-color: #3a6650; }
+.dark .dym-reception-page .badge-waiting,
+[data-color-mode="dark"] .dym-reception-page .badge-waiting { color: #f2cd8e; background: #3c3020; border-color: #705633; }
+.dym-reception-page .dym-btn-table-action { min-height: 36px; font-size: 12px; font-weight: 500; border-radius: 8px; background: var(--color-paper-2); color: var(--color-ink-2); border-color: var(--color-rule-2); }
+.dark .dym-reception-page :is(.dym-btn-recall, .dym-btn-table-action, .dym-btn-undo),
+[data-color-mode="dark"] .dym-reception-page :is(.dym-btn-recall, .dym-btn-table-action, .dym-btn-undo) {
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  border-color: var(--color-rule-2);
+}
+.dym-reception-page .dym-pagination-bar { background: var(--color-paper-2); border-radius: 0 0 12px 12px; }
+.dym-reception-page [role="tab"] { font-size: 14px; font-weight: 500; }
+.dym-reception-page .dym-search-field { font-family: inherit; font-size: 14px; border-radius: 8px; background: var(--color-paper-2); }
+.dym-reception-page .dym-search-field:focus { border-color: var(--reception-accent); box-shadow: none; outline: 2px solid var(--reception-accent); outline-offset: 2px; }
+.dym-reception-page :is(.dym-btn-call-next, .dym-btn-recall, .dym-btn-table-action):focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .dym-reception-page :is(.dym-terminal-hero, .dym-terminal-ledger) { padding: 16px; }
+  .dym-reception-page .dym-terminal-header { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .dym-reception-page .dym-btn-call-next .dym-kbd-hint { display: none; }
+  .dym-reception-page .dym-display-patient-name { font-size: 18px; line-height: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dym-reception-page :is(.dym-btn-call-next, .dym-btn-recall, .dym-progress-fill, .dym-table-row) { transition: none; }
+}
+.dym-reception-page .dym-table-empty-box {
+  min-height: 256px;
+  padding: 48px 24px;
+  gap: 12px;
+}
+.dym-reception-page .dym-empty-title {
+  margin: 0;
+  font-family: inherit;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.dym-reception-page .dym-empty-desc {
+  max-width: 440px;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--color-muted);
+}
+.dym-reception-page .dym-btn-reset-filter {
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--reception-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  transition: background-color 160ms var(--ease-out);
+}
+.dym-reception-page .dym-btn-reset-filter:hover { background: var(--reception-accent-hover); }
+.dym-reception-page .dym-btn-reset-filter:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .dym-reception-page .dym-btn-reset-filter { transition: none; }
+}
+

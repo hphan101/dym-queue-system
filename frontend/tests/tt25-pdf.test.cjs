@@ -26,7 +26,6 @@ function loadService() {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit, '../../lib/date': date,
     './pdfDrawing': drawing, './tt25Types': types, './tt25TemplateFields.json': layout,
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
-    './tt25PdfService': { generateTT25OriginalPdf: async () => ({ legacy: true }) },
   }, async (url) => {
     const bytes = fs.readFileSync(path.join(frontend, 'public', url.split('?')[0]));
     return { ok: true, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
@@ -48,13 +47,15 @@ const customer = {
   },
 };
 if (require.main === module) {
-test('TT25 selects original HCM templates by language and Work Permit, preserving Hanoi', () => {
+test('TT25 selects each branch template by language and Work Permit', () => {
   const service = loadService();
   assert.equal(service.getTT25TemplateInfo(customer).key, 'vnm');
   assert.equal(service.getTT25TemplateInfo({ ...customer, language: 'en' }).key, 'bilingual');
   for (const language of ['vi', 'en']) assert.equal(service.getTT25TemplateInfo({ ...customer, language, checkupReason: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit' }).key, 'wp');
   assert.equal(service.getTT25TemplateInfo({ ...customer, checkupReason: 'Khám sức khỏe khác' }).key, 'vnm');
-  assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn' }).key, 'legacy');
+  assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn' }).key, 'hn_vnm');
+  assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn', language: 'en' }).key, 'hn_bilingual');
+  for (const language of ['vi', 'en']) assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn', language, checkupReason: 'Work Permit' }).key, 'hn_wp');
   for (const checkupReason of ['Khám sức khỏe định kì doanh nghiệp', 'Khám sức khỏe định kỳ theo công ty', '']) {
     assert.equal(service.getTT25PrintCopies({ checkupReason }), 1);
   }
@@ -62,7 +63,7 @@ test('TT25 selects original HCM templates by language and Work Permit, preservin
     assert.equal(service.getTT25PrintCopies({ checkupReason }), 2);
   }
 });
-test('TT25 fills padded 10/14/12-page PDFs and all 22 history answers', async () => {
+test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
   const service = loadService();
   const drawn = [];
   const segments = [];
@@ -72,7 +73,7 @@ test('TT25 fills padded 10/14/12-page PDFs and all 22 history answers', async ()
   PDFPage.prototype.drawText = function (text, options) { drawn.push({ text, options }); return drawText.call(this, text, options); };
   PDFPage.prototype.drawLine = function (options) { lines++; segments.push(options); return drawLine.call(this, options); };
   try {
-    for (const [language, reason, pages] of [['vi', customer.checkupReason, 10], ['en', customer.checkupReason, 14], ['vi', 'Work Permit', 24]]) {
+    for (const [language, reason, pages] of [['vi', customer.checkupReason, 8], ['en', customer.checkupReason, 12], ['vi', 'Work Permit', 24]]) {
       drawn.length = 0; segments.length = 0; lines = 0;
       const result = await service.generateTT25OriginalPdf({ ...customer, language, checkupReason: reason });
       try {
@@ -88,10 +89,45 @@ test('TT25 fills padded 10/14/12-page PDFs and all 22 history answers', async ()
     const blank = await service.generateTT25OriginalPdf({ ...customer, medicalHistory: undefined });
     URL.revokeObjectURL(blank.url);
     assert.equal(lines, 2, 'missing medical history must not be marked No');
-    assert.equal((await service.generateTT25OriginalPdf({ ...customer, branch: 'hn' })).legacy, true);
+    const hanoi = await service.generateTT25OriginalPdf({ ...customer, branch: 'hn' });
+    try { assert.equal((await PDFDocument.load(await hanoi.blob.arrayBuffer())).getPageCount(), 8); }
+    finally { URL.revokeObjectURL(hanoi.url); }
   } finally { PDFPage.prototype.drawText = drawText; PDFPage.prototype.drawLine = drawLine; }
 });
-test('mixed TT25 bulk printing pads each original template correctly for duplex', async () => {
+
+test('Hanoi templates fill all history answers and keep only WP duplex padding', async () => {
+  const service = loadService();
+  const original = PDFPage.prototype.drawText;
+  const originalLine = PDFPage.prototype.drawLine;
+  let texts = [], lines = 0;
+  PDFPage.prototype.drawText = function (text, options) { texts.push(text); return original.call(this, text, options); };
+  PDFPage.prototype.drawLine = function (...args) { lines++; return originalLine.apply(this, args); };
+  try {
+    for (const [language, reason, expected, copies, blank] of [
+      ['vi', customer.checkupReason, 8, 1, false], ['en', customer.checkupReason, 12, 1, false],
+      ['vi', 'Work Permit', 12, 2, true], ['en', 'Work Permit', 12, 2, true],
+    ]) {
+      texts = []; lines = 0;
+      const data = { ...customer, branch: 'hn', language, checkupReason: reason };
+      const info = service.getTT25TemplateInfo(data);
+      const template = layout[info.key];
+      assert.equal(info.pageCount, expected);
+      for (const field of template.fields) assert.ok(field.page < expected, field.field);
+      const result = await service.generateTT25OriginalPdf(data);
+      try {
+        const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+        assert.equal(pdf.getPageCount(), expected * copies);
+        assert.equal(lines, 52 * copies);
+        for (const text of ['NGUYỄN THỊ MINH ANH', '001195012345', 'Đái tháo đường', 'Dị ứng thời tiết', 'Vitamin D, mỗi ngày một viên', 'Sinh thường năm 2020']) assert.ok(texts.includes(text), `${info.key}: ${text}`);
+        for (let page = 0; page < pdf.getPageCount(); page++) {
+          const empty = (pdf.getPage(page).node.Contents()?.asArray().length ?? 0) === 0;
+          assert.equal(empty, blank && page % expected === expected - 1, `unexpected blank at ${info.key} page ${page}`);
+        }
+      } finally { URL.revokeObjectURL(result.url); }
+    }
+  } finally { PDFPage.prototype.drawText = original; PDFPage.prototype.drawLine = originalLine; }
+});
+test('mixed TT25 bulk printing preserves the configured template lengths', async () => {
   const service = loadService();
   const bulk = execute('src/features/registration/bulkPrintPdfDocument.ts', {
     'pdf-lib': require('pdf-lib'), './tt25HcmPdfService': service,
@@ -102,7 +138,7 @@ test('mixed TT25 bulk printing pads each original template correctly for duplex'
     customer, { ...customer, language: 'en' }, { ...customer, checkupReason: 'Work Permit' },
   ], 'tt25');
   const pdf = await PDFDocument.load(result);
-  assert.equal(pdf.getPageCount(), 48, '10, 14, two WP copies of 12 pages');
+  assert.equal(pdf.getPageCount(), 44, '8, 12, two WP copies of 12 pages');
 });
 }
 module.exports = { loadService, customer };

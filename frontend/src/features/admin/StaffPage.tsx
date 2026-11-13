@@ -1,15 +1,15 @@
+import { getDefaultPermissions } from '@/lib/staffPermissions';
 import { AdminLayout } from './components/AdminLayout';
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
   PlusIcon,
-  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
 import { Avatar } from '@astryxdesign/core/Avatar';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,6 +20,7 @@ import type { BranchCode } from '../../types/domain';
 import { getInitialStaffName, rememberStaffName } from './adminIdentity';
 
 import './admin.css';
+import './reception.css';
 import './staff.css';
 
 import { formatDateTime, normalizeSearch } from './utils/adminFormatters';
@@ -34,11 +35,13 @@ import { useAdminScope } from './hooks/useAdminScope';
 
 interface StaffApiResponse {
   success: boolean;
+  permissionSchemaVersion?: number;
   code?: string;
   staff?: StaffAccount[];
 }
 
 const EMPTY_FORM: StaffFormState = {
+  permissions: getDefaultPermissions('receptionist'),
   canEditRosterHistory: false,
   userId: null,
   displayName: '',
@@ -58,11 +61,13 @@ function apiErrorMessage(code?: string) {
     case 'ACCOUNT_EXISTS':
       return 'Tài khoản đăng nhập này đã tồn tại trên hệ thống.';
     case 'SELF_ADMIN_PROTECTION':
-      return 'Bạn không thể tự khóa, tự xóa hoặc tự hạ quyền quản trị của chính mình.';
+      return 'Bạn không thể tự khóa, tự xóa hoặc tự thu hồi quyền quản lý nhân viên của mình.';
     case 'INVALID_DATA':
       return 'Thông tin không hợp lệ. Vui lòng kiểm tra lại họ tên, tài khoản và mật khẩu.';
     case 'ADMIN_REQUIRED':
-      return 'Chỉ quản trị viên mới được quản lý nhân viên.';
+      return 'Tài khoản chưa được cấp quyền thực hiện thao tác này.';
+    case 'PERMISSION_API_NOT_READY':
+      return 'Cần cập nhật database và API phân quyền trước khi lưu. Các quyền hiện tại chưa bị thay đổi.';
     case 'STAFF_NOT_FOUND':
       return 'Không tìm thấy tài khoản nhân viên.';
     case 'CREATE_FAILED':
@@ -217,7 +222,7 @@ export function StaffPage({
   }, [error, bannerTick]);
 
   useEffect(() => {
-    if (!formError) return;
+    if (!formError || formError.includes('Cần cập nhật database')) return;
     const timer = window.setTimeout(() => {
       setFormError(null);
     }, 3000);
@@ -353,7 +358,8 @@ export function StaffPage({
       password: '',
       role: account.role,
       canEditRosterHistory: account.canEditRosterHistory ?? false,
-      branchCodes: account.branches.map((branch) => branch.code),
+      permissions: account.permissions ?? getDefaultPermissions(account.role),
+      branchCodes: account.branches.length ? account.branches.map((branch) => branch.code) : account.role === 'admin' ? ['q1', 'q7', 'hn'] : [],
     });
     setFormError(null);
     setIsFormOpen(true);
@@ -376,17 +382,18 @@ export function StaffPage({
       form.displayName.trim().length < 2 ||
       !/^[a-z0-9][a-z0-9._-]{2,31}$/i.test(form.loginName.trim()) ||
       (!form.userId && form.password.length < 6) ||
-      ((form.role === 'receptionist' || form.role === 'operator') &&
-        form.branchCodes.length === 0)
+      form.branchCodes.length === 0
     ) {
       setFormError(
-        'Vui lòng nhập đủ thông tin, mật khẩu từ 6 ký tự và chọn ít nhất một chi nhánh cho nhân viên lễ tân / vận hành.',
+        'Vui lòng nhập đủ thông tin, mật khẩu từ 6 ký tự và chọn ít nhất một chi nhánh cho tài khoản.',
       );
       return;
     }
 
     setIsSaving(true);
     try {
+      const capabilities = await requestStaffApi('GET');
+      if (capabilities.permissionSchemaVersion !== 1) throw new Error('PERMISSION_API_NOT_READY');
       if (form.userId) {
         await requestStaffApi('POST', {
           action: 'update',
@@ -396,6 +403,7 @@ export function StaffPage({
           role: form.role,
           branchCodes: form.branchCodes,
           canEditRosterHistory: form.canEditRosterHistory,
+          permissions: form.permissions,
         });
         showSuccess(`Đã cập nhật ${form.displayName.trim()}.`);
       } else {
@@ -407,6 +415,7 @@ export function StaffPage({
           role: form.role,
           branchCodes: form.branchCodes,
           canEditRosterHistory: form.canEditRosterHistory,
+          permissions: form.permissions,
         });
         showSuccess(`Đã tạo tài khoản cho ${form.displayName.trim()}.`);
       }
@@ -633,12 +642,12 @@ export function StaffPage({
         title="Quản lý nhân viên"
         actions={
           <div className="flex items-center gap-2">
-            <Button
+            <Button permissionAction="create"
               type="button"
               size="sm"
               onClick={openCreateForm}
               title="Thêm tài khoản nhân viên mới"
-              className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
+              className="h-9 gap-2 px-3 text-sm font-medium shadow-none"
             >
               <PlusIcon className="size-3.5 shrink-0" />
               <span>Thêm nhân viên</span>
@@ -650,7 +659,7 @@ export function StaffPage({
               disabled={isLoading}
               onClick={() => void loadStaff()}
               title="Làm mới danh sách nhân viên (F5)"
-              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
+              className="h-9 gap-2 bg-card px-3 text-sm font-medium shadow-none"
             >
               <ArrowPathIcon
                 className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
@@ -662,7 +671,7 @@ export function StaffPage({
         }
       />
 
-      <main className="dym-admin-content">
+      <main className="dym-admin-content dym-reception-page dym-staff-content">
         {error && (
           <div
             className="dym-data-error flex items-center justify-between gap-3"
@@ -702,7 +711,7 @@ export function StaffPage({
           <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
             <div className="dym-registry-title-block">
               <h2 id="staff-list-title" className="dym-registry-title">
-                Danh Sách Nhân Viên Phòng Khám
+                Danh sách tài khoản nhân viên
               </h2>
             </div>
 
@@ -783,7 +792,7 @@ export function StaffPage({
                   placeholder="Tìm tên, tài khoản, chi nhánh..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
+                  className="dym-search-field h-10 bg-card pl-8 pr-8 text-sm shadow-none"
                 />
                 {query ? (
                   <Button
@@ -869,13 +878,7 @@ export function StaffPage({
               </table>
             </div>
           ) : filteredStaff.length === 0 ? (
-            <div className="dym-table-empty-box">
-              <div className="dym-empty-icon-wrap">
-                <UserGroupIcon
-                  className="w-7 h-7 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </div>
+            <div className="dym-table-empty-box" role="status">
               <h3 className="dym-empty-title">Không tìm thấy nhân viên</h3>
               <p className="dym-empty-desc">
                 Không có tài khoản nào phù hợp với bộ lọc hiện tại. Hãy đổi từ
@@ -899,13 +902,13 @@ export function StaffPage({
               <table className="dym-table-precision">
                 <thead>
                   <tr>
-                    <th scope="col">Nhân Viên</th>
-                    <th scope="col">Vai Trò</th>
-                    <th scope="col">Cơ Sở Tiếp Nhận</th>
-                    <th scope="col">Đăng Nhập Gần Nhất</th>
-                    <th scope="col">Trạng Thái</th>
+                    <th scope="col">Nhân viên</th>
+                    <th scope="col">Vai trò</th>
+                    <th scope="col">Chi nhánh</th>
+                    <th scope="col">Đăng nhập gần nhất</th>
+                    <th scope="col">Trạng thái</th>
                     <th scope="col" className="text-right">
-                      Thao Tác
+                      Thao tác
                     </th>
                   </tr>
                 </thead>
@@ -967,7 +970,7 @@ export function StaffPage({
                               Tất cả cơ sở
                             </span>
                           ) : account.branches.length === 0 ? (
-                            <span className="text-xs text-slate-400 italic">
+                            <span className="text-xs text-muted-foreground">
                               Chưa gán
                             </span>
                           ) : (
@@ -1005,7 +1008,7 @@ export function StaffPage({
                       {/* Actions */}
                       <td className="text-right">
                         <div className="dym-table-actions-group">
-                          <Button
+                          <Button permissionAction="update"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -1016,7 +1019,7 @@ export function StaffPage({
                             Sửa
                           </Button>
 
-                          <Button
+                          <Button permissionAction="update"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -1028,7 +1031,7 @@ export function StaffPage({
                             Mật khẩu
                           </Button>
 
-                          <Button
+                          <Button permissionAction="update"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -1048,7 +1051,7 @@ export function StaffPage({
                                 : 'Mở khóa'}
                           </Button>
 
-                          <Button
+                          <Button permissionAction="delete"
                             type="button"
                             variant="outline"
                             size="sm"

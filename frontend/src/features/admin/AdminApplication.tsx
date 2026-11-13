@@ -1,3 +1,5 @@
+import { getDefaultPermissions, hasPermission, type StaffPermissions } from '@/lib/staffPermissions';
+import { StaffPermissionsContext, DESTINATION_PERMISSIONS } from './hooks/useStaffPermissions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Theme } from '@astryxdesign/core/theme';
@@ -28,22 +30,8 @@ export type AdminDestination =
   | 'roster-personnel'
   | 'staff';
 
-function isDestinationAllowed(
-  destination: AdminDestination,
-  role: StaffRole,
-): boolean {
-  if (destination === 'staff' || destination === 'roster-personnel') {
-    return role === 'admin';
-  }
-  if (
-    destination === 'roster-dashboard' ||
-    destination === 'roster-settlement' ||
-    destination === 'roster-insite' ||
-    destination === 'roster-onsite'
-  ) {
-    return role === 'admin' || role === 'operator';
-  }
-  return true;
+function isDestinationAllowed(destination: AdminDestination, permissions: StaffPermissions): boolean {
+  return hasPermission('', permissions, DESTINATION_PERMISSIONS[destination]);
 }
 
 function AdminLoader() {
@@ -68,11 +56,13 @@ function AdminLoader() {
 
 function AdminApplication({ destination }: { destination: AdminDestination }) {
   const initialDestination = useRef(destination);
+  initialDestination.current = destination;
   const { themeMode } = useAdminTheme();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [staffRole, setStaffRole] = useState<StaffRole>('receptionist');
+  const [permissions, setPermissions] = useState<StaffPermissions>(getDefaultPermissions('none'));
   const isAdmin = staffRole === 'admin';
-  const canAccessRoster = staffRole === 'admin' || staffRole === 'operator';
+  const canAccessRoster = ['overview','clinic','onsite','settlement','personnel'].some((key) => permissions[key as keyof StaffPermissions]?.view);
 
   useEffect(() => {
     let isMounted = true;
@@ -100,7 +90,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_active, role')
+        .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -115,21 +105,26 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
           ? profile.role
           : 'receptionist';
 
-      if (!isDestinationAllowed(initialDestination.current, resolvedRole)) {
-        window.location.replace('/?page=admin');
-        return;
+      const resolvedPermissions: StaffPermissions = profile.permissions ?? getDefaultPermissions(resolvedRole);
+      if (!isDestinationAllowed(initialDestination.current, resolvedPermissions)) {
+        const fallback = Object.keys(DESTINATION_PERMISSIONS).find((key) => resolvedPermissions[DESTINATION_PERMISSIONS[key]].view);
+        if (fallback) { window.location.replace('/?page=' + (fallback === 'dashboard' ? 'admin' : fallback)); return; }
       }
 
       if (isMounted) {
         setStaffRole(resolvedRole);
+        setPermissions(resolvedPermissions);
         setIsAuthorized(true);
       }
     };
 
     void verifyAccess();
+    const refreshAccess = () => { void verifyAccess(); };
+    window.addEventListener('focus', refreshAccess);
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('focus', refreshAccess);
     };
   }, []);
 
@@ -147,8 +142,9 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
   }, [visitedTabs, destination]);
 
   useEffect(() => {
-    if (isAuthorized && !isDestinationAllowed(destination, staffRole)) {
-      window.location.replace('/?page=admin');
+    if (isAuthorized && !isDestinationAllowed(destination, permissions)) {
+      const fallback = Object.keys(DESTINATION_PERMISSIONS).find((key) => permissions[DESTINATION_PERMISSIONS[key]].view);
+      if (fallback) window.location.replace('/?page=' + (fallback === 'dashboard' ? 'admin' : fallback));
       return;
     }
 
@@ -158,22 +154,21 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
       next.add(destination);
       return next;
     });
-  }, [destination, isAuthorized, staffRole]);
+  }, [destination, isAuthorized, permissions]);
 
-  if (!isAuthorized || !isDestinationAllowed(destination, staffRole)) {
-    return <AdminLoader />;
-  }
+  if (!isAuthorized) return <AdminLoader />;
+  if (!isDestinationAllowed(destination, permissions)) return <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center"><p>Tài khoản chưa được cấp quyền cho chức năng này. Vui lòng liên hệ quản trị viên.</p><button type="button" onClick={() => void supabase.auth.signOut()}>Đăng xuất</button></div>;
 
   return (
-    <Theme theme={dymAdminTheme} mode={themeMode}>
-      <div className={destination === 'dashboard' ? 'contents' : 'hidden'}>
+    <StaffPermissionsContext.Provider value={permissions}><Theme theme={dymAdminTheme} mode={themeMode}>
+      {permissions.reception.view && <div className={destination === 'dashboard' ? 'contents' : 'hidden'}>
         <AdminPage
           authorizedIsAdmin={isAdmin}
           isActiveTab={destination === 'dashboard'}
         />
-      </div>
+      </div>}
 
-      {activeVisitedTabs.has('registrations') && (
+      {permissions.registrations.view && activeVisitedTabs.has('registrations') && (
         <div className={destination === 'registrations' ? 'contents' : 'hidden'}>
           <RegistrationsPage
             authorizedIsAdmin={isAdmin}
@@ -187,9 +182,9 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
           activeVisitedTabs.has('roster-settlement') ||
           activeVisitedTabs.has('roster-insite') ||
           activeVisitedTabs.has('roster-onsite') ||
-          (isAdmin && activeVisitedTabs.has('roster-personnel'))) && (
+          (permissions.personnel.view && activeVisitedTabs.has('roster-personnel'))) && (
           <RosterDataProvider>
-            {activeVisitedTabs.has('roster-dashboard') && (
+            {permissions.overview.view && activeVisitedTabs.has('roster-dashboard') && (
               <div
                 className={
                   destination === 'roster-dashboard' ? 'contents' : 'hidden'
@@ -199,13 +194,13 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
               </div>
             )}
 
-            {activeVisitedTabs.has('roster-settlement') && (
+            {permissions.settlement.view && activeVisitedTabs.has('roster-settlement') && (
               <div className={destination === 'roster-settlement' ? 'contents' : 'hidden'}>
                 <RosterSettlementPage authorizedIsAdmin={isAdmin} isActiveTab={destination === 'roster-settlement'} />
               </div>
             )}
 
-            {activeVisitedTabs.has('roster-insite') && (
+            {permissions.clinic.view && activeVisitedTabs.has('roster-insite') && (
               <div
                 className={destination === 'roster-insite' ? 'contents' : 'hidden'}
               >
@@ -213,7 +208,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
               </div>
             )}
 
-            {activeVisitedTabs.has('roster-onsite') && (
+            {permissions.onsite.view && activeVisitedTabs.has('roster-onsite') && (
               <div
                 className={destination === 'roster-onsite' ? 'contents' : 'hidden'}
               >
@@ -221,7 +216,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
               </div>
             )}
 
-            {isAdmin && activeVisitedTabs.has('roster-personnel') && (
+            {permissions.personnel.view && activeVisitedTabs.has('roster-personnel') && (
               <div
                 className={
                   destination === 'roster-personnel' ? 'contents' : 'hidden'
@@ -233,12 +228,12 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
           </RosterDataProvider>
         )}
 
-      {isAdmin && activeVisitedTabs.has('staff') && (
+      {permissions.staff.view && activeVisitedTabs.has('staff') && (
         <div className={destination === 'staff' ? 'contents' : 'hidden'}>
           <StaffPage isActiveTab={destination === 'staff'} />
         </div>
       )}
-    </Theme>
+    </Theme></StaffPermissionsContext.Provider>
   );
 }
 

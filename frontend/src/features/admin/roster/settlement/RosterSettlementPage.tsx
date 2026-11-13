@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { MonthPicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -150,7 +150,7 @@ export function RosterSettlementPage({
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
         <div className="flex items-center gap-2">
-          <Button
+          <Button permissionAction="view" permissionModule="export"
             type="button"
             size="sm"
             disabled={
@@ -327,7 +327,7 @@ export function RosterSettlementPage({
                 )}
               </div>
 
-              <Button
+              <Button permissionAction="view" permissionModule="export"
                 type="button"
                 variant="outline"
                 size="sm"

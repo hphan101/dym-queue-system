@@ -1,3 +1,6 @@
+import { useContext } from 'react';
+import { PermissionModuleContext } from '../../hooks/useStaffPermissions';
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
 import { useMemo, useState } from 'react';
 import {
   CheckIcon,
@@ -7,7 +10,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { Input } from '@/components/ui/input';
 import {
   Popover,
@@ -90,6 +93,8 @@ export function RosterAssignmentCell({
   onSaveAssignment,
   onDeleteAssignment,
 }: RosterAssignmentCellProps) {
+  const { can } = useStaffPermissions();
+  const module = useContext(PermissionModuleContext) ?? 'clinic';
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(
     null,
   );
@@ -324,7 +329,7 @@ export function RosterAssignmentCell({
             >
               <button
                 type="button"
-                onClick={() => openEditPopover(assign)}
+                disabled={!can(module, 'update') && !can(module, 'delete')} onClick={() => openEditPopover(assign)}
                 className="inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
                 title={chipTooltip}
               >
@@ -361,7 +366,7 @@ export function RosterAssignmentCell({
 
               <button
                 type="button"
-                onClick={(e) => {
+                disabled={!can(module, 'delete')} onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteClick(assign.id);
                 }}
@@ -387,7 +392,7 @@ export function RosterAssignmentCell({
         }}
       >
         <PopoverTrigger asChild>
-          <Button
+          <Button permissionAction="create"
             type="button"
             variant="outline"
             size="sm"
@@ -669,7 +674,7 @@ export function RosterAssignmentCell({
 
             <div className="flex items-center justify-between gap-1.5 pt-1">
               {editingAssignmentId ? (
-                <Button
+                <Button permissionAction="delete"
                   type="button"
                   variant="ghost"
                   size="sm"
@@ -694,7 +699,7 @@ export function RosterAssignmentCell({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={isSubmitDisabled}
+                  disabled={isSubmitDisabled || !can(module, editingAssignmentId ? 'update' : 'create')}
                   className="h-8 px-3.5 text-[13px] font-medium"
                 >
                   {editingAssignmentId ? updateButtonLabel : 'Lưu (Enter)'}

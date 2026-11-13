@@ -37,6 +37,7 @@ test('mobile previews retain the selected PDF page and never alter the full docu
 function nodes(node) {
   if (!node || typeof node !== 'object') return [];
   if (Array.isArray(node)) return node.flatMap(nodes);
+  if (typeof node.type === 'function') return nodes(node.type(node.props));
   return [node, ...nodes(node.props?.children)];
 }
 
@@ -48,11 +49,12 @@ test('mobile navigation reaches first, middle and last pages with correct bounda
     'react/jsx-runtime': require('react/jsx-runtime'),
     './pdfBrowser': { isMobilePdfViewer: () => true },
     './pdfPagePreview': {},
+    '@/components/numbered-pagination': require('./helpers/numbered-pagination.cjs'),
   });
   let ready = 0;
   const props = { url: 'blob:complete', title: 'Consent', iframeRef: { current: null }, onReady() { ready++; } };
   const render = () => { slot = 0; return nodes(PdfPreview(props)); };
-  const buttons = () => render().filter((node) => node.type === 'button');
+  const buttons = () => render().filter((node) => node.type === 'button' && ['Trang trước', 'Trang sau'].includes(node.props['aria-label']));
   assert.equal(buttons()[0].props.disabled, true);
   buttons()[1].props.onClick();
   assert.equal(states[2], 1);

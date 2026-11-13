@@ -8,6 +8,8 @@ import { useAdminTheme } from '../hooks/useAdminTheme';
 import { useSidebarResponsive } from '../hooks/useSidebarResponsive';
 import { dymAdminTheme } from '../theme';
 import '../admin.css';
+import '../buttonFeedback.css';
+import { PermissionModuleContext, DESTINATION_PERMISSIONS } from '../hooks/useStaffPermissions';
 
 type AdminLayoutProps = Pick<
   ComponentProps<typeof AdminSidebar>,
@@ -28,7 +30,7 @@ export function AdminLayout({
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebarResponsive();
 
   return (
-    <Theme theme={dymAdminTheme} mode={themeMode}>
+    <PermissionModuleContext.Provider value={DESTINATION_PERMISSIONS[sidebar.activePage]}><Theme theme={dymAdminTheme} mode={themeMode}>
       <div
         className={cn('dym-admin-shell', className)}
         data-color-mode={themeMode}
@@ -46,6 +48,6 @@ export function AdminLayout({
         <div className="dym-admin-workspace">{children}</div>
         {overlays}
       </div>
-    </Theme>
+    </Theme></PermissionModuleContext.Provider>
   );
 }

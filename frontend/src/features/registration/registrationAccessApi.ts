@@ -24,7 +24,7 @@ export interface AccessSessionResponse {
 }
 
 export async function requestRegistrationAccess<T>(
-  body: { action: 'qr' | 'exchange'; branch: BranchCode; challenge?: string },
+  body: { action: 'qr' | 'exchange'; branch: BranchCode; challenge?: string; purpose?: 'staff' },
   signal: AbortSignal,
   accessToken?: string,
 ): Promise<T> {

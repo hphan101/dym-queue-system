@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import { NumberedPagination } from '@/components/numbered-pagination';
 import { isMobilePdfViewer } from './pdfBrowser';
 import { createPdfPagePreview } from './pdfPagePreview';
 
@@ -50,11 +51,11 @@ export function PdfPreview({ url, title, iframeRef, onReady }: PdfPreviewProps) 
   const controls = 'min-h-11 rounded border border-slate-500 px-3 py-2 text-sm text-white disabled:opacity-40';
 
   return <div className="flex min-h-0 w-full flex-1 flex-col">
-    {mobile && <nav aria-label="Chuyển trang PDF" className="flex shrink-0 items-center justify-between gap-2 bg-slate-800 px-3 py-2">
-      <button type="button" className={controls} disabled={!document || pageIndex === 0} onClick={() => setPageIndex((page) => page - 1)}>Trang trước</button>
-      <span aria-live="polite" className="text-sm tabular-nums text-white">{pageCount ? `Trang ${pageIndex + 1} / ${pageCount}` : 'Đang tải…'}</span>
-      <button type="button" className={controls} disabled={!document || pageIndex >= pageCount - 1} onClick={() => setPageIndex((page) => page + 1)}>Trang sau</button>
-    </nav>}
+    {mobile && <div className="flex shrink-0 justify-center bg-slate-800 px-2 py-2">
+      {pageCount ? <NumberedPagination currentPage={pageIndex + 1} totalPages={pageCount}
+        onPageChange={(page) => setPageIndex(page - 1)} label="Chuyển trang PDF" />
+        : <span role="status" className="text-sm text-white">Đang tải…</span>}
+    </div>}
     {error ? <div role="alert" className="flex flex-col items-center gap-3 p-6 text-sm text-white">
       <p>Không thể tải trang PDF. Vui lòng thử lại.</p>
       <button type="button" className={controls} onClick={() => setAttempt((value) => value + 1)}>Thử lại</button>

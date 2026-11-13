@@ -1,11 +1,10 @@
 import { useState, type ComponentPropsWithoutRef, type FormEvent } from "react"
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, User } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -40,71 +39,59 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="shadow-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">
+        <CardHeader className="px-6 pb-6 pt-8 text-center sm:px-8">
+          <CardTitle className="text-2xl font-medium leading-tight tracking-normal">
             Đăng nhập hệ thống
           </CardTitle>
-          <CardDescription>
-            Cổng điều phối tiếp nhận &amp; quản trị DYM Medical Center
-          </CardDescription>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-6 pb-8 sm:px-8">
           <form onSubmit={onFormSubmit} noValidate>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6">
               {error && (
                 <div
                   role="alert"
                   aria-live="polite"
                   className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
                 >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
                   <span>{error}</span>
                 </div>
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="loginName">
+                <Label htmlFor="loginName" className="text-base">
                   Tài khoản
                 </Label>
-                <div className="relative">
-                  <User
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="loginName"
-                    name="username"
-                    type="text"
-                    placeholder="Nhập tên tài khoản"
-                    autoComplete="username"
-                    value={loginName}
-                    disabled={isLoading}
-                    onChange={(event) => onLoginNameChange(event.target.value)}
-                    className="pl-9"
-                    required
-                  />
-                </div>
+                <Input
+                  id="loginName"
+                  name="username"
+                  type="text"
+                  placeholder="Nhập tên tài khoản"
+                  autoComplete="username"
+                  value={loginName}
+                  disabled={isLoading}
+                  onChange={(event) => onLoginNameChange(event.target.value)}
+                  className="h-12 px-4 text-base md:text-base"
+                  required
+                />
               </div>
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">
+                  <Label htmlFor="password" className="text-base">
                     Mật khẩu
                   </Label>
                   <button
                     type="button"
+                    disabled={isLoading}
                     onClick={onForgotPassword}
-                    className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
+                    className="rounded-sm text-sm text-muted-foreground underline-offset-4 hover:underline hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
                   >
                     Quên mật khẩu?
                   </button>
                 </div>
                 <div className="relative">
-                  <LockKeyhole
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
                   <Input
                     id="password"
                     name="password"
@@ -114,20 +101,22 @@ export function LoginForm({
                     value={password}
                     disabled={isLoading}
                     onChange={(event) => onPasswordChange(event.target.value)}
-                    className="pl-9 pr-9"
+                    className="h-12 pl-4 pr-12 text-base md:text-base"
                     required
                   />
                   <button
                     type="button"
-                    tabIndex={-1}
                     aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-pressed={showPassword}
+                    aria-controls="password"
+                    disabled={isLoading}
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                    className="absolute right-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
                   >
                     {showPassword ? (
-                      <EyeOff className="size-4" aria-hidden="true" />
+                      <EyeOff className="size-4" strokeWidth={1.5} aria-hidden="true" />
                     ) : (
-                      <Eye className="size-4" aria-hidden="true" />
+                      <Eye className="size-4" strokeWidth={1.5} aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -136,18 +125,16 @@ export function LoginForm({
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="mt-2 w-full"
+                size="lg"
+                className="mt-2 h-12 w-full text-base"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    <span>Đang đăng nhập...</span>
+                    <Loader2 className="size-4 animate-spin" strokeWidth={1.5} aria-hidden="true" />
+                    <span>Đang đăng nhập…</span>
                   </>
                 ) : (
-                  <>
-                    <span>Đăng nhập</span>
-                    <ArrowRight className="size-4" aria-hidden="true" />
-                  </>
+                  <span>Đăng nhập</span>
                 )}
               </Button>
             </div>

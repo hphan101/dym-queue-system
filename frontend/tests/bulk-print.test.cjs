@@ -20,24 +20,25 @@ test('bulk PDF generation does not depend on timers throttled in background tabs
 });
 
 const profiles = {
-  viCompany: { branch: 'q1', language: 'vi', checkupReason: customer.checkupReason, pages: 10, copies: 1, consent: 2 },
-  viOther: { branch: 'q7', language: 'vi', checkupReason: 'Khám sức khỏe khác', pages: 10, copies: 2, consent: 2 },
-  enCompany: { branch: 'q7', language: 'en', checkupReason: customer.checkupReason, pages: 14, copies: 1, consent: 4 },
-  enOther: { branch: 'q1', language: 'en', checkupReason: 'Khám sức khỏe khác', pages: 14, copies: 2, consent: 4 },
+  viCompany: { branch: 'q1', language: 'vi', checkupReason: customer.checkupReason, pages: 8, copies: 1, consent: 2 },
+  viOther: { branch: 'q7', language: 'vi', checkupReason: 'Khám sức khỏe khác', pages: 8, copies: 2, consent: 2 },
+  enCompany: { branch: 'q7', language: 'en', checkupReason: customer.checkupReason, pages: 12, copies: 1, consent: 4 },
+  enOther: { branch: 'q1', language: 'en', checkupReason: 'Khám sức khỏe khác', pages: 12, copies: 2, consent: 4 },
   viWp: { branch: 'q1', language: 'vi', checkupReason: 'Work Permit', pages: 12, copies: 2, consent: 2 },
   enWp: { branch: 'q7', language: 'en', checkupReason: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit', pages: 12, copies: 2, consent: 4 },
+  hnWp: { branch: 'hn', language: 'en', checkupReason: 'Work Permit', pages: 12, copies: 2, consent: 4, blank: true },
   hnCompany: { branch: 'hn', language: 'vi', checkupReason: customer.checkupReason, pages: 8, copies: 1, consent: 2 },
-  hnOther: { branch: 'hn', language: 'en', checkupReason: 'Khám sức khỏe cá nhân tự nguyện', pages: 8, copies: 2, consent: 4 },
+  hnOther: { branch: 'hn', language: 'en', checkupReason: 'Khám sức khỏe cá nhân tự nguyện', pages: 12, copies: 2, consent: 4 },
 };
 
 for (const order of [
   ['viOther', 'viCompany'], ['viCompany', 'viOther'], ['viOther', 'viOther'],
   ['enOther', 'enCompany'], ['enCompany', 'enOther'], ['enOther', 'enOther'],
   ['viWp', 'viCompany'], ['viCompany', 'viWp'], ['viWp', 'enWp'],
-  ['hnOther', 'hnCompany'], ['hnCompany', 'hnOther'],
+  ['hnOther', 'hnCompany'], ['hnCompany', 'hnOther'], ['hnWp', 'hnCompany'], ['hnWp', 'enOther', 'viCompany'],
   ['viOther', 'enCompany', 'enWp', 'hnOther', 'viCompany'],
 ]) {
-  test(`mixed print order ${order.join(' -> ')} across all modes with padded templates`, async () => {
+  test(`mixed print order ${order.join(' -> ')} across all modes with the configured templates`, async () => {
     const bulk = loadPdfFixtures();
     const items = order.map((key, index) => ({ ...customer, ...profiles[key], fullName: ['ĐỖ THỊ ÁNH', 'NGUYỄN VĂN QUÝ', 'TRẦN THỊ DIỄM', 'LÊ HỒNG PHƯỚC', 'VŨ THỊ HƯƠNG'][index] }));
     for (const mode of ['consent', 'tt25', 'both']) {
@@ -50,7 +51,7 @@ for (const order of [
           }
           if (mode !== 'consent') {
             for (let copy = 0; copy < profile.copies; copy++) {
-              if (profile.pages !== 12) blanks.push(expected + profile.pages - 1);
+              if (profile.blank) blanks.push(expected + profile.pages - 1);
               expected += profile.pages;
             }
           }
@@ -73,7 +74,7 @@ test('a two-copy customer can precede a one-copy customer using the same fonts',
   ], 'both');
   try {
     const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
-    assert.equal(pdf.getPageCount(), 34);
+    assert.equal(pdf.getPageCount(), 28);
   } finally { URL.revokeObjectURL(url); }
 });
 
@@ -96,12 +97,12 @@ test('bulk printing shares fonts, saves once and retains mixed-template order an
       { ...customer, fullName: 'Patient C', language: 'en', checkupReason: 'Work Permit' },
       { ...customer, fullName: 'Patient D', branch: 'hn' },
     ], 'both', (done, total) => progress.push([done, total]));
-    assert.equal(fonts, 6, 'four shared Arial fonts and two legacy Times fonts');
+    assert.equal(fonts, 4, 'all branch templates share four Arial fonts');
     assert.equal(saves, 1, 'no intermediate PDF serialization');
     assert.deepEqual(progress, [[1,4],[2,4],[3,4],[4,4]]);
     const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
-    assert.equal(pdf.getPageCount(), 68); // 12 + 18 + 28 + 10
-    for (const [name, start, end] of [['PATIENT A',0,12],['PATIENT B',12,30],['PATIENT C',30,58],['PATIENT D',58,68]]) {
+    assert.equal(pdf.getPageCount(), 64); // 10 + 16 + 28 + 10
+    for (const [name, start, end] of [['PATIENT A',0,10],['PATIENT B',10,26],['PATIENT C',26,54],['PATIENT D',54,64]]) {
       const pages = names.filter(([text]) => text === name).map(([, page]) => page);
       assert.ok(pages.length > 0, name);
       assert.ok(pages.every((page) => page >= start && page < end), name);
@@ -123,9 +124,12 @@ test('non-corporate printing duplicates complete filled TT25 sets, keeping conse
   for (const [branch, language, checkupReason, pages, consentPages] of [
     ['q1', 'vi', 'Work Permit', 12, 2],
     ['q7', 'en', 'Work Permit', 12, 4],
-    ['q1', 'vi', 'Khám sức khỏe khác', 10, 2],
-    ['q7', 'en', 'Khám sức khỏe khác', 14, 4],
+    ['q1', 'vi', 'Khám sức khỏe khác', 8, 2],
+    ['q7', 'en', 'Khám sức khỏe khác', 12, 4],
     ['hn', 'vi', 'Khám sức khỏe khác', 8, 2],
+    ['hn', 'en', 'Khám sức khỏe khác', 12, 4],
+    ['hn', 'vi', 'Work Permit', 12, 2],
+    ['hn', 'en', 'Work Permit', 12, 4],
   ]) {
     const data = { ...customer, branch, language, checkupReason };
     const result = await service.generateTT25OriginalPdf(data);
@@ -136,7 +140,8 @@ test('non-corporate printing duplicates complete filled TT25 sets, keeping conse
       for (let page = 0; page < pages; page++) {
         assert.deepEqual(contents(pdf, page), contents(pdf, secondStart + page), 'each copied page preserves filled content');
       }
-      if (pages !== 12) assert.deepEqual(contents(pdf, pages - 1), [], 'template separator is blank');
+      if (branch === 'hn' && checkupReason === 'Work Permit') assert.deepEqual(contents(pdf, pages - 1), [], 'Hanoi WP template separator is blank');
+      else for (let page = 0; page < pdf.getPageCount(); page++) assert.ok(contents(pdf, page).length > 0, 'templates contain no extra blank pages');
     } finally { URL.revokeObjectURL(result.url); }
     {
       const url = await bulk.generateBulkPrintPdf([data], 'both');

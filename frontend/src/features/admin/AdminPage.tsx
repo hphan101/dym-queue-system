@@ -1,3 +1,4 @@
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
 import { AdminLayout } from './components/AdminLayout';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -13,6 +14,7 @@ import {
 } from './constants/queueConstants';
 
 import './admin.css';
+import './reception.css';
 
 import { useStaffIdentity } from './hooks/useStaffIdentity';
 import { useDashboardQueueQuery } from './hooks/useDashboardQueueQuery';
@@ -56,6 +58,7 @@ export function AdminPage({
   authorizedIsAdmin: boolean;
   isActiveTab?: boolean;
 }) {
+  const { can } = useStaffPermissions();
   const queryClient = useQueryClient();
 
   const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
@@ -371,7 +374,7 @@ export function AdminPage({
   }, [totalPages]);
 
   const callNext = async () => {
-    if (isMutating) return;
+    if (isMutating || !can('reception', 'update')) return;
 
     setPendingQueueAction('next');
     setActionError(null);
@@ -411,7 +414,7 @@ export function AdminPage({
   };
 
   const recallCurrent = async () => {
-    if (isMutating) return;
+    if (isMutating || !can('reception', 'update')) return;
 
     setPendingQueueAction('recall');
     setActionError(null);
@@ -568,7 +571,7 @@ export function AdminPage({
       <AdminHeader
         registrationHref={
           !isLoadingIdentity &&
-          (authorizedIsAdmin || staffRole === 'receptionist')
+          can('registrations', 'create')
             ? `/?branch=${branch}&staff=1`
             : undefined
         }
@@ -586,7 +589,7 @@ export function AdminPage({
         onClose={() => setCustomerNotification(null)}
       />
 
-      <main id="overview" className="dym-admin-content">
+      <main id="overview" className="dym-admin-content dym-reception-page">
         <RealtimeConnectionAlert state={connectionState} />
         {(dataError || identityError) && (
           <div className="dym-data-error" role="alert" aria-live="polite">
@@ -599,7 +602,7 @@ export function AdminPage({
           currentPatient={currentPatient}
           branchName={BRANCH_NAMES[branch]}
           announcement={announcement}
-          isMutating={isMutating}
+          isMutating={isMutating || !can('reception', 'update')}
           isDataLoading={isDataLoading}
           counts={counts}
           totalDayCount={rowsForDay.length}

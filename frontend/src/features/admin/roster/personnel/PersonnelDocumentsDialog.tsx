@@ -1,5 +1,6 @@
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
 import { useEffect, useId, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ export function PersonnelDocumentsDialog({
   person: MedicalPersonnel;
   onClose: () => void;
 }) {
+  const { can } = useStaffPermissions();
   const inputId = useId();
   const [documents, setDocuments] = useState<PersonnelDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -197,7 +199,7 @@ export function PersonnelDocumentsDialog({
               File sẽ bị gỡ khỏi hồ sơ và kho lưu trữ, không thể khôi phục.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button
+              <Button permissionAction="delete" permissionModule="personnel_documents"
                 type="button"
                 variant="destructive"
                 size="sm"
@@ -255,7 +257,7 @@ export function PersonnelDocumentsDialog({
                 type="file"
                 multiple
                 accept={PERSONNEL_FILE_ACCEPT}
-                disabled={isBusy}
+                disabled={isBusy || !can('personnel_documents', 'create')}
                 className="h-auto min-h-10 cursor-pointer py-2"
                 onChange={(event) => {
                   const files = Array.from(event.target.files ?? []);
@@ -293,7 +295,7 @@ export function PersonnelDocumentsDialog({
                         >
                           Xem
                         </Button>
-                        <Button
+                        <Button permissionAction="delete" permissionModule="personnel_documents"
                           type="button"
                           variant="destructive"
                           size="sm"

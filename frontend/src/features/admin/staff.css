@@ -1,3 +1,48 @@
+.dym-staff-content .dym-table-precision { min-width: 1100px; }
+.dym-staff-content .dym-table-precision tbody tr:last-child { border-bottom: 0; }
+.dym-staff-content .dym-registry-panel > .dym-table-scroller:last-child { border-radius: 0 0 12px 12px; }
+.dym-staff-content .dym-patient-info { min-width: 160px; display: grid; gap: 4px; }
+.dym-staff-content .dym-patient-name { font-size: 14px; font-weight: 500; line-height: 20px; }
+.dym-staff-content .dym-patient-meta { font-size: 12px; line-height: 20px; }
+.dym-staff-content .dym-role-badge {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.dym-staff-content .dym-branch-chip {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--color-paper-3);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.dym-staff-content .dym-status-led-badge { padding: 4px 8px; font-size: 12px; line-height: 20px; font-weight: 500; }
+.dym-staff-content .dym-table-actions-group { gap: 8px; }
+.dym-staff-content .dym-table-actions-group button {
+  height: 36px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-paper-2);
+  border-color: var(--color-rule-2);
+  box-shadow: none;
+}
+.dym-staff-content .dym-table-actions-group button:not(.dym-staff-delete-button) { color: var(--color-ink-2); }
+.dym-staff-content [role="tablist"] { height: 40px; }
+.dym-staff-content [role="tab"] { height: 32px; }
+.dym-staff-content .dym-search-field { height: 40px; }
+.dym-staff-content .dym-staff-avatar { flex-shrink: 0; }
+.dym-staff-content .dym-table-precision tr:focus-within { outline: 2px solid var(--reception-accent); outline-offset: -2px; }
+
 .dym-staff-page .dym-staff-delete-button {
   color: #b42323;
 }
@@ -65,7 +110,7 @@
 }
 
 .dym-staff-dialog {
-  width: min(36rem, 100%);
+  width: min(46rem, 100%);
   max-height: calc(100dvh - var(--space-12));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-panel);
@@ -76,6 +121,22 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   animation: dymStaffDialogPop 200ms var(--ease-out);
+}
+
+.dym-staff-permission-matrix { min-width: 0; display: grid; gap: 0.75rem; }
+.dym-staff-permission-scroll { max-height: 23rem; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: 8px; }
+.dym-staff-permission-scroll table { width: 100%; min-width: 28rem; border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; }
+.dym-staff-permission-scroll th, .dym-staff-permission-scroll td { padding: 0.75rem; border-bottom: 1px solid hsl(var(--border)); text-align: center; }
+.dym-staff-permission-scroll th:first-child { text-align: left; font-weight: 500; }
+.dym-staff-permission-scroll thead th { position: sticky; top: 0; background: hsl(var(--muted)); z-index: 1; }
+.dym-staff-permission-scroll thead button { font: inherit; cursor: pointer; }
+.dym-staff-permission-scroll input { width: 1rem; height: 1rem; accent-color: hsl(var(--primary)); cursor: pointer; }
+.dym-staff-permission-scroll input:focus-visible, .dym-staff-permission-scroll button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+
+@media (max-width: 40rem) {
+  .dym-staff-permission-scroll table { min-width: 0; table-layout: fixed; }
+  .dym-staff-permission-scroll th:first-child { width: 44%; }
+  .dym-staff-permission-scroll th, .dym-staff-permission-scroll td { padding: 0.625rem 0.25rem; font-size: 0.75rem; }
 }
 
 @keyframes dymStaffBackdropIn {
@@ -291,11 +352,13 @@
 }
 
 .dym-staff-branch-options {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .dym-staff-branch-options > label {
+  flex: 1 1 12rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -356,4 +419,77 @@
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
   font-size: var(--text-sm);
   font-weight: 600;
+}
+
+/* Account form polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-staff-account-dialog {
+  --background: 0 0% 100%;
+  --card: 0 0% 100%;
+  --border: 220 14% 87%;
+  --input: 220 14% 82%;
+  --foreground: 222 32% 18%;
+  --muted: 220 18% 96%;
+  --muted-foreground: 219 14% 40%;
+  --primary: 227 50% 25%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 227 50% 25%;
+  display: flex;
+  flex-direction: column;
+  width: min(52rem, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.dark .dym-staff-account-dialog,
+[data-color-mode="dark"] .dym-staff-account-dialog {
+  --background: 220 20% 12%;
+  --card: 220 20% 12%;
+  --foreground: 220 24% 94%;
+  --muted: 220 18% 18%;
+  --muted-foreground: 220 18% 73%;
+  --border: 220 16% 26%;
+  --input: 220 16% 36%;
+  --primary: 224 41% 36%;
+  --ring: 222 48% 76%;
+}
+.dym-staff-account-dialog > header { position: static; flex-shrink: 0; padding: 16px 24px; }
+.dym-staff-account-dialog h2 { font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: 0; }
+.dym-staff-account-dialog form { display: flex; flex-direction: column; min-height: 0; padding: 0; gap: 0; }
+.dym-staff-account-body { display: flex; flex-direction: column; gap: 20px; padding: 24px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.dym-staff-account-dialog .dym-staff-account-body > .dym-staff-history-permission {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 44px; padding: 12px 0; border: 0; border-bottom: 1px solid hsl(var(--border));
+  background: transparent; border-radius: 0; font-size: 14px; font-weight: 400; cursor: pointer;
+}
+.dym-staff-account-dialog label, .dym-staff-account-dialog legend { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dym-staff-account-dialog input:not([type="checkbox"]),
+.dym-staff-account-dialog [role="combobox"] { height: 40px; font-family: inherit; font-size: 14px; border-radius: 8px; background: hsl(var(--card)); box-shadow: none; }
+.dym-staff-account-dialog .dym-staff-form-grid { gap: 16px; }
+.dym-staff-account-dialog fieldset { min-width: 0; border: 0; padding: 0; border-radius: 0; }
+.dym-staff-account-dialog legend { padding: 0 0 12px; }
+.dym-staff-account-dialog small { font-size: 12px; line-height: 20px; }
+.dym-staff-account-dialog .dym-staff-branch-options > label { padding: 12px; border-radius: 8px; background: hsl(var(--card)); }
+.dym-staff-account-dialog .dym-staff-branch-options > label:has(input:checked) { border-color: hsl(var(--primary)); background: hsl(var(--muted)); }
+.dym-staff-account-dialog .dym-staff-branch-options strong { font-size: 14px; line-height: 20px; font-weight: 500; margin-bottom: 4px; }
+.dym-staff-account-dialog .dym-staff-branch-options span { font-size: 12px; line-height: 20px; }
+.dym-staff-account-dialog .dym-staff-permission-matrix { display: grid; gap: 12px; }
+.dym-staff-account-dialog .dym-staff-permission-matrix > small { margin: 0; }
+.dym-staff-account-dialog .dym-staff-permission-scroll { max-height: none; overflow: visible; border-radius: 8px; }
+.dym-staff-account-dialog .dym-staff-permission-scroll table { min-width: 0; font-size: 14px; }
+.dym-staff-account-dialog .dym-staff-permission-scroll th,
+.dym-staff-account-dialog .dym-staff-permission-scroll td { padding: 12px; }
+.dym-staff-account-dialog .dym-staff-permission-scroll thead th { background: hsl(var(--muted)); }
+.dym-staff-account-dialog .dym-staff-permission-matrix > div > button { height: 36px; font-family: inherit; font-size: 12px; font-weight: 500; border-radius: 8px; box-shadow: none; }
+.dym-staff-account-dialog form > footer { flex-shrink: 0; padding: 16px 24px; gap: 8px; border-top: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+.dym-staff-account-dialog form > footer button { height: 40px; font-family: inherit; font-size: 14px; font-weight: 500; border-radius: 8px; box-shadow: none; }
+@media (max-width: 640px) {
+  .dym-staff-account-dialog { max-height: calc(100dvh - 32px); }
+  .dym-staff-account-dialog > header, .dym-staff-account-dialog form > footer { padding: 16px; }
+  .dym-staff-account-body { padding: 16px; }
+  .dym-staff-account-dialog .dym-staff-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .dym-staff-account-dialog .dym-staff-permission-scroll table { table-layout: fixed; }
+  .dym-staff-account-dialog .dym-staff-permission-scroll th,
+  .dym-staff-account-dialog .dym-staff-permission-scroll td { padding: 12px 4px; font-size: 12px; }
 }

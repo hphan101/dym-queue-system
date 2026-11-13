@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -242,7 +242,7 @@ export function RosterOnsiteWeek({
                     ))
                   )}
                   {loaded && (
-                    <Button
+                    <Button permissionAction="create"
                       type="button"
                       variant="outline"
                       className="dym-onsite-calendar-add"

@@ -1,3 +1,4 @@
+import { hasPermission, parsePermissions, type StaffPermissions, type PermissionAction } from "../_shared/staffPermissions.ts";
 import { type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import {
   CONTROL_CHARACTERS,
@@ -23,6 +24,7 @@ const ALLOWED_ROLES = new Set(["admin", "operator", "receptionist"]);
 type StaffRole = "admin" | "operator" | "receptionist";
 
 interface StaffInput {
+  permissions: StaffPermissions | null;
   canEditRosterHistory: boolean;
   displayName: string;
   role: StaffRole;
@@ -79,14 +81,16 @@ function parseStaffInput(value: Record<string, unknown>): StaffInput | null {
     typeof role !== "string" ||
     !ALLOWED_ROLES.has(role) ||
     branchCodes.some((code) => !ALLOWED_BRANCH_CODES.has(code)) ||
-    ((role === "receptionist" || role === "operator") && branchCodes.length === 0)
+    ((role !== "admin" || value.permissions !== undefined) && branchCodes.length === 0)
   ) {
     return null;
   }
 
   if (value.canEditRosterHistory !== undefined && typeof value.canEditRosterHistory !== 'boolean') return null;
-  const canEditRosterHistory = role !== 'receptionist' && value.canEditRosterHistory === true;
-  return { displayName, role: role as StaffRole, branchCodes, canEditRosterHistory };
+  const permissions = value.permissions === undefined ? null : parsePermissions(value.permissions);
+  if (value.permissions !== undefined && !permissions) return null;
+  const canEditRosterHistory = value.canEditRosterHistory === true;
+  return { displayName, role: role as StaffRole, branchCodes, canEditRosterHistory, permissions };
 }
 
 function parsePayload(value: unknown): StaffRequest | null {
@@ -185,6 +189,7 @@ type ActorCheckResult =
 async function getAdminActor(
   serviceClient: SupabaseClient,
   accessToken: string,
+  action: PermissionAction = 'view',
 ): Promise<ActorCheckResult> {
   const { data: userData, error: userError } = await serviceClient.auth.getUser(
     accessToken,
@@ -196,11 +201,11 @@ async function getAdminActor(
 
   const { data: profile, error: profileError } = await serviceClient
     .from("profiles")
-    .select("role, is_active")
+    .select("role, is_active, permissions")
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role !== "admin" || !profile.is_active) {
+  if (profileError || !profile?.is_active || !hasPermission(profile.role, profile.permissions, "staff", action)) {
     console.error(JSON.stringify({
       code: "ADMIN_PROFILE_REQUIRED",
       userId: userData.user.id,
@@ -276,7 +281,7 @@ async function listStaff(serviceClient: SupabaseClient, databaseClient: Supabase
   const [usersResult, profilesResult, accessResult, branchesResult] = await Promise.all([
     serviceClient.auth.admin.listUsers({ page: 1, perPage: MAX_STAFF_ACCOUNTS }),
     databaseClient.from("profiles").select(
-      "user_id, display_name, role, is_active, can_edit_roster_history, created_at, updated_at",
+      "user_id, display_name, role, is_active, permissions, can_edit_roster_history, created_at, updated_at",
     ),
     databaseClient.from("staff_branch_access").select("user_id, branch_id"),
     databaseClient.from("branches").select("id, code, name").eq("is_active", true),
@@ -317,6 +322,7 @@ async function listStaff(serviceClient: SupabaseClient, databaseClient: Supabase
         role: String(profile.role),
         isActive: Boolean(profile.is_active),
         canEditRosterHistory: Boolean(profile.can_edit_roster_history),
+        permissions: profile.permissions ?? null,
         branches: (accessByUser.get(String(profile.user_id)) ?? [])
           .sort((left, right) => left.code.localeCompare(right.code)),
         createdAt: String(profile.created_at),
@@ -373,6 +379,7 @@ async function handleCreateStaff(
       role: payload.role,
       is_active: true,
       can_edit_roster_history: payload.canEditRosterHistory,
+      permissions: payload.permissions,
     });
     if (profileError) throw profileError;
 
@@ -391,9 +398,10 @@ async function handleCreateStaff(
     role: payload.role,
     branch_codes: payload.branchCodes,
     can_edit_roster_history: payload.canEditRosterHistory,
+      permissions: payload.permissions,
   });
 
-  return jsonResponse({ success: true, userId: targetUserId }, 201, origin);
+  return jsonResponse({ success: true, permissionSchemaVersion: 1, userId: targetUserId }, 201, origin);
 }
 
 async function handleUpdateStaff(
@@ -402,7 +410,7 @@ async function handleUpdateStaff(
   payload: UpdateStaffInput,
   origin: string | null,
 ): Promise<Response> {
-  if (payload.userId === actor.id && payload.role !== "admin") {
+  if (payload.userId === actor.id && ((payload.permissions && (!payload.permissions.staff.view || !payload.permissions.staff.update)) || (!payload.permissions && payload.role !== 'admin'))) {
     return jsonResponse({ success: false, code: "SELF_ADMIN_PROTECTION" }, 400, origin);
   }
 
@@ -424,7 +432,7 @@ async function handleUpdateStaff(
 
   const { data: oldProfile, error: oldProfileError } = await serviceClient
     .from("profiles")
-    .select("display_name, role, is_active, can_edit_roster_history")
+    .select("display_name, role, is_active, permissions, can_edit_roster_history")
     .eq("user_id", payload.userId)
     .maybeSingle();
   const { data: oldAccess, error: oldAccessError } = await serviceClient
@@ -438,7 +446,7 @@ async function handleUpdateStaff(
 
   const { error: profileError } = await serviceClient
     .from("profiles")
-    .update({ display_name: payload.displayName, role: payload.role, can_edit_roster_history: payload.canEditRosterHistory })
+    .update({ display_name: payload.displayName, role: payload.role, can_edit_roster_history: payload.canEditRosterHistory, permissions: payload.permissions ?? oldProfile.permissions })
     .eq("user_id", payload.userId);
   if (profileError) throw profileError;
 
@@ -453,6 +461,7 @@ async function handleUpdateStaff(
       display_name: oldProfile.display_name,
       role: oldProfile.role,
       can_edit_roster_history: oldProfile.can_edit_roster_history,
+      permissions: oldProfile.permissions,
     }).eq("user_id", payload.userId);
     await replaceBranchAccess(
       serviceClient,
@@ -490,9 +499,10 @@ async function handleUpdateStaff(
     role: payload.role,
     branch_codes: payload.branchCodes,
     can_edit_roster_history: payload.canEditRosterHistory,
+      permissions: payload.permissions,
   });
 
-  return jsonResponse({ success: true }, 200, origin);
+  return jsonResponse({ success: true, permissionSchemaVersion: 1 }, 200, origin);
 }
 
 async function handleSetActive(
@@ -543,7 +553,7 @@ async function handleSetActive(
     payload.userId,
   );
 
-  return jsonResponse({ success: true }, 200, origin);
+  return jsonResponse({ success: true, permissionSchemaVersion: 1 }, 200, origin);
 }
 
 async function handleResetPassword(
@@ -571,7 +581,7 @@ async function handleResetPassword(
 
   await recordAuditLog(serviceClient, actor.id, "staff.password_reset", payload.userId);
 
-  return jsonResponse({ success: true }, 200, origin);
+  return jsonResponse({ success: true, permissionSchemaVersion: 1 }, 200, origin);
 }
 
 async function handleDeleteStaff(
@@ -607,7 +617,7 @@ async function handleDeleteStaff(
     role: targetProfile.role,
   });
 
-  return jsonResponse({ success: true }, 200, origin);
+  return jsonResponse({ success: true, permissionSchemaVersion: 1 }, 200, origin);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -662,7 +672,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   try {
     if (request.method === "GET") {
       return jsonResponse(
-        { success: true, staff: await listStaff(serviceClient, serviceClient) },
+        { success: true, permissionSchemaVersion: 1, staff: await listStaff(serviceClient, serviceClient) },
         200,
         origin,
       );
@@ -690,6 +700,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return jsonResponse({ success: false, code: "INVALID_DATA" }, 400, origin);
     }
 
+    const action: PermissionAction = payload.action === "create" ? "create" : payload.action === "delete" ? "delete" : "update";
+    const mutationActor = await getAdminActor(serviceClient, accessToken, action);
+    if (!mutationActor.ok) return jsonResponse({ success: false, code: mutationActor.code }, mutationActor.status, origin);
     switch (payload.action) {
       case "create":
         return await handleCreateStaff(serviceClient, actor, payload, origin);

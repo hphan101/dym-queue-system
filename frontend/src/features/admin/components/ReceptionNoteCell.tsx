@@ -1,3 +1,4 @@
+import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
 import { useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ interface ReceptionNoteCellProps {
 }
 
 export function ReceptionNoteCell({ id, name, value, query, onSaved }: ReceptionNoteCellProps) {
+  const { can } = useStaffPermissions();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [expected, setExpected] = useState(value);
@@ -21,7 +23,7 @@ export function ReceptionNoteCell({ id, name, value, query, onSaved }: Reception
   const pending = useRef(false);
 
   const save = async () => {
-    if (pending.current) return;
+    if (pending.current || !can('registrations', 'update')) return;
     if (draft.trim() === expected) { setEditing(false); return; }
     pending.current = true;
     setSaving(true);
@@ -35,20 +37,20 @@ export function ReceptionNoteCell({ id, name, value, query, onSaved }: Reception
     } finally { pending.current = false; setSaving(false); }
   };
 
-  if (!editing) return <button type="button" className="flex min-h-9 w-full items-start gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Sửa ghi chú / STT HIS của ${name}`} onClick={() => {
+  if (!editing) return <button disabled={!can('registrations', 'update')} type="button" className="flex min-h-9 w-full items-start gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Sửa ghi chú của ${name}`} onClick={() => {
     setDraft(value); setExpected(value); setError(null); setEditing(true);
   }}>
     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${value ? '' : 'text-muted-foreground'}`}>
-      {value ? <HighlightText text={value} query={query} /> : 'Thêm ghi chú / STT HIS'}
+      {value ? <HighlightText text={value} query={query} /> : 'Thêm ghi chú'}
     </span>
     <Pencil className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
   </button>;
 
   return <div className="flex flex-col gap-2">
     <textarea autoFocus value={draft} maxLength={500} rows={3} disabled={saving}
-      aria-label={`Ghi chú / STT HIS của ${name}`} aria-invalid={Boolean(error)}
+      aria-label={`Ghi chú của ${name}`} aria-invalid={Boolean(error)}
       className="w-full resize-y rounded border border-input bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-      placeholder="VD: STT HIS 0123, tên đoàn, ghi chú…" onChange={(event) => setDraft(event.target.value)}
+      placeholder="Nhập ghi chú…" onChange={(event) => setDraft(event.target.value)}
       onBlur={() => void save()}
       onKeyDown={(event) => {
         if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {

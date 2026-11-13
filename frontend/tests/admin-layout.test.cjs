@@ -18,11 +18,13 @@ test('shared admin layout preserves branch/role, sidebar controls and workspace/
     '../hooks/useAdminTheme': { useAdminTheme: () => ({ themeMode: 'light', setThemeMode: callback => { mode = callback('light'); } }) },
     '../hooks/useSidebarResponsive': { useSidebarResponsive: () => ({ isSidebarCollapsed: false, setIsSidebarCollapsed: value => { collapsed = value; } }) },
     '../theme': { dymAdminTheme: 'theme' },
+    '../hooks/useStaffPermissions': { PermissionModuleContext: { Provider: 'PermissionProvider' }, DESTINATION_PERMISSIONS: { registrations: 'registrations' } },
   };
   new Function('exports', 'require', code)(result, name => mocks[name] ?? {});
   const children = { type: 'content' }, overlays = { type: 'modal' };
   const tree = result.AdminLayout({ activePage: 'registrations', branch: 'q7', date: '2026-11-06', staffName: 'Lễ tân', isAdmin: false, staffRole: 'receptionist', className: 'extra', children, overlays });
-  const shell = tree.props.children;
+  assert.equal(tree.props.value, 'registrations');
+  const shell = tree.props.children.props.children;
   const [sidebar, workspace, modal] = shell.props.children;
   assert.equal(shell.props.className, 'dym-admin-shell extra');
   assert.equal(sidebar.props.branch, 'q7');

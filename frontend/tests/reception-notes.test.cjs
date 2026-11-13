@@ -36,6 +36,7 @@ test('leaving a note saves once; failed saves preserve the draft for retry; unch
   const states = []; let index = 0, finish, requests = 0;
   const pending = { current: false };
   const mocks = {
+    '@/features/admin/hooks/useStaffPermissions': { useStaffPermissions: () => ({ can: () => true }) },
     react: { useRef: () => pending, useState(initial) { const slot = index++; if (!(slot in states)) states[slot] = initial; return [states[slot], (value) => { states[slot] = value; }]; } },
     'react/jsx-runtime': require('react/jsx-runtime'),
     'lucide-react': { Pencil: 'Pencil' }, '@/components/ui/button': { Button: 'Button' }, './HighlightText': { HighlightText: 'HighlightText' },

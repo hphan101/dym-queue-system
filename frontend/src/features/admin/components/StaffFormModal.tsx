@@ -14,6 +14,8 @@ import {
 import { BRANCH_NAMES } from '../../../config/branches';
 import type { BranchCode } from '../../../types/domain';
 import type { StaffFormState, StaffRole } from '../types';
+import { getDefaultPermissions } from '@/lib/staffPermissions';
+import { StaffPermissionMatrix } from './StaffPermissionMatrix';
 
 const BRANCH_CODES = Object.keys(BRANCH_NAMES) as BranchCode[];
 
@@ -43,7 +45,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
   return (
     <div className="dym-staff-dialog-backdrop" role="presentation">
       <section
-        className="dym-staff-dialog"
+        className="dym-staff-dialog dym-staff-account-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="staff-form-title"
@@ -66,11 +68,12 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
         </header>
 
         <form onSubmit={(event) => void onSave(event)}>
-          {form.role !== 'receptionist' && <label className="dym-staff-history-permission">
+          <div className="dym-staff-account-body">
+          <label className="dym-staff-history-permission">
             <span>Cho phép sửa lịch cũ</span>
             <input type="checkbox" checked={form.canEditRosterHistory} disabled={isSaving}
               onChange={(event) => setForm((current) => ({ ...current, canEditRosterHistory: event.target.checked }))} />
-          </label>}
+          </label>
           {formError && (
             <div className="dym-staff-form-error" role="alert">
               {formError}
@@ -83,6 +86,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
             </Label>
             <Input
               id="staff-display-name"
+              disabled={isSaving}
               type="text"
               value={form.displayName}
               maxLength={100}
@@ -106,6 +110,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
               </Label>
               <Input
                 id="staff-login-name"
+                disabled={isSaving}
                 type="text"
                 value={form.loginName}
                 maxLength={32}
@@ -124,14 +129,16 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="staff-role-select" className="text-xs font-medium">
-                Vai trò hệ thống
+                Vai trò (mẫu quyền)
               </Label>
               <Select
+                disabled={isSaving}
                 value={form.role}
                 onValueChange={(value) =>
                   setForm((current) => ({
                     ...current,
                     role: value as StaffRole,
+                    permissions: getDefaultPermissions(value),
                   }))
                 }
               >
@@ -165,6 +172,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
               </Label>
               <Input
                 id="staff-password"
+                disabled={isSaving}
                 type="password"
                 value={form.password}
                 minLength={6}
@@ -183,7 +191,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
             </div>
           )}
 
-          <fieldset>
+          <fieldset disabled={isSaving}>
             <legend>Cơ sở phòng khám được cấp quyền</legend>
             <div className="dym-staff-branch-options">
               {BRANCH_CODES.map((branchCode) => (
@@ -200,10 +208,12 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
                 </label>
               ))}
             </div>
-            {form.role === 'admin' && (
-              <small>Quản trị viên mặc định được truy cập toàn bộ các chi nhánh.</small>
-            )}
+            <small>Chọn ít nhất một chi nhánh cho tiếp nhận và lịch. Danh mục nhân sự, file hồ sơ và tài khoản dùng chung hệ thống.</small>
           </fieldset>
+
+          <StaffPermissionMatrix value={form.permissions} disabled={isSaving}
+            onChange={(permissions) => setForm((current) => ({ ...current, permissions }))} />
+          </div>
 
           <footer>
             <Button
@@ -225,7 +235,7 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
               {isSaving
                 ? 'Đang lưu…'
                 : form.userId
-                  ? 'Lưu thay đổi'
+                  ? 'Lưu'
                   : 'Tạo tài khoản'}
             </Button>
           </footer>

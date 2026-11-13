@@ -28,7 +28,7 @@ export function useStaffIdentity() {
         ] = await Promise.all([
           supabase
             .from('profiles')
-            .select('display_name, role')
+            .select('*')
             .eq('user_id', user.id)
             .maybeSingle(),
           supabase.from('branches').select('id, code').eq('is_active', true),
@@ -55,7 +55,7 @@ export function useStaffIdentity() {
           const code = String(record.code);
           if (
             (code === 'q1' || code === 'q7' || code === 'hn') &&
-            (profile?.role === 'admin' || allowedBranchIds.has(String(record.id)))
+            ((profile?.role === 'admin' && profile.permissions == null) || allowedBranchIds.has(String(record.id)))
           ) {
             nextBranchIds[code] = String(record.id);
           }

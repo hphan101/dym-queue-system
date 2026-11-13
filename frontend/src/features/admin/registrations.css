@@ -4,6 +4,84 @@
  * responsive: pass · icons: pass · mobile: pass (34, 49, 50–57)
  */
 
+/* Registry polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-registration-filters {
+  display: flex;
+  flex: 0 1 864px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.dym-registrations-page .dym-registration-print-filter,
+.dym-registrations-page .dym-registration-company-filter {
+  flex: 1 1 224px;
+  width: 224px;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  gap: 8px;
+  color: var(--color-ink-2);
+  border-color: var(--color-rule-2);
+}
+.dym-registration-print-filter > div { flex: 1; min-width: 0; }
+.dym-registration-search { flex: 1.5 1 320px; min-width: 0; }
+.dym-registrations-page .dym-registration-search input { height: 40px; }
+.dym-registration-filters svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.dym-registration-filters [data-slot="badge"] { font-size: 12px; }
+.dym-registration-filter-menu { font-family: var(--font-body); }
+.dym-registration-filter-menu :is([role="option"], input) { font-family: inherit; font-size: 14px; font-weight: 400; }
+.dym-registration-filter-menu [role="option"] { min-height: 36px; }
+.dym-registration-filter-menu [role="option"] [class*="text-[11px]"] { font-size: 12px; }
+@media (max-width: 600px) {
+  .dym-registration-filters { flex-basis: 100%; }
+  .dym-registrations-page :is(.dym-registration-print-filter, .dym-registration-company-filter),
+  .dym-registration-search { flex-basis: 100%; width: 100%; }
+}
+.dym-registrations-page .dym-table-precision { min-width: 1440px; }
+.dym-registrations-page .dym-table-precision th { white-space: nowrap; }
+.dym-registrations-page .dym-table-precision td { padding: 16px; }
+.dym-registrations-page .dym-patient-block { min-width: 240px; gap: 4px; }
+.dym-registrations-page :is(.dym-contact-phone, .dym-company-name) { font-size: 14px; font-weight: 500; line-height: 20px; }
+.dym-registrations-page :is(.dym-contact-id, .dym-address-line) { font-size: 12px; line-height: 20px; }
+.dym-registrations-page .dym-contact-phone { white-space: nowrap; }
+.dym-registrations-page { color: var(--color-ink); }
+.dym-registrations-page .dym-table-precision td > button { color: var(--color-ink-2); }
+.dym-registrations-page .dym-table-actions-group button {
+  color: var(--color-ink-2);
+  background: var(--color-paper-2);
+  border-color: var(--color-rule-2);
+}
+.dym-registrations-page .dym-table-precision input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--reception-accent); }
+.dym-registrations-page .dym-table-precision tr[data-selected="true"] { background: #edf0f8; }
+.dym-registrations-page .dym-table-precision tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--reception-accent); }
+.dark .dym-registrations-page .dym-table-precision tr[data-selected="true"],
+[data-color-mode="dark"] .dym-registrations-page .dym-table-precision tr[data-selected="true"] { background: #28344d; }
+.dym-registrations-page .dym-table-precision tr:focus-within { outline: 2px solid var(--reception-accent); outline-offset: -2px; }
+.dym-registrations-page .dym-bulk-toolbar { background: var(--color-paper); color: var(--color-ink-2); }
+.dym-registrations-page .dym-bulk-toolbar[data-selected="true"] { border-top: 1px solid var(--color-rule); }
+.dym-registrations-page :is(.dym-bulk-toolbar button, .dym-table-actions-group button) {
+  min-height: 36px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.dym-registrations-page .dym-bulk-print-primary { background: var(--reception-accent); color: #fff; }
+.dym-registrations-page .dym-bulk-print-primary:hover:not(:disabled) { background: var(--reception-accent-hover); }
+.dym-registrations-page :is([role="combobox"], input[type="search"]) { font-family: inherit; font-size: 14px; border-radius: 8px; box-shadow: none; }
+.dym-registrations-page [role="tab"] { height: 32px; }
+.dym-registrations-page [role="tablist"] { height: 40px; }
+.dym-registrations-page .dym-patient-block span[class*="text-[11px]"] { font-size: 12px; font-weight: 500; }
+.dym-registrations-page .dym-table-actions-group { gap: 8px; }
+.dym-registrations-page textarea { font-family: inherit; font-size: 14px; border-radius: 8px; }
+@media (max-width: 600px) {
+  .dym-registrations-page .dym-registry-title { font-size: 18px; line-height: 24px; }
+  .dym-registrations-page [role="combobox"] { max-width: 100%; }
+}
+
 .dym-records-workspace {
   color: var(--color-ink);
   background: var(--color-paper);

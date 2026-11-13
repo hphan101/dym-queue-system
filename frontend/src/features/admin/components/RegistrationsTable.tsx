@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
+import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import { usePrintStatus } from '../hooks/usePrintStatus';
 import type { RegistrationDetails } from '../types';
@@ -60,14 +60,14 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 />
               </th>
             )}
-            <th scope="col">Số Phiếu & Giờ</th>
-            <th scope="col">Tên Khách Hàng</th>
-            <th scope="col">Liên Hệ & Định Danh</th>
-            <th scope="col">Đơn Vị & Địa Chỉ</th>
-            <th scope="col">Ghi chú / STT HIS</th>
-            <th scope="col">Trạng Thái</th>
-            <th scope="col">Trạng Thái In</th>
-            <th scope="col" className="text-right">Hồ Sơ</th>
+            <th scope="col">Số phiếu & giờ</th>
+            <th scope="col">Tên khách hàng</th>
+            <th scope="col">SĐT & CCCD</th>
+            <th scope="col">Đơn vị & địa chỉ</th>
+            <th scope="col">Ghi chú</th>
+            <th scope="col">Trạng thái</th>
+            <th scope="col">Trạng thái in</th>
+            <th scope="col" className="text-right">Hồ sơ</th>
           </tr>
         </thead>
         <tbody>
@@ -81,7 +81,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
             const tt25Copies = getTT25PrintCopies({ checkupReason: getRegistrationCheckupReason(row) });
 
             return (
-              <tr key={row.id}>
+              <tr key={row.id} data-selected={checkedIds?.has(row.id) ?? false}>
                 {isSelectable && (
                   <td className="w-10">
                     <input
@@ -96,7 +96,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 {/* Ticket & Time */}
                 <td className="col-ticket">
                   <div className="flex flex-col gap-1 items-start">
-                    <span className="dym-ticket-tag">
+                    <span className="dym-ticket-tag" data-parity={row.queue_number % 2 === 0 ? 'even' : 'odd'}>
                       <HighlightText
                         text={formatQueueNumber(row.queue_number)}
                         query={searchQuery}
@@ -112,7 +112,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 <td>
                   <div className="dym-patient-block">
                     <div className="flex items-center gap-2">
-                      <strong className="dym-patient-name uppercase tracking-tight">
+                      <strong className="dym-patient-name whitespace-nowrap uppercase">
                         <HighlightText
                           text={row.full_name}
                           query={searchQuery}
@@ -203,7 +203,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 </td>
 
                 {/* Status */}
-                <td className="min-w-[240px] max-w-xs">
+                <td className="w-44 min-w-44 max-w-44">
                   <ReceptionNoteCell id={row.id} name={row.full_name} value={row.reception_note ?? ''} query={searchQuery} onSaved={(note) => onNoteSaved(row.id, note)} />
                 </td>
                 <td>
@@ -238,7 +238,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                       Chi tiết
                     </Button>
                     {onPrintConsentRow && (
-                      <Button
+                      <Button permissionAction="view" permissionModule="printing"
                         type="button"
                         variant="outline"
                         size="sm"
@@ -249,7 +249,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                         In Đồng thuận · 1 bộ
                       </Button>
                     )}
-                    <Button
+                    <Button permissionAction="view" permissionModule="printing"
                       type="button"
                       variant="outline"
                       size="sm"

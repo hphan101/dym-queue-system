@@ -15,6 +15,7 @@ function load(file, mocks = {}, globals = {}) {
   const code = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
+  mocks = { '@/lib/staffPermissions': require('./helpers/staff-permissions.cjs'), '../_shared/staffPermissions.ts': require('./helpers/staff-permissions.cjs'), ...mocks };
   const exports = {};
   vm.runInNewContext(code, {
     exports, require: (name) => { if (!(name in mocks)) throw new Error(`Missing mock: ${name}`); return mocks[name]; },
@@ -70,6 +71,7 @@ test('QR menu opens a new staff tab for the selected branch and leaves reception
   const source = fs.readFileSync(path.join(root, 'frontend/src/features/admin/AdminSidebar.tsx'), 'utf8');
   const imports = [...source.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]);
   const mocks = Object.fromEntries(imports.map((name) => [name, symbols]));
+  mocks['./hooks/useStaffPermissions'] = { useStaffPermissions: () => ({ can: () => true }), DESTINATION_PERMISSIONS: new Proxy({}, { get: () => 'clinic' }) };
   mocks.react = { useState: (initial) => [initial, () => {}] };
   mocks['./hooks/useSidebarDisclosureMotion'] = { useSidebarDisclosureMotion: () => ({ panelRef: { current: null }, prepare() {} }) };
   mocks['./sidebarMotion.css'] = {};
@@ -158,10 +160,11 @@ test('assisted registration requires active staff and a server-authorized branch
   session = { user: { id: 'staff' }, access_token: 'existing-staff-token' };
   profile.is_active = false;
   await assert.rejects(run(), { code: 'ACCESS_DENIED' });
-  profile = { role: 'operator', is_active: true };
+  profile = { role: 'operator', is_active: true, permissions: require('./helpers/staff-permissions.cjs').getDefaultPermissions('none') };
   await assert.rejects(run(), { code: 'ACCESS_DENIED' });
   assert.equal(calls.length, 0);
   profile.role = 'receptionist';
+  profile.permissions = null;
   branchAllowed = false;
   await assert.rejects(run(), { code: 'ACCESS_DENIED' });
   assert.equal(calls.length, 1);
