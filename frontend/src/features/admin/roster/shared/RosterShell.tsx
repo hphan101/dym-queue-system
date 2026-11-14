@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { type AdminPageKey } from '../../AdminSidebar';
 import { getInitialStaffName } from '../../adminIdentity';
 import { AdminHeader } from '../../components/AdminHeader';
+import type { AdminBreadcrumbItem } from '../../components/adminBreadcrumbs';
 
 import { useRosterData } from '../data/useRosterData';
 import '../../admin.css';
@@ -21,6 +22,7 @@ export interface RosterShellProps {
     | 'roster-personnel'
   >;
   title: string;
+  breadcrumbs?: AdminBreadcrumbItem[];
   authorizedIsAdmin?: boolean;
   headerActions?: ReactNode;
   children: ReactNode;
@@ -29,6 +31,7 @@ export interface RosterShellProps {
 export function RosterShell({
   activePage,
   title,
+  breadcrumbs,
   authorizedIsAdmin = true,
   headerActions,
   children,
@@ -51,7 +54,7 @@ export function RosterShell({
       isAdmin={authorizedIsAdmin}
       staffRole={authorizedIsAdmin ? 'admin' : 'operator'}
     >
-      <AdminHeader title={title} actions={headerActions} />
+      <AdminHeader title={title} breadcrumbs={breadcrumbs} actions={headerActions} />
 
       <main className="dym-admin-content">
         {errorBanner && (

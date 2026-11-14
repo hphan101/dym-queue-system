@@ -9,6 +9,7 @@ import { useSidebarResponsive } from '../hooks/useSidebarResponsive';
 import { dymAdminTheme } from '../theme';
 import '../admin.css';
 import '../buttonFeedback.css';
+import { AdminBreadcrumbContext, getAdminBreadcrumbs } from './adminBreadcrumbs';
 import { PermissionModuleContext, DESTINATION_PERMISSIONS } from '../hooks/useStaffPermissions';
 
 type AdminLayoutProps = Pick<
@@ -45,7 +46,9 @@ export function AdminLayout({
           }
           onLogout={() => void signOutAdminSession()}
         />
-        <div className="dym-admin-workspace">{children}</div>
+        <AdminBreadcrumbContext.Provider value={getAdminBreadcrumbs(sidebar.activePage)}>
+          <div className="dym-admin-workspace">{children}</div>
+        </AdminBreadcrumbContext.Provider>
         {overlays}
       </div>
     </Theme></PermissionModuleContext.Provider>

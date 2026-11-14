@@ -715,6 +715,11 @@ export function RosterInsitePage({
   return (
     <RosterShell
       activePage="roster-insite"
+      breadcrumbs={view === 'day' ? [
+        { label: 'Điều phối' },
+        { label: 'Lịch tại Phòng khám', onSelect: () => setView('week') },
+        { label: formatDisplayDate(selectedDate) },
+      ] : undefined}
       title={`Lịch tại Phòng khám (${ROSTER_BRANCH_LABELS[selectedBranch]})`}
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={

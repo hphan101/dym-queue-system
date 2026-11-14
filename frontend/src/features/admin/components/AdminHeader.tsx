@@ -1,10 +1,10 @@
 import { type ReactNode } from 'react';
 import {
-  BellOff,
-  BellRing,
-  Building2,
-  RotateCcw,
-  Plus,
+  VolumeX,
+  Volume2,
+  Hospital,
+  CalendarCheck,
+  UserRoundPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -21,8 +21,12 @@ import type { BranchCode } from '../../../types/domain';
 import { getTodayInVietnam } from '../../../lib/date';
 import { formatDisplayDate } from '../utils/adminFormatters';
 import { openStaffTab } from '../../../lib/navigation';
+import '../adminHeader.css';
+import { AdminBreadcrumb } from './AdminBreadcrumb';
+import type { AdminBreadcrumbItem } from './adminBreadcrumbs';
 
 export interface AdminHeaderProps {
+  breadcrumbs?: AdminBreadcrumbItem[];
   title?: string;
   branch?: BranchCode;
   branchOptions?: Array<{ value: string; label: string }>;
@@ -36,6 +40,7 @@ export interface AdminHeaderProps {
 }
 
 export function AdminHeader({
+  breadcrumbs,
   title = 'Tiếp nhận',
   branch,
   branchOptions = [],
@@ -54,17 +59,18 @@ export function AdminHeader({
     <header className="dym-admin-header-bar">
       {/* Page Title */}
       <div className="dym-header-branding">
+        <AdminBreadcrumb items={breadcrumbs} />
         <h1 className="dym-header-title">{title}</h1>
       </div>
 
       {/* Control Filter Bar */}
       <div
-        className="flex flex-wrap items-center justify-end gap-2.5"
+        className="dym-header-controls"
         aria-label="Bộ lọc điều phối"
       >
-        {registrationHref && <Button type="button" size="sm" className="h-9 gap-2 px-3 text-xs font-medium"
+        {registrationHref && <Button type="button" size="sm" className="dym-header-register gap-2 px-4"
           onClick={() => openStaffTab(registrationHref)} title="Mở đăng ký hộ khách trong tab mới">
-          <Plus className="size-3.5" aria-hidden="true" />Đăng ký
+          <UserRoundPlus aria-hidden="true" />Đăng ký
         </Button>}
         {/* Sound Toggle (if configured) */}
         {isNotificationSoundEnabled !== undefined && onToggleNotificationSound && (
@@ -80,31 +86,19 @@ export function AdminHeader({
                 : 'Âm báo đang tắt. Bấm để bật chuông thông báo'
             }
             className={cn(
-              'h-9 gap-2 bg-card px-3 text-xs font-medium shadow-sm',
+              'gap-2 bg-card px-3 shadow-none',
               isNotificationSoundEnabled &&
                 'border-ring bg-accent text-accent-foreground hover:bg-accent/80',
             )}
           >
             {isNotificationSoundEnabled ? (
-              <BellRing className="size-3.5 shrink-0 text-foreground" aria-hidden="true" />
+              <Volume2 aria-hidden="true" />
             ) : (
-              <BellOff
-                className="size-3.5 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
+              <VolumeX aria-hidden="true" />
             )}
             <span>
-              {isNotificationSoundEnabled ? 'Âm báo bật' : 'Bật âm báo'}
+              {isNotificationSoundEnabled ? 'Âm báo: Bật' : 'Âm báo: Tắt'}
             </span>
-            <span
-              className={cn(
-                'size-2 rounded-full',
-                isNotificationSoundEnabled
-                  ? 'bg-emerald-500'
-                  : 'bg-muted-foreground/40',
-              )}
-              aria-hidden="true"
-            />
           </Button>
         )}
 
@@ -117,23 +111,20 @@ export function AdminHeader({
             <SelectTrigger
               id="branch-select"
               aria-label="Cơ sở phòng khám"
-              className="h-9 w-[220px] bg-card px-3 text-xs font-medium shadow-sm"
+              className="dym-header-branch bg-card px-3 shadow-none"
             >
               <div className="flex min-w-0 items-center gap-1.5 truncate">
-                <Building2
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
+                <Hospital aria-hidden="true" />
                 <SelectValue placeholder="Chọn cơ sở" />
               </div>
             </SelectTrigger>
-            <SelectContent align="end" className="w-[220px]">
+            <SelectContent align="end" className="dym-header-branch-menu min-w-[260px]">
               <SelectGroup>
                 {branchOptions.map((opt) => (
                   <SelectItem
                     key={opt.value}
                     value={opt.value}
-                    className="text-xs"
+                    className="text-sm"
                   >
                     {opt.label}
                   </SelectItem>
@@ -145,7 +136,7 @@ export function AdminHeader({
 
         {/* Date Selection (if configured) */}
         {date !== undefined && onDateChange && (
-          <div className="relative flex items-center gap-1.5">
+          <div className="dym-header-date flex items-center gap-2">
             <DatePicker
               id="date-select-btn"
               value={date}
@@ -153,6 +144,7 @@ export function AdminHeader({
               ariaLabel={`Ngày tiếp nhận: ${formatDisplayDate(date)}`}
               highlightWhenNotToday
               align="end"
+              className="gap-2 px-3 shadow-none"
             />
 
             {!isToday && (
@@ -162,9 +154,9 @@ export function AdminHeader({
                 size="sm"
                 onClick={() => onDateChange(today)}
                 title="Quay về ngày hôm nay"
-                className="h-9 gap-1 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                className="gap-2 px-3 text-muted-foreground hover:text-foreground"
               >
-                <RotateCcw className="size-3.5 shrink-0" aria-hidden="true" />
+                <CalendarCheck aria-hidden="true" />
                 <span>Hôm nay</span>
               </Button>
             )}

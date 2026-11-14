@@ -966,6 +966,13 @@ export function RosterOnsitePage({
   return (
     <RosterShell
       activePage="roster-onsite"
+      breadcrumbs={view === 'details' ? [
+        { label: 'Điều phối' },
+        { label: 'Đoàn khám Onsite', onSelect: () => setView('week') },
+        { label: selectedCampaign
+          ? `${selectedCampaign.company_name || selectedCampaign.campaign_code} · ${formatDisplayDate(selectedCampaign.schedule_date)}`
+          : 'Danh sách & chi tiết' },
+      ] : undefined}
       title="Đoàn khám Onsite & Lấy máu ngoại viện"
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
