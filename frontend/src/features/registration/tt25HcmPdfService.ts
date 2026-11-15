@@ -4,6 +4,7 @@ import { formatDateForPrint, getTodayInVietnam } from '../../lib/date';
 import { drawPdfCheck } from './pdfDrawing';
 import { getDefaultTargetPaymentByReason, getTT25PrintCopies, type TT25RegistrationData, type TT25TargetPaymentInfo } from './tt25Types';
 import layouts from './tt25TemplateFields.json';
+import { requiresCompanyName } from './tt25Constants';
 
 export { getTT25PrintCopies } from './tt25Types';
 
@@ -68,7 +69,8 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
     cccd: data.cccd || '', ethnicity: data.ethnicity || '', bloodGroup: data.bloodGroup || '',
     insuranceNumber: data.insuranceNumber || '', addressDetail: data.addressDetail || '',
     homeWard: [data.ward, data.province].filter(Boolean).join(', '), occupation: data.occupation || '',
-    workplace: data.workplace || '', workplaceWard: data.workplaceWard || '',
+    workplace: requiresCompanyName(data.checkupReason || '') ? '' : data.workplace || '',
+    workplaceWard: data.workplaceWard || '',
     phoneNumber: data.phoneNumber || '', email: data.email || '', checkupReason: data.checkupReason || '',
     checkupDate, targetGroup: targetPayment.targetGroup === 'other' ? targetPayment.targetOtherDetails : targetPayment.targetGroup,
     paymentSource: formatPaymentSource(targetPayment, !info.key.endsWith('vnm')),

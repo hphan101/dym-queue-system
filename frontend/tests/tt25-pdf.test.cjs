@@ -25,6 +25,7 @@ function loadService() {
   return execute('src/features/registration/tt25HcmPdfService.ts', {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit, '../../lib/date': date,
     './pdfDrawing': drawing, './tt25Types': types, './tt25TemplateFields.json': layout,
+    './tt25Constants': execute('src/features/registration/tt25Constants.ts', {}),
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
   }, async (url) => {
     const bytes = fs.readFileSync(path.join(frontend, 'public', url.split('?')[0]));
@@ -83,6 +84,8 @@ test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
         assert.ok(segments[0].start.y > segments[0].end.y && segments[1].end.y > segments[1].start.y);
         for (const text of ['NGUYỄN THỊ MINH ANH', '0901234567', 'khach@example.test', 'Dị ứng thời tiết', 'Sinh thường năm 2020']) assert.ok(drawn.some((item) => item.text === text), text);
         assert.ok(drawn.some((item) => item.text === '001195012345/02112026/GKSK-DYM'));
+        assert.equal(drawn.some((item) => item.text === customer.workplace), reason === 'Work Permit', 'company names are omitted only for corporate TT25');
+        assert.equal(customer.workplace, 'Công ty TNHH Kiểm Tra Biểu Mẫu', 'source data must remain available to consent/refusal printing');
       } finally { URL.revokeObjectURL(result.url); }
     }
     lines = 0;
@@ -118,6 +121,7 @@ test('Hanoi templates fill all history answers and keep only WP duplex padding',
         const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
         assert.equal(pdf.getPageCount(), expected * copies);
         assert.equal(lines, 52 * copies);
+        assert.equal(texts.includes(customer.workplace), reason === 'Work Permit', 'Hanoi corporate TT25 omits company names in both languages');
         for (const text of ['NGUYỄN THỊ MINH ANH', '001195012345', 'Đái tháo đường', 'Dị ứng thời tiết', 'Vitamin D, mỗi ngày một viên', 'Sinh thường năm 2020']) assert.ok(texts.includes(text), `${info.key}: ${text}`);
         for (let page = 0; page < pdf.getPageCount(); page++) {
           const empty = (pdf.getPage(page).node.Contents()?.asArray().length ?? 0) === 0;
