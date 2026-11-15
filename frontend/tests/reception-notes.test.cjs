@@ -6,7 +6,7 @@ const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 
 function loadService(rpc) {
-  const file = path.resolve(__dirname, '../src/features/admin/receptionNotes.ts');
+  const file = path.resolve(__dirname, '../src/features/admin/registrations/receptionNotes.ts');
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, () => ({ supabase: { rpc } }));
@@ -31,16 +31,17 @@ test('notes save only after server confirmation, retain leading zeroes and surfa
 });
 
 test('leaving a note saves once; failed saves preserve the draft for retry; unchanged notes do not write', async () => {
-  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/components/ReceptionNoteCell.tsx'), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/registrations/ReceptionNoteCell.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const states = []; let index = 0, finish, requests = 0;
   const pending = { current: false };
   const mocks = {
-    '@/features/admin/hooks/useStaffPermissions': { useStaffPermissions: () => ({ can: () => true }) },
+    '@/features/admin/shared/useStaffPermissions': { useStaffPermissions: () => ({ can: () => true }) },
     react: { useRef: () => pending, useState(initial) { const slot = index++; if (!(slot in states)) states[slot] = initial; return [states[slot], (value) => { states[slot] = value; }]; } },
     'react/jsx-runtime': require('react/jsx-runtime'),
-    'lucide-react': { Pencil: 'Pencil' }, '@/components/ui/button': { Button: 'Button' }, './HighlightText': { HighlightText: 'HighlightText' },
-    '../receptionNotes': { saveReceptionNote: async () => { requests++; return new Promise((resolve, reject) => { finish = { resolve, reject }; }); } },
+    '@/components/ui/alert': { Alert: 'Alert', AlertDescription: 'AlertDescription' },
+    'lucide-react': { Pencil: 'Pencil' }, '@/components/ui/button': { Button: 'Button' }, '../shared/HighlightText': { HighlightText: 'HighlightText' },
+    './receptionNotes': { saveReceptionNote: async () => { requests++; return new Promise((resolve, reject) => { finish = { resolve, reject }; }); } },
   };
   const exports = {};
   new Function('exports', 'require', code)(exports, (name) => mocks[name]);

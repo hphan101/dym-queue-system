@@ -2,9 +2,9 @@ const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
+
 const ts = require('typescript');
-const directory = path.resolve(__dirname, '../src/features/admin/roster');
+
 function load(file, imports) {
   const result = {};
   const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {

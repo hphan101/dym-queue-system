@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -101,9 +102,9 @@ export function CampaignTemplateDialog({
             disabled={busy}
           />
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <Alert variant="destructive"><AlertDescription>
               {error}
-            </p>
+            </AlertDescription></Alert>
           )}
           <DialogFooter>
             <Button

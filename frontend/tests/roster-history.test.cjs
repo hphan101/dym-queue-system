@@ -1,4 +1,4 @@
-const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
+const { rosterPath } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +6,7 @@ const path = require('node:path');
 const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 const root = path.resolve(__dirname, '../..');
-const directory = path.join(root, 'frontend/src/features/admin/roster');
+
 function compile(source) { return ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; }
 function loadService() {
   const result = {};

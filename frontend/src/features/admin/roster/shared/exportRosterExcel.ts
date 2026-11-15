@@ -18,7 +18,7 @@ import {
   type RosterAssignment,
   type RosterSchedule,
 } from '../data/rosterService';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 
 /**
  * Style indices in buildStylesXml:

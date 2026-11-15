@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { Search, X } from 'lucide-react';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { MonthPicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';

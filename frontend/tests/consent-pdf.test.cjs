@@ -7,11 +7,11 @@ const { PDFDocument } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 
 const frontend = path.resolve(__dirname, '..');
-const layout = require('../src/features/registration/consentTemplateFields.json');
+const layout = require('../src/features/registration/printing/consentTemplateFields.json');
 
 function loadService() {
   const fetched = [];
-  const code = ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/consentPdfService.ts'), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/printing/consentPdfService.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
   const exports = {};
@@ -20,13 +20,13 @@ function loadService() {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText)(date);
   const drawing = {};
-  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/pdfDrawing.ts'), 'utf8'), {
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/printing/pdfDrawing.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText)(drawing, require);
   const dependencies = {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit,
     './consentTemplateFields.json': layout,
-    '../../lib/date': { ...date, getTodayInVietnam: () => '2026-11-01' },
+    '../../../lib/date': { ...date, getTodayInVietnam: () => '2026-11-01' },
     './pdfDrawing': drawing,
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
   };

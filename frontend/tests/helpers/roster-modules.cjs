@@ -21,8 +21,8 @@ function rosterPath(name) {
 
 function rosterImport(specifier) {
   // Keep mock keys stable when a production module moves into a feature folder.
-  if (specifier.startsWith('.') && specifier.includes('/utils/'))
-    return '../utils/' + path.basename(specifier);
+  if (specifier.startsWith('.') && path.basename(specifier) === 'adminFormatters')
+    return '../shared/adminFormatters';
   if (specifier.startsWith('.') && specifier.includes('/lib/'))
     return '../../../lib/' + path.basename(specifier);
   const basename = path.basename(specifier);

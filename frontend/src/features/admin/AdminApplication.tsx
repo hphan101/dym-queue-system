@@ -1,24 +1,24 @@
 import { getDefaultPermissions, hasPermission, type StaffPermissions } from '@/lib/staffPermissions';
-import { StaffPermissionsContext, DESTINATION_PERMISSIONS } from './hooks/useStaffPermissions';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { Theme } from '@astryxdesign/core/theme';
-import dymLogoDark from '../../assets/dym-logo-dark.png';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import AdminPage from './AdminPage';
-import { useAdminTheme } from './hooks/useAdminTheme';
-import RegistrationsPage from './RegistrationsPage';
+import StaffPage from './accounts/StaffPage';
+import type { StaffRole } from './accounts/types';
+import AdminPage from './reception/AdminPage';
+import RegistrationsPage from './registrations/RegistrationsPage';
 import {
   RosterDashboardPage,
-  RosterSettlementPage,
   RosterDataProvider,
   RosterInsitePage,
   RosterOnsitePage,
   RosterPersonnelPage,
+  RosterSettlementPage,
 } from './roster';
-import StaffPage from './StaffPage';
-import { dymAdminTheme } from './theme';
-import type { StaffRole } from './types';
+import { DESTINATION_PERMISSIONS, StaffPermissionsContext } from './shared/useStaffPermissions';
+import { AdminLoader } from './shell/AdminLoader';
+import './shell/adminLoader.css';
+import { dymAdminTheme } from './shell/theme';
+import { useAdminTheme } from './shell/useAdminTheme';
 
 export type AdminDestination =
   | 'dashboard'
@@ -34,25 +34,7 @@ function isDestinationAllowed(destination: AdminDestination, permissions: StaffP
   return hasPermission('', permissions, DESTINATION_PERMISSIONS[destination]);
 }
 
-function AdminLoader() {
-  return (
-    <div
-      className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background text-foreground"
-      role="status"
-      aria-live="polite"
-    >
-      <img
-        src={dymLogoDark}
-        alt="DYM Medical Center"
-        className="h-auto w-36 opacity-90"
-      />
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Loader2 className="size-4 animate-spin text-primary" aria-hidden="true" />
-        <span>Đang tải không gian quản trị...</span>
-      </div>
-    </div>
-  );
-}
+
 
 function AdminApplication({ destination }: { destination: AdminDestination }) {
   const initialDestination = useRef(destination);
@@ -62,7 +44,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
   const [staffRole, setStaffRole] = useState<StaffRole>('receptionist');
   const [permissions, setPermissions] = useState<StaffPermissions>(getDefaultPermissions('none'));
   const isAdmin = staffRole === 'admin';
-  const canAccessRoster = ['overview','clinic','onsite','settlement','personnel'].some((key) => permissions[key as keyof StaffPermissions]?.view);
+  const canAccessRoster = ['overview', 'clinic', 'onsite', 'settlement', 'personnel'].some((key) => permissions[key as keyof StaffPermissions]?.view);
 
   useEffect(() => {
     let isMounted = true;

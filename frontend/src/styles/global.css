@@ -1,9 +1,16 @@
 @import "./tokens.css";
-@import "../features/registration/tt25Print.css";
+@import "../features/registration/printing/tt25Print.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --warning: 40 100% 47%;
+  --warning-foreground: 222 32% 12%;
+  --success: 120 100% 25%;
+  --success-foreground: 0 0% 100%;
+}
 
 html {
   -webkit-tap-highlight-color: transparent;

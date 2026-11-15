@@ -139,6 +139,6 @@ for language, label, page_count, consent_pages, refusal_pages in [
                         'fields': fields, 'genderMarks': gender_marks}
     (args.input_dir / f'{label}-masks.json').write_text(json.dumps(masks), encoding='utf-8')
 
-(root / 'frontend/src/features/registration/consentTemplateFields.json').write_text(
+(root / 'frontend/src/features/registration/printing/consentTemplateFields.json').write_text(
     json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print('Prepared original consent PDFs and fill-in coordinates.')

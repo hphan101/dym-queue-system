@@ -5,7 +5,7 @@ const path = require('node:path');
 const ts = require('typescript');
 
 test('birth date editing displays day/month/year and saves ISO without swapping day and month', () => {
-  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/BirthDateInput.tsx'), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/form/BirthDateInput.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {};
   const react = { useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}], useRef: () => ({ current: null }), useEffect() {} };

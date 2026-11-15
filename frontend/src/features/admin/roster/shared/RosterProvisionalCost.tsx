@@ -1,5 +1,6 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useContext, useId, useState } from 'react';
-import { PermissionModuleContext, useStaffPermissions } from '../../hooks/useStaffPermissions';
+import { PermissionModuleContext, useStaffPermissions } from '../../shared/useStaffPermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -108,14 +109,14 @@ export function RosterProvisionalCost({
         </Button>
       </div>
       {error && (
-        <p role="alert" className="w-full text-sm text-destructive">
+        <Alert variant="destructive" className="w-full"><AlertDescription>
           {error}
-        </p>
+        </AlertDescription></Alert>
       )}
       {saved && (
-        <p role="status" className="w-full text-sm">
+        <Alert variant="success" role="status" aria-live="polite" className="w-full"><AlertDescription>
           Đã lưu chi phí dự phòng.
-        </p>
+        </AlertDescription></Alert>
       )}
     </form>
   );

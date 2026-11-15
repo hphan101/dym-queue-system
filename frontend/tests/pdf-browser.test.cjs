@@ -5,7 +5,7 @@ const path = require('node:path');
 const ts = require('typescript');
 
 function load(file, globals) {
-  const code = ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../src/features/registration', file), 'utf8'), {
+  const code = ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../src/features/registration/printing', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const exports = {};

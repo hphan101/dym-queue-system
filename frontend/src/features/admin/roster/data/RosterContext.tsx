@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { getTodayInVietnam } from '../../../../lib/date';
-import { useAdminScope } from '../../hooks/useAdminScope';
+import { useAdminScope } from '../../shared/useAdminScope';
 import {
   addTemporaryDailyRoom,
   bulkImportMedicalPersonnel,

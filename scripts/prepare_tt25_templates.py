@@ -299,7 +299,7 @@ for name, count, history_pages, family_page, questions_page in [
     (args.input_dir / f'{name}-masks.json').write_text(json.dumps(masks), encoding='utf-8')
     print(f'{name}: {len(fields)} fields, 22 personal history check pairs, {count} pages')
 
-metadata_path = root / 'frontend/src/features/registration/tt25TemplateFields.json'
+metadata_path = root / 'frontend/src/features/registration/printing/tt25TemplateFields.json'
 if args.site == 'hn':
     layouts = {**json.loads(metadata_path.read_text(encoding='utf-8')), **{f'hn_{name}': layout for name, layout in layouts.items()}}
 elif metadata_path.exists():

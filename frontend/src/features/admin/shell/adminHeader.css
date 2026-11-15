@@ -1,0 +1,72 @@
+/* Header polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-header-branding { min-width: 0; gap: 4px; }
+.dym-breadcrumb { min-width: 0; }
+.dym-admin-header-bar {
+  --header-ink: #182239;
+  --header-surface: #ffffff;
+  --header-rule: #cdd3de;
+  color: var(--header-ink);
+  background: var(--header-surface);
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 24px;
+  font-family: var(--font-body);
+}
+.dark .dym-admin-header-bar,
+[data-color-mode="dark"] .dym-admin-header-bar {
+  --header-ink: #edf0f6;
+  --header-surface: #1b2230;
+  --header-rule: #4a566b;
+}
+.dym-header-controls :is([data-variant="outline"], [role="combobox"]) {
+  color: var(--header-ink);
+  background: var(--header-surface);
+  border-color: var(--header-rule);
+}
+.dym-admin-header-bar .dym-header-title {
+  color: var(--header-ink);
+  font-family: inherit;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.dym-header-controls {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 8px;
+}
+.dym-header-controls :is(button, [role="combobox"]) {
+  height: 40px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.dym-header-controls svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-width: 1.5;
+}
+.dym-header-controls .dym-header-branch { width: 260px; gap: 12px; }
+.dym-header-branch > div { flex: 1; gap: 8px; min-width: 0; }
+.dym-header-branch-menu { font-family: var(--font-body); }
+.dym-header-controls .dym-header-register { background: #202e61; color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .dym-header-controls .dym-header-register:hover { background: #2d407f; }
+}
+@media (max-width: 1023px) {
+  .dym-header-controls { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 600px) {
+  .dym-admin-header-bar { padding: 16px; }
+  .dym-header-controls .dym-header-branch { width: 100%; }
+  .dym-header-date { flex-wrap: wrap; }
+}

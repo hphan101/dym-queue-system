@@ -46,7 +46,7 @@ test('shared Bearer parsing preserves staff and QR authorization header handling
 });
 
 test('missing QR deployment is reported distinctly from a network failure', async () => {
-  const api = load('frontend/src/features/registration/registrationAccessApi.ts', {}, {
+  const api = load('frontend/src/features/registration/access/registrationAccessApi.ts', {}, {
     fetch: async () => new Response(JSON.stringify({ code: 'NOT_FOUND' }), { status: 404 }),
   });
   await assert.rejects(api.requestRegistrationAccess({ action: 'qr', branch: 'q1' }, new AbortController().signal, 'staff-token'),
@@ -68,17 +68,16 @@ test('QR menu opens a new staff tab for the selected branch and leaves reception
       sessionStorage: { getItem: (key) => session.get(key) } },
   });
   const symbols = new Proxy({}, { get: (_, key) => key === '__esModule' ? false : String(key) });
-  const source = fs.readFileSync(path.join(root, 'frontend/src/features/admin/AdminSidebar.tsx'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'frontend/src/features/admin/shell/AdminSidebar.tsx'), 'utf8');
   const imports = [...source.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]);
   const mocks = Object.fromEntries(imports.map((name) => [name, symbols]));
-  mocks['./hooks/useStaffPermissions'] = { useStaffPermissions: () => ({ can: () => true }), DESTINATION_PERMISSIONS: new Proxy({}, { get: () => 'clinic' }) };
-  mocks.react = { useState: (initial) => [initial, () => {}] };
-  mocks['./hooks/useSidebarDisclosureMotion'] = { useSidebarDisclosureMotion: () => ({ panelRef: { current: null }, prepare() {} }) };
+  mocks['../shared/useStaffPermissions'] = { useStaffPermissions: () => ({ can: () => true }), DESTINATION_PERMISSIONS: new Proxy({}, { get: () => 'clinic' }) };
+  mocks.react = { useRef: () => ({ current: null }), useLayoutEffect() {}, useState: (initial) => [initial, () => {}] };
   mocks['./sidebarMotion.css'] = {};
   mocks['react/jsx-runtime'] = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
-  mocks['../../lib/navigation'] = navigation;
-  mocks['../../config/branches'] = { BRANCH_NAMES: { q1: 'Quận 1', q7: 'Quận 7', hn: 'Hà Nội' } };
-  const { AdminSidebar } = load('frontend/src/features/admin/AdminSidebar.tsx', mocks);
+  mocks['../../../lib/navigation'] = navigation;
+  mocks['../../../config/branches'] = { BRANCH_NAMES: { q1: 'Quận 1', q7: 'Quận 7', hn: 'Hà Nội' } };
+  const { AdminSidebar } = load('frontend/src/features/admin/shell/AdminSidebar.tsx', mocks);
   const tree = AdminSidebar({ activePage: 'dashboard', branch: 'q7', staffName: 'Lễ tân',
     isAdmin: false, staffRole: 'receptionist', themeMode: 'light', isCollapsed: false });
   const find = (node) => {
@@ -138,10 +137,10 @@ test('assisted registration requires active staff and a server-authorized branch
   let profile = { role: 'receptionist', is_active: true };
   let branchAllowed = true;
   const calls = [];
-  const api = load('frontend/src/features/registration/registrationAccessApi.ts');
+  const api = load('frontend/src/features/registration/access/registrationAccessApi.ts');
   const chain = { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: profile }; } };
-  const helper = load('frontend/src/features/registration/staffRegistrationAccess.ts', {
-    '../../lib/supabaseClient': { supabase: { auth: { getSession: async () => ({ data: { session } }) }, from: () => chain } },
+  const helper = load('frontend/src/features/registration/access/staffRegistrationAccess.ts', {
+    '../../../lib/supabaseClient': { supabase: { auth: { getSession: async () => ({ data: { session } }) }, from: () => chain } },
     './registrationAccessApi': { ...api, requestRegistrationAccess: async (body, signal, token) => {
       calls.push({ body, token });
       assert.equal(signal.aborted, false);
@@ -182,8 +181,8 @@ test('staff links request a fresh authorized session, while public links still r
     const effects = [], states = [];
     let staffRequests = 0;
     const now = Date.now();
-    const api = load('frontend/src/features/registration/registrationAccessApi.ts');
-    const helper = load('frontend/src/features/registration/useRegistrationAccess.ts', {
+    const api = load('frontend/src/features/registration/access/registrationAccessApi.ts');
+    const helper = load('frontend/src/features/registration/access/useRegistrationAccess.ts', {
       react: { useState: (value) => [value, (next) => states.push(next)], useEffect: (effect) => effects.push(effect), useCallback: (fn) => fn },
       './registrationAccessApi': { ...api, requestRegistrationAccess: () => { throw new Error('No public QR supplied'); } },
       './registrationSession': { readRegistrationSession: () => null, storeRegistrationSession: () => { throw new Error('Do not persist staff capability'); }, clearRegistrationSession() {} },
@@ -217,7 +216,7 @@ test('a shared QR supports multiple scans, each issuing a different opaque sessi
 
 test('session restoration rejects expired, malformed and wrong-branch tokens without storing patient data', () => {
   let value = null;
-  const helper = load('frontend/src/features/registration/registrationSession.ts', {}, {
+  const helper = load('frontend/src/features/registration/access/registrationSession.ts', {}, {
     sessionStorage: { getItem: () => value, setItem: (_, next) => { value = next; }, removeItem: () => { value = null; } },
   });
   helper.storeRegistrationSession({ branch: 'q1', token: 'a'.repeat(64), expiresAt: now + 1_200_000 });

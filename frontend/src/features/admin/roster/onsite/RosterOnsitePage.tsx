@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ArrowDownTrayIcon,
@@ -19,7 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -46,7 +47,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { BranchCode } from '../../../../types/domain';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import { exportScheduleCostExcel } from '../shared/exportRosterExcel';
 import {
   RosterAssignmentCell,
@@ -967,7 +968,7 @@ export function RosterOnsitePage({
     <RosterShell
       activePage="roster-onsite"
       breadcrumbs={view === 'details' ? [
-        { label: 'Điều phối' },
+        { label: 'Điều phối Y khoa' },
         { label: 'Đoàn khám Onsite', onSelect: () => setView('week') },
         { label: selectedCampaign
           ? `${selectedCampaign.company_name || selectedCampaign.campaign_code} · ${formatDisplayDate(selectedCampaign.schedule_date)}`
@@ -1699,13 +1700,9 @@ export function RosterOnsitePage({
                     </div>
 
                     {historyLocked && (
-                      <p
-                        role="status"
-                        className="border-b border-border bg-muted px-5 py-3 text-sm"
-                      >
-                        Lịch đã khóa. Tài khoản chưa được cấp quyền sửa lịch từ
+                      <Alert variant="warning" role="status" className="my-3"><AlertDescription>Lịch đã khóa. Tài khoản chưa được cấp quyền sửa lịch từ
                         hôm qua trở về trước.
-                      </p>
+                      </AlertDescription></Alert>
                     )}
                     <fieldset
                       disabled={historyLocked}
@@ -2744,9 +2741,9 @@ export function RosterOnsitePage({
               )}
 
               {campaignFormError && (
-                <p role="alert" className="text-sm text-destructive">
+                <Alert variant="destructive"><AlertDescription>
                   {campaignFormError}
-                </p>
+                </AlertDescription></Alert>
               )}
               <DialogFooter className="pt-1">
                 <Button

@@ -1,15 +1,16 @@
-import { AdminLayout } from '../../components/AdminLayout';
-import { useState, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState,type ReactNode } from 'react';
+import { FeedbackBanner } from '../../shared/FeedbackBanner';
+import { AdminLayout } from '../../shell/AdminLayout';
 
-import { type AdminPageKey } from '../../AdminSidebar';
-import { getInitialStaffName } from '../../adminIdentity';
-import { AdminHeader } from '../../components/AdminHeader';
-import type { AdminBreadcrumbItem } from '../../components/adminBreadcrumbs';
+import { getInitialStaffName } from '../../shared/adminIdentity';
+import { AdminHeader } from '../../shell/AdminHeader';
+import { type AdminPageKey } from '../../shell/AdminSidebar';
+import type { AdminBreadcrumbItem } from '../../shell/adminBreadcrumbs';
 
+import '../../accounts/staff.css';
+import '../../shell/admin.css';
 import { useRosterData } from '../data/useRosterData';
-import '../../admin.css';
-import '../../staff.css';
 import './roster.css';
 
 export interface RosterShellProps {
@@ -25,6 +26,7 @@ export interface RosterShellProps {
   breadcrumbs?: AdminBreadcrumbItem[];
   authorizedIsAdmin?: boolean;
   headerActions?: ReactNode;
+  contentClassName?: string;
   children: ReactNode;
 }
 
@@ -34,6 +36,7 @@ export function RosterShell({
   breadcrumbs,
   authorizedIsAdmin = true,
   headerActions,
+  contentClassName,
   children,
 }: RosterShellProps) {
   const [staffName] = useState(getInitialStaffName);
@@ -56,35 +59,12 @@ export function RosterShell({
     >
       <AdminHeader title={title} breadcrumbs={breadcrumbs} actions={headerActions} />
 
-      <main className="dym-admin-content">
+      <main className={cn('dym-admin-content', contentClassName)}>
         {errorBanner && (
-          <div
-            className="dym-data-error flex items-center justify-between gap-3"
-            role="alert"
-          >
-            <span>{errorBanner}</span>
-            <button
-              type="button"
-              onClick={clearBanners}
-              aria-label="Đóng thông báo lỗi"
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
+          <FeedbackBanner variant="destructive" message={errorBanner} onDismiss={clearBanners} />
         )}
         {successBanner && (
-          <div className="dym-staff-success" role="status">
-            <span>{successBanner}</span>
-            <button
-              type="button"
-              onClick={clearBanners}
-              aria-label="Đóng thông báo"
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
+          <FeedbackBanner variant="success" message={successBanner} onDismiss={clearBanners} />
         )}
         {children}
       </main>

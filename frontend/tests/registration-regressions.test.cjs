@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 test('registration time can omit the date while other date-time displays retain it', () => {
-  const { formatRegistrationTime } = load('features/admin/utils/adminFormatters.ts', {});
+  const { formatRegistrationTime } = load('features/admin/shared/adminFormatters.ts', {});
   assert.equal(formatRegistrationTime('2026-11-09T03:38:00Z', false), '10:38');
   assert.match(formatRegistrationTime('2026-11-09T03:38:00Z'), /09\/11\/2026/);
 });
@@ -31,7 +31,7 @@ function load(file, mocks = {}, globals = {}) {
     exports, console, Date, ...globals,
     require: (name) => {
       if (name in mocks) return mocks[name];
-      if (name === '@/features/admin/hooks/useStaffPermissions') return { useStaffPermissions: () => ({ can: () => true }) };
+      if (name === '@/features/admin/shared/useStaffPermissions') return { useStaffPermissions: () => ({ can: () => true }) };
       if (name === './pdfBrowser' || name === './usePrintModalDismiss') {
         return load(path.join(path.dirname(file), `${name}.ts`), mocks, globals);
       }
@@ -80,8 +80,8 @@ test('failed saves reject, never write a local success, and can be retried', asy
   let args;
   const localStorage = storage();
   const sessionStorage = storage();
-  const { saveRegistrationEdit } = load('features/admin/registrationEdits.ts', {
-    '../../lib/supabaseClient': { supabase: { rpc: async (_, input) => { args = input; return { error }; } } },
+  const { saveRegistrationEdit } = load('features/admin/registrations/registrationEdits.ts', {
+    '../../../lib/supabaseClient': { supabase: { rpc: async (_, input) => { args = input; return { error }; } } },
   }, { window: { localStorage, sessionStorage } });
   await assert.rejects(saveRegistrationEdit('patient', fields), /Không thể lưu/);
   assert.equal(sessionStorage.getItem('dym_registration_overrides_v1'), null);
@@ -93,16 +93,16 @@ test('failed saves reject, never write a local success, and can be retried', asy
 });
 
 test('network failures propagate to the edit form', async () => {
-  const { saveRegistrationEdit } = load('features/admin/registrationEdits.ts', {
-    '../../lib/supabaseClient': { supabase: { rpc: async () => { throw new Error('offline'); } } },
+  const { saveRegistrationEdit } = load('features/admin/registrations/registrationEdits.ts', {
+    '../../../lib/supabaseClient': { supabase: { rpc: async () => { throw new Error('offline'); } } },
   });
   await assert.rejects(saveRegistrationEdit('patient', fields), /offline/);
 });
 
 test('queue receipts restore only for the same branch and Vietnam date', () => {
   const localStorage = storage();
-  const receipt = load('features/registration/registrationReceipt.ts', {
-    '../../lib/date': { getTodayInVietnam: () => '2026-11-01' },
+  const receipt = load('features/registration/flow/registrationReceipt.ts', {
+    '../../../lib/date': { getTodayInVietnam: () => '2026-11-01' },
   }, { localStorage });
   localStorage.setItem('dym_registration_step', 'success');
   localStorage.setItem('dym_registration_queue', '0001');
@@ -119,7 +119,7 @@ test('queue receipts restore only for the same branch and Vietnam date', () => {
 });
 
 test('receipt storage errors do not turn a successful registration into a failure', () => {
-  const receipt = load('features/registration/registrationReceipt.ts', {}, {
+  const receipt = load('features/registration/flow/registrationReceipt.ts', {}, {
     localStorage: new Proxy({}, { get: () => () => { throw new Error('storage blocked'); } }),
   });
   assert.doesNotThrow(() => receipt.storeRegistrationReceipt({ branch: 'q1', queueDate: '2026-11-01', queueNumber: '0001' }));
@@ -129,7 +129,7 @@ test('receipt storage errors do not turn a successful registration into a failur
 test('print status remains unchanged until the server confirms, including on failure', async () => {
   const localStorage = storage();
   let finish;
-  const status = load('features/admin/hooks/usePrintStatus.ts', {
+  const status = load('features/admin/registrations/usePrintStatus.ts', {
     react: {},
     '../../../lib/supabaseClient': { supabase: { rpc: () => new Promise((resolve) => { finish = resolve; }) } },
   }, { window: { localStorage, dispatchEvent() {} }, CustomEvent: class {} });
@@ -149,7 +149,7 @@ for (const name of ['TT25PrintModal', 'ConsentPrintModal']) {
     const harness = reactHarness(name === 'ConsentPrintModal'
       ? ['blob:pdf', false, null, 'all', null, true] : ['blob:pdf', false, null, null, true]);
     let confirmations = 0;
-    const component = load(`features/registration/${name}.tsx`, {
+    const component = load(`features/registration/printing/${name}.tsx`, {
       ...harness.mocks, 'react-dom': { createPortal: (tree) => tree },
       './consentPdfService': {
         getConsentFormLanguage: () => 'vi', getConsentPageIndices: () => [0, 1],
@@ -176,7 +176,7 @@ for (const name of ['TT25PrintModal', 'ConsentPrintModal']) {
 test('printing both documents uses one request and reprinting never resets a status', async () => {
   const localStorage = storage();
   const requests = [];
-  const status = load('features/admin/hooks/usePrintStatus.ts', {
+  const status = load('features/admin/registrations/usePrintStatus.ts', {
     react: {},
     '../../../lib/supabaseClient': { supabase: { rpc: async (_, args) => { requests.push(args); return { error: null }; } } },
   }, { window: { localStorage, dispatchEvent() {} }, CustomEvent: class {} });
@@ -194,8 +194,8 @@ test('printing both documents uses one request and reprinting never resets a sta
 
 test('editing a profile cannot overwrite print status from another workstation', async () => {
   let request;
-  const { saveRegistrationEdit } = load('features/admin/registrationEdits.ts', {
-    '../../lib/supabaseClient': { supabase: { rpc: async (_, args) => { request = args; return { error: null }; } } },
+  const { saveRegistrationEdit } = load('features/admin/registrations/registrationEdits.ts', {
+    '../../../lib/supabaseClient': { supabase: { rpc: async (_, args) => { request = args; return { error: null }; } } },
   });
   const extras = { occupation: 'Kế toán', printedConsent: false, printedTT25: false };
   await saveRegistrationEdit('patient', { ...fields, tt25_data: extras });
@@ -215,19 +215,19 @@ test('reception prints the latest server record and ignores obsolete browser ove
     phone: '0901234567', companyName: '', status: 'waiting',
   };
   let marked = false;
-  const { buildPrintData } = load('features/admin/utils/buildPrintData.ts', {
+  const { buildPrintData } = load('features/admin/registrations/buildPrintData.ts', {
     '../../registration/tt25Types': {
       createDefaultTT25Data: (data) => data,
       getDefaultTargetPaymentByReason: () => ({}),
     },
     '../../../lib/queueNumber': { formatQueueNumber: (n) => String(n) },
   });
-  const { QueueTable } = load('features/admin/components/QueueTable.tsx', {
+  const { QueueTable } = load('features/admin/reception/QueueTable.tsx', {
     ...harness.mocks,
-    '../hooks/usePrintStatus': { usePrintStatus: () => ({ getStatus: () => ({}), markPrinted: () => { marked = true; } }) },
-    '../constants/queueConstants': { STATUS_META: { waiting: { label: 'Chờ gọi' } } },
-    '../utils/adminFormatters': { calculateAge: () => 26, formatPhone: (s) => s },
-    '../utils/buildPrintData': { buildPrintData },
+    '../registrations/usePrintStatus': { usePrintStatus: () => ({ getStatus: () => ({}), markPrinted: () => { marked = true; } }) },
+    './queueConstants': { STATUS_META: { waiting: { label: 'Chờ gọi' } } },
+    '../shared/adminFormatters': { calculateAge: () => 26, formatPhone: (s) => s },
+    '../registrations/buildPrintData': { buildPrintData },
     '../../registration/tt25Types': {
       createDefaultTT25Data: (data) => data,
       getDefaultTargetPaymentByReason: () => ({}),
@@ -240,13 +240,14 @@ test('reception prints the latest server record and ignores obsolete browser ove
     }) } },
   }, { window: { sessionStorage: oldStorage, localStorage: oldStorage } });
   const tree = QueueTable({
+    statusFilter: 'all', pageSize: 20,
     filteredRows: [row], paginatedRows: [row], query: '', branchName: 'Q1',
     date: row.date, today: row.date, visiblePage: 1, totalPages: 1,
     firstVisibleRow: 1, lastVisibleRow: 1,
   });
   elements(tree).find((n) => n.props?.title === 'In phiếu khám sức khỏe TT25').props.onClick();
   await new Promise(setImmediate);
-  assert.equal(harness.states[1].fullName, 'Latest server name');
-  assert.equal(harness.states[1].cccd, 'B1234567');
+  assert.equal(harness.states[0].fullName, 'Latest server name');
+  assert.equal(harness.states[0].cccd, 'B1234567');
   assert.equal(marked, false);
 });

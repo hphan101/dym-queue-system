@@ -1,6 +1,7 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTodayInVietnam } from '../../../../lib/date';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import { getInsiteWeekDates } from '../clinic/insiteWeek';
 import { fetchOnsiteWeek, groupOnsiteWeek } from './onsiteCalendar';
 import {
@@ -180,7 +181,7 @@ export function RosterOnsiteWeek({
         ))}
       </div>
       {loadError ? (
-        <div role="alert" className="flex items-center gap-3">
+        <Alert variant="destructive"><AlertDescription className="flex items-center gap-3">
           <p className="text-sm text-destructive">{loadError}</p>
           <Button
             type="button"
@@ -189,7 +190,7 @@ export function RosterOnsiteWeek({
           >
             Thử lại
           </Button>
-        </div>
+        </AlertDescription></Alert>
       ) : (
         <div className="dym-onsite-calendar-scroll">
           <div

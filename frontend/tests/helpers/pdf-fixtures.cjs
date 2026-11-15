@@ -28,12 +28,12 @@ exports.loadPdfFixtures = function (entry = 'bulkPrintPdf') {
     return result;
   }
   if (entry === 'bulkPrintPdf') {
-    const builder = load(path.join(root, 'src/features/registration/bulkPrintPdfDocument.ts'));
+    const builder = load(path.join(root, 'src/features/registration/printing/bulkPrintPdfDocument.ts'));
     return {
       generateBulkPrintPdf: async (...args) => URL.createObjectURL(new Blob(
         [await builder.generateBulkPrintPdfBytes(...args)], { type: 'application/pdf' },
       )),
     };
   }
-  return load(path.join(root, `src/features/registration/${entry}.ts`));
+  return load(path.join(root, `src/features/registration/printing/${entry}.ts`));
 };

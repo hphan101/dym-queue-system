@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useMemo, useState } from 'react';
 import { useRosterDeepLink } from '../shared/useRosterDeepLink';
 import { GripVertical } from 'lucide-react';
@@ -15,7 +16,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -42,7 +43,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { getTodayInVietnam } from '../../../../lib/date';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import { exportScheduleCostExcel } from '../shared/exportRosterExcel';
 import {
   RosterAssignmentCell,
@@ -716,7 +717,7 @@ export function RosterInsitePage({
     <RosterShell
       activePage="roster-insite"
       breadcrumbs={view === 'day' ? [
-        { label: 'Điều phối' },
+        { label: 'Điều phối Y khoa' },
         { label: 'Lịch tại Phòng khám', onSelect: () => setView('week') },
         { label: formatDisplayDate(selectedDate) },
       ] : undefined}
@@ -946,13 +947,9 @@ export function RosterInsitePage({
           </div>
 
           {historyLocked && (
-            <p
-              role="status"
-              className="my-3 rounded-md border border-border bg-muted p-3 text-sm"
-            >
-              Lịch đã khóa: từ hôm qua trở về trước chỉ tài khoản được cấp quyền
+            <Alert variant="warning" role="status" className="my-3"><AlertDescription>Lịch đã khóa: từ hôm qua trở về trước chỉ tài khoản được cấp quyền
               sửa lịch cũ mới được chỉnh sửa.
-            </p>
+            </AlertDescription></Alert>
           )}
           <fieldset disabled={historyLocked} className="min-w-0 border-0 p-0">
             <RosterProvisionalCost

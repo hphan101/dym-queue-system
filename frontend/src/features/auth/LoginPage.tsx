@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { LoginForm } from '@/components/login-form';
+import { LoginForm } from '@/features/auth/LoginForm';
 import dymLogo from '../../assets/dym-logo-dark.png';
 import { supabase } from '../../lib/supabaseClient';
 import { isBranchCode } from '../../config/branches';

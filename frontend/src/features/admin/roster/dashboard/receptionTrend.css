@@ -1,0 +1,12 @@
+/* Chart polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.reception-trend { min-width: 0; }
+.reception-trend-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.reception-trend-total { margin: 0 0 16px; font-size: 28px; line-height: 36px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.reception-trend-total span { color: hsl(var(--muted-foreground)); font-size: 14px; font-weight: 400; }
+.reception-trend-empty { margin: 0 0 8px; color: hsl(var(--muted-foreground)); font-size: 14px; }
+.reception-trend-plot { height: 280px; width: 100%; aspect-ratio: auto; }
+.reception-trend-data { margin-top: 24px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.reception-trend-data summary { cursor: pointer; width: fit-content; }
+.reception-trend-data summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; }
+.reception-trend-data th[scope="row"] { font-weight: 400; }
+@media (max-width: 40rem) { .reception-trend-plot { height: 260px; } }

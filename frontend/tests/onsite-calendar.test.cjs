@@ -2,9 +2,9 @@ const { rosterPath, rosterImport } = require('./helpers/roster-modules.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
+
 const ts = require('typescript');
-const directory = path.resolve(__dirname, '../src/features/admin/roster');
+
 function load(file, imports = {}) {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {
@@ -107,7 +107,7 @@ test('calendar opens the exact campaign and hides stale events after week/branch
   const context = { selectedBranch: 'q1', setSelectedBranch() {}, canEditHistory: false };
   const imports = {
     react, 'react/jsx-runtime': require('react/jsx-runtime'), '../../../lib/date': { getTodayInVietnam: () => '2026-11-05' },
-    '../utils/adminFormatters': { formatDisplayDate: (date) => date.split('-').reverse().join('/') },
+    '../shared/adminFormatters': { formatDisplayDate: (date) => date.split('-').reverse().join('/') },
     './insiteWeek': week, './onsiteCalendar': model, './rosterService': service,
     './useRosterData': { useRosterData: () => context },
   };

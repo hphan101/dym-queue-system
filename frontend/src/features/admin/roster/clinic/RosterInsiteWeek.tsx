@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { getTodayInVietnam } from '../../../../lib/date';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import { buildInsiteWeek, getInsiteWeekDates } from './insiteWeek';
 import {
   fetchRosterBundleForRange,
@@ -137,7 +138,7 @@ export function RosterInsiteWeek({
         </div>
       </div>
       {loadError ? (
-        <div className="flex flex-wrap items-center gap-3" role="alert">
+        <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-destructive">{loadError}</p>
           <Button
             type="button"
@@ -146,7 +147,7 @@ export function RosterInsiteWeek({
           >
             Thử lại
           </Button>
-        </div>
+        </AlertDescription></Alert>
       ) : loading ? (
         <div
           className="dym-week-loading"

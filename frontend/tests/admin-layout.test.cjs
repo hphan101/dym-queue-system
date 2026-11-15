@@ -5,7 +5,7 @@ const path = require('node:path');
 const ts = require('typescript');
 
 test('shared admin layout preserves branch/role, sidebar controls and workspace/modal placement', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../src/features/admin/components/AdminLayout.tsx'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../src/features/admin/shell/AdminLayout.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const result = {};
   let mode, collapsed, signedOut = 0;
@@ -13,19 +13,22 @@ test('shared admin layout preserves branch/role, sidebar controls and workspace/
     'react/jsx-runtime': require('react/jsx-runtime'),
     '@astryxdesign/core/theme': { Theme: 'Theme' },
     '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
-    '../AdminSidebar': { AdminSidebar: 'Sidebar' },
-    '../adminIdentity': { signOutAdminSession: () => { signedOut++; } },
-    '../hooks/useAdminTheme': { useAdminTheme: () => ({ themeMode: 'light', setThemeMode: callback => { mode = callback('light'); } }) },
-    '../hooks/useSidebarResponsive': { useSidebarResponsive: () => ({ isSidebarCollapsed: false, setIsSidebarCollapsed: value => { collapsed = value; } }) },
-    '../theme': { dymAdminTheme: 'theme' },
-    '../hooks/useStaffPermissions': { PermissionModuleContext: { Provider: 'PermissionProvider' }, DESTINATION_PERMISSIONS: { registrations: 'registrations' } },
+    './AdminSidebar': { AdminSidebar: 'Sidebar' },
+    '../shared/adminIdentity': { signOutAdminSession: () => { signedOut++; } },
+    './useAdminTheme': { useAdminTheme: () => ({ themeMode: 'light', setThemeMode: callback => { mode = callback('light'); } }) },
+    './useSidebarResponsive': { useSidebarResponsive: () => ({ isSidebarCollapsed: false, setIsSidebarCollapsed: value => { collapsed = value; } }) },
+    './adminBreadcrumbs': { AdminBreadcrumbContext: { Provider: 'BreadcrumbProvider' }, getAdminBreadcrumbs: () => [{ label: 'Danh sách tiếp nhận' }] },
+    './theme': { dymAdminTheme: 'theme' },
+    '../shared/useStaffPermissions': { PermissionModuleContext: { Provider: 'PermissionProvider' }, DESTINATION_PERMISSIONS: { registrations: 'registrations' } },
   };
   new Function('exports', 'require', code)(result, name => mocks[name] ?? {});
   const children = { type: 'content' }, overlays = { type: 'modal' };
   const tree = result.AdminLayout({ activePage: 'registrations', branch: 'q7', date: '2026-11-06', staffName: 'Lễ tân', isAdmin: false, staffRole: 'receptionist', className: 'extra', children, overlays });
   assert.equal(tree.props.value, 'registrations');
   const shell = tree.props.children.props.children;
-  const [sidebar, workspace, modal] = shell.props.children;
+  const [sidebar, breadcrumbProvider, modal] = shell.props.children;
+  const workspace = breadcrumbProvider.props.children;
+  assert.equal(breadcrumbProvider.props.value[0].label, 'Danh sách tiếp nhận');
   assert.equal(shell.props.className, 'dym-admin-shell extra');
   assert.equal(sidebar.props.branch, 'q7');
   assert.equal(sidebar.props.staffRole, 'receptionist');

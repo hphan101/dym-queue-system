@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import './numbered-pagination.css';
 
 function getPaginationItems(currentPage: number, totalPages: number): Array<number | string> {
@@ -19,10 +20,12 @@ interface NumberedPaginationProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   label?: string;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
 }
 
-export function NumberedPagination({ currentPage, totalPages, onPageChange, label = 'Phân trang' }: NumberedPaginationProps) {
-  return (
+export function NumberedPagination({ currentPage, totalPages, onPageChange, label = 'Phân trang', pageSize, onPageSizeChange }: NumberedPaginationProps) {
+  const pagination = (
     <nav className="dym-numbered-pagination" aria-label={label}>
       <Button type="button" variant="outline" size="icon" aria-label="Trang trước"
         disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
@@ -39,4 +42,20 @@ export function NumberedPagination({ currentPage, totalPages, onPageChange, labe
       </Button>
     </nav>
   );
+  if (pageSize === undefined || !onPageSizeChange) return pagination;
+  return <div className="dym-pagination-controls">
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground">Số dòng mỗi trang</span>
+      <Select value={String(pageSize)} onValueChange={(value) => {
+        onPageSizeChange(Number(value));
+        onPageChange(1);
+      }}>
+        <SelectTrigger className="w-20" aria-label="Số dòng mỗi trang"><SelectValue /></SelectTrigger>
+        <SelectContent side="top" align="end">
+          <SelectGroup>{[10, 20, 30, 40, 50].map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+    {pagination}
+  </div>;
 }

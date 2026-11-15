@@ -1,0 +1,66 @@
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useEffect, useState, type RefObject } from 'react';
+import { PDFDocument } from 'pdf-lib';
+import { NumberedPagination } from '@/components/numbered-pagination';
+import { isMobilePdfViewer } from './pdfBrowser';
+import { createPdfPagePreview } from './pdfPagePreview';
+
+interface PdfPreviewProps {
+  url: string;
+  title: string;
+  iframeRef: RefObject<HTMLIFrameElement | null>;
+  onReady: () => void;
+}
+
+export function PdfPreview({ url, title, iframeRef, onReady }: PdfPreviewProps) {
+  const [mobile] = useState(isMobilePdfViewer);
+  const [document, setDocument] = useState<PDFDocument | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageUrl, setPageUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!mobile) return;
+    const controller = new AbortController();
+    setError(false);
+    void fetch(url, { signal: controller.signal }).then(async (response) => {
+      if (!response.ok) throw new Error('PDF unavailable');
+      const loaded = await PDFDocument.load(await response.arrayBuffer());
+      if (!controller.signal.aborted) setDocument(loaded);
+    }).catch(() => { if (!controller.signal.aborted) setError(true); });
+    return () => controller.abort();
+  }, [url, mobile, attempt]);
+
+  useEffect(() => {
+    if (!document) return;
+    let current = true;
+    let generatedUrl: string | null = null;
+    setPageUrl(null);
+    setError(false);
+    // Mobile embedded viewers can expose only page one. Give each selection its own one-page PDF.
+    void createPdfPagePreview(document, pageIndex).then((blob) => {
+      if (!current) return;
+      generatedUrl = URL.createObjectURL(blob);
+      setPageUrl(generatedUrl);
+    }).catch(() => { if (current) setError(true); });
+    return () => { current = false; if (generatedUrl) URL.revokeObjectURL(generatedUrl); };
+  }, [document, pageIndex, attempt]);
+
+  const frameUrl = mobile ? pageUrl : url;
+  const pageCount = document?.getPageCount() ?? 0;
+
+  return <div className="flex min-h-0 w-full flex-1 flex-col">
+    {mobile && <div className="flex shrink-0 justify-center bg-slate-800 px-2 py-2">
+      {pageCount ? <NumberedPagination currentPage={pageIndex + 1} totalPages={pageCount}
+        onPageChange={(page) => setPageIndex(page - 1)} label="Chuyển trang PDF" />
+        : <span role="status" className="text-sm text-white">Đang tải…</span>}
+    </div>}
+    {error ? <Alert variant="destructive"><AlertDescription className="flex flex-col items-center gap-3">
+      <p>Không thể tải trang PDF. Vui lòng thử lại.</p>
+      <Button type="button" variant="outline" onClick={() => setAttempt((value) => value + 1)}>Thử lại</Button>
+    </AlertDescription></Alert> : frameUrl ? <iframe ref={iframeRef} src={`${frameUrl}#toolbar=0&navpanes=0&view=FitH`} title={mobile ? `${title}, trang ${pageIndex + 1}` : title} onLoad={onReady} className="h-full min-h-0 w-full flex-1 border-0" />
+      : <p role="status" className="p-6 text-center text-sm text-white">Đang tải trang…</p>}
+  </div>;
+}

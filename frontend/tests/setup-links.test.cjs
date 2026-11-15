@@ -6,7 +6,7 @@ const path = require('node:path');
 const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 const root = path.resolve(__dirname, '../..');
-const directory = path.join(root, 'frontend/src/features/admin/roster');
+
 function load(file, imports = {}) {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -33,7 +33,7 @@ test('setup picker selects an HC event, lets users choose its dates and never sh
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   let index = 0;
   const react = { useState(initial) { return [index++ === 0 ? { branch: 'q1', items: [a, b] } : initial, () => {}]; }, useEffect() {} };
-  const imports = { react, 'react/jsx-runtime': require('react/jsx-runtime'), './setupLinks': load('setupLinks.ts'), '../utils/adminFormatters': { formatDisplayDate: (date) => date } };
+  const imports = { react, 'react/jsx-runtime': require('react/jsx-runtime'), './setupLinks': load('setupLinks.ts'), '../shared/adminFormatters': { formatDisplayDate: (date) => date } };
   const exports = {};
   new Function('exports', 'require', code)(exports, (name) => imports[rosterImport(name)] ?? {});
   let chosen;

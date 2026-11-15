@@ -1,0 +1,22 @@
+/* Loading polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-admin-loader {
+  --background: 220 18% 97%;
+  --foreground: 222 32% 18%;
+  --muted-foreground: 219 14% 40%;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+}
+.dark .dym-admin-loader {
+  --background: 220 25% 10%;
+  --foreground: 222 33% 95%;
+  --muted-foreground: 217 22% 73%;
+}
+.dym-admin-loader-content { display: flex; flex-direction: column; align-items: center; gap: 24px; max-width: 100%; }
+.dym-admin-loader-logo { width: 176px; max-width: 100%; height: auto; }
+.dym-admin-loader-status { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; line-height: 20px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.dym-admin-loader-status svg { width: 16px; height: 16px; flex-shrink: 0; }

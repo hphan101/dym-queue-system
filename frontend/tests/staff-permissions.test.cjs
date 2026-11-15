@@ -6,6 +6,37 @@ const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 const { PERMISSION_MODULES, PERMISSION_ACTIONS, getDefaultPermissions, parsePermissions, hasPermission } = require('./helpers/staff-permissions.cjs');
 
+test('new staff starts without a role or grants and cannot save until a role is chosen', async () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/accounts/StaffPage.tsx'), 'utf8');
+  const ast = ts.createSourceFile('StaffPage.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const declarations = new Map();
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) declarations.set(node.name.text, node);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  const code = ts.transpileModule(`const ${declarations.get('EMPTY_FORM').getText(ast)};
+    const ${declarations.get('saveStaff').getText(ast)};
+    const ${declarations.get('openEditForm').getText(ast)};
+    return { initial: EMPTY_FORM, saveStaff, openEditForm };`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  let error;
+  let edited;
+  const form = { displayName: 'Nhân viên', loginName: 'nhanvien', password: '123456', branchCodes: ['q1'], role: '' };
+  const handlers = new Function('getDefaultPermissions', 'form', 'setFormError', 'setForm', 'setIsFormOpen', code)(
+    getDefaultPermissions, form, (value) => { error = value; }, (value) => { edited = value; }, () => {},
+  );
+  assert.equal(handlers.initial.role, '');
+  assert.deepEqual(handlers.initial.permissions, getDefaultPermissions('none'));
+  await handlers.saveStaff({ preventDefault() {} });
+  assert.equal(error, 'Vui lòng chọn vai trò cho tài khoản.');
+  const account = { userId: 'existing', role: 'operator', permissions: getDefaultPermissions('operator'), branches: [{ code: 'hn' }] };
+  handlers.openEditForm(account);
+  assert.equal(edited.role, account.role);
+  assert.deepEqual(edited.permissions, account.permissions);
+});
+
 test('staff management authorizes each action independently of the role and rejects inactive actors', async () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../../supabase/functions/manage-staff/index.ts'), 'utf8');
   const ast = ts.createSourceFile('staff.ts', source, ts.ScriptTarget.Latest, true);
@@ -41,7 +72,7 @@ test('permissions preserve legacy defaults and accept explicit grants beyond the
 });
 
 test('matrix toggles, column selection and presets keep dependent view permissions consistent', () => {
-  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/components/StaffPermissionMatrix.tsx'), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/accounts/StaffPermissionMatrix.tsx'), 'utf8');
   const exports = {};
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const dependencies = { '@/components/ui/button': { Button: 'button' }, '@/lib/staffPermissions': require('./helpers/staff-permissions.cjs'), 'react/jsx-runtime': require('react/jsx-runtime') };
@@ -97,6 +128,7 @@ test('database matrix enforces grants, denied mutations and branch scope through
     assert.equal((await db.query(`select public.has_permission('staff','update') as allowed`)).rows[0].allowed, false);
     await assert.rejects(db.query(`insert into public.clinic_rooms(branch_code,room_name) values('q1','Denied room')`));
     await assert.rejects(db.query(`select * from public.get_dashboard_registrations('q1',current_date)`), /PERMISSION_DENIED/);
+    await assert.rejects(db.query(`select * from public.get_reception_trend(2024)`), /PERMISSION_DENIED/);
     await db.exec('reset role');
     await db.exec(`create function public.test_privileged_room_insert() returns void language plpgsql security definer set search_path='' as $$ begin insert into public.clinic_rooms(branch_code,room_name) values('q1','Bypass attempt'); end; $$;`);
     await db.exec('set role authenticated');
@@ -121,7 +153,30 @@ test('database matrix enforces grants, denied mutations and branch scope through
         assert.equal(actual, getDefaultPermissions(role)[key][action], `${role}.${key}.${action}`);
       }
     }
+    permissions.overview.view = true;
+    await db.query(`update public.profiles set permissions=$2::jsonb where user_id=$1`, [user, JSON.stringify(permissions)]);
+    await db.exec(`insert into public.registrations(branch_id,queue_date,queue_number,full_name,birth_date,gender,phone_number,identity_document,province,ward,address_detail,state,completed_at,cancelled_at)
+      select b.id,v.day::date,v.ticket,'Test patient','1990-01-01','Nam','0901234567','001090000001','Test','Test','Test address',v.state::public.registration_state,
+        case when v.state='completed' then now() end,case when v.state='cancelled' then now() end
+      from (values ('q1','2024-02-29',1,'active'),('q1','2024-02-29',2,'completed'),('q1','2024-02-29',3,'cancelled'),('q7','2024-02-29',1,'active'),('q1','2024-03-01',1,'active'),('q1','2023-02-28',1,'active')) v(branch,day,ticket,state)
+      join public.branches b on b.code=v.branch;`);
+    await db.exec('set role authenticated');
+    let trend = (await db.query(`select * from public.get_reception_trend(2024)`)).rows;
+    assert.deepEqual(trend.map((row) => [row.queue_date.toISOString().slice(0, 10), Number(row.total)]), [['2024-02-29', 2], ['2024-03-01', 1]]);
+    assert.deepEqual(Object.keys(trend[0]), ['queue_date', 'total']);
+    await assert.rejects(db.query(`select * from public.get_reception_trend(2024,'q7')`), /ACCESS_DENIED/);
+    await assert.rejects(db.query(`select * from public.get_reception_trend(null)`), /INVALID_YEAR/);
+    await db.exec('reset role');
+    await db.query(`insert into public.staff_branch_access(user_id,branch_id) select $1,id from public.branches where code='q7'`, [user]);
+    await db.exec('set role authenticated');
+    trend = (await db.query(`select * from public.get_reception_trend(2024)`)).rows;
+    assert.equal(Number(trend[0].total), 3);
+    await db.exec(`reset role; set role anon;`);
+    await assert.rejects(db.query(`select * from public.get_reception_trend(2024)`), /permission denied/);
+    await db.exec('reset role');
     await db.query(`update public.profiles set is_active=false where user_id=$1`, [user]);
     assert.equal((await db.query(`select public.has_permission('clinic') as allowed`)).rows[0].allowed, false);
+    await db.exec('set role authenticated');
+    await assert.rejects(db.query(`select * from public.get_reception_trend(2024)`), /PERMISSION_DENIED/);
   } finally { await db.close(); }
 });

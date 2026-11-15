@@ -6,7 +6,7 @@ const ts = require('typescript');
 const { PDFDocument } = require('pdf-lib');
 
 function load(file, mocks = {}) {
-  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration', file), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/printing', file), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {};
   new Function('exports', 'require', code)(exports, (name) => name in mocks ? mocks[name] : require(name));
@@ -49,6 +49,8 @@ test('mobile navigation reaches first, middle and last pages with correct bounda
     'react/jsx-runtime': require('react/jsx-runtime'),
     './pdfBrowser': { isMobilePdfViewer: () => true },
     './pdfPagePreview': {},
+    '@/components/ui/alert': { Alert: 'Alert', AlertDescription: 'AlertDescription' },
+    '@/components/ui/button': { Button: 'button' },
     '@/components/numbered-pagination': require('./helpers/numbered-pagination.cjs'),
   });
   let ready = 0;

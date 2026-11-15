@@ -19,30 +19,43 @@ Hướng dẫn triển khai Cloudflare Pages: [docs/cloudflare-pages.md](docs/cl
 
 ### Cấu trúc frontend
 
-Các trang quản trị dùng chung `features/admin/components/AdminLayout.tsx` cho
-sidebar, theme và vùng nội dung. `RosterShell` bổ sung tiêu đề và trạng thái riêng
-của điều phối. Các module điều phối nằm trong `frontend/src/features/admin/roster/`:
+Mã nguồn được gom theo chức năng. Xem [bản đồ codebase và quy tắc mở rộng](docs/architecture.md)
+để tìm đúng nơi sửa giao diện, API, phân quyền và in biểu mẫu.
 
 ```text
-roster/
-  clinic/       Lịch tuần, lịch ngày và phòng khám
-  onsite/       Đoàn khám, lịch đoàn, set-up và vị trí mẫu
-  dashboard/    Tổng quan vận hành và biểu đồ
-  personnel/    Danh mục nhân sự và hồ sơ đính kèm
-  settlement/   Quyết toán chi phí
-  shared/       Khung trang, phân công, kéo thả, dự phòng và xuất Excel
-  data/         Context, service Supabase và các kiểu dữ liệu
-  index.ts      Điểm nhập cho ứng dụng quản trị
+frontend/src/
+  app/                         Khởi tạo ứng dụng và phân giải URL
+  components/ui/               Component shadcn dùng chung
+  features/
+    auth/                      Đăng nhập và form đăng nhập
+    display/                   Màn hình chờ gọi số
+    admin/
+      AdminApplication.tsx     Kiểm tra phiên và quyền truy cập
+      shell/                   Layout, sidebar, header, breadcrumb, theme
+      shared/                  Phân quyền, danh tính, định dạng, thông báo chung
+      accounts/                Quản lý tài khoản, API, form và kiểu dữ liệu
+      reception/               Gọi số, hàng đợi, Realtime
+      registrations/           Danh sách tiếp nhận, chỉnh sửa, ghi chú, trạng thái in
+      roster/                  Điều phối: clinic, onsite, dashboard, personnel, settlement
+    registration/
+      access/                  QR và phiên đăng ký
+      flow/                    Các bước đăng ký của khách
+      form/                    Form TT25, ngày sinh, địa chỉ và kiểm tra CCCD
+      printing/                PDF, worker in hàng loạt, preview và metadata mẫu
+      tt25Types.ts             Dữ liệu TT25 dùng chung cho form và in
+      tt25Constants.ts         Các lựa chọn nghiệp vụ và bản dịch
+  lib/                         Supabase client, ngày tháng, điều hướng và Excel
 ```
 
-Đặt thành phần chỉ dùng bởi một trang vào thư mục chức năng của trang đó;
-chuyển sang `shared/` khi có nhiều chức năng cùng sử dụng. Các kiểu dữ liệu nằm
-trong `data/types.ts`; `rosterService.ts` giữ API truy cập dữ liệu và tiếp tục
-export các kiểu để tương thích với những nơi đang dùng.
+Đặt file chỉ dùng bởi một chức năng trong thư mục của chức năng đó. Đưa vào
+`shared/` hoặc `components/ui/` khi có nhiều chức năng thật sự cùng dùng.
+`accounts/types.ts` chứa kiểu tài khoản; `registrations/types.ts` chứa kiểu hồ sơ
+khách; `roster/data/types.ts` chứa kiểu điều phối. Các URL và đường dẫn mẫu trong
+`frontend/public/` giữ nguyên.
 
-Bộ kiểm thử nằm trong `frontend/tests/`. Helper `tests/helpers/roster-modules.cjs`
-định vị module và chuẩn hóa tên dependency giả lập khi thay đổi cấu trúc thư mục;
-TypeScript và Vite kiểm tra các đường dẫn import thực tế khi build.
+Bộ kiểm thử nằm trong `frontend/tests/`. Chạy `npm test`, `npm run lint` và
+`npm run build` từ thư mục gốc sau khi thay đổi. Các script chuẩn bị mẫu Word/PDF
+trong `scripts/` ghi metadata vào `registration/printing/`.
 
 ## Chạy local
 
@@ -151,6 +164,7 @@ Frontend được deploy từ thư mục `frontend/`. Edge Function và migratio
 ├─ frontend/
 │  ├─ public/
 │  └─ src/
+│     ├─ app/
 │     ├─ assets/
 │     ├─ config/
 │     ├─ features/
@@ -161,12 +175,14 @@ Frontend được deploy từ thư mục `frontend/`. Edge Function và migratio
 │     ├─ lib/
 │     ├─ styles/
 │     ├─ types/
-│     ├─ App.tsx
 │     └─ main.tsx
 └─ supabase/
    ├─ functions/
    │  ├─ _shared/
-   │  └─ register/
+   │  ├─ register/
+   │  ├─ registration-access/
+   │  ├─ manage-staff/
+   │  └─ login/
    └─ migrations/
 ```
 

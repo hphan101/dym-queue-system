@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,7 +9,7 @@ import {
   SelectGroup,
   SelectItem,
 } from '@/components/ui/select';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import { fetchHcChoices, groupHcSchedules } from './setupLinks';
 import type { RosterSchedule } from '../data/rosterService';
 
@@ -50,7 +51,7 @@ export function SetupTargetPicker({
     <fieldset className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3 sm:col-span-2">
       <legend className="px-1 text-sm font-medium">Thuộc đoàn khám</legend>
       {error ? (
-        <div role="alert" className="flex items-center gap-2">
+        <Alert variant="destructive"><AlertDescription className="flex items-center gap-2">
           <p className="text-sm text-destructive">{error}</p>
           <Button
             type="button"
@@ -60,7 +61,7 @@ export function SetupTargetPicker({
           >
             Thử lại
           </Button>
-        </div>
+        </AlertDescription></Alert>
       ) : (
         <>
           <Select

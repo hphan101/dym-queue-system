@@ -1,0 +1,171 @@
+/* Operational dashboard polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-personnel-content {
+  --background: 220 18% 97%;
+  --foreground: 222 32% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 32% 18%;
+  --muted: 220 18% 96%;
+  --muted-foreground: 219 14% 40%;
+  --border: 220 14% 87%;
+  --input: 220 14% 82%;
+  --primary: 227 50% 25%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 220 18% 96%;
+  --accent-foreground: 222 32% 18%;
+  --secondary: 220 18% 96%;
+  --secondary-foreground: 222 32% 18%;
+  --ring: 227 50% 25%;
+  --overview-warning-bg: #fff6e9;
+  --overview-warning-text: #8b510c;
+  --overview-success-bg: #edf7f0;
+  --overview-success-text: #18734c;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+.dark .dym-personnel-content {
+  --background: 220 25% 10%;
+  --foreground: 222 33% 95%;
+  --card: 220 28% 15%;
+  --card-foreground: 222 33% 95%;
+  --muted: 220 24% 19%;
+  --muted-foreground: 217 22% 73%;
+  --border: 219 21% 27%;
+  --input: 219 19% 35%;
+  --primary: 224 41% 34%;
+  --accent: 220 24% 19%;
+  --accent-foreground: 222 33% 95%;
+  --secondary: 220 24% 19%;
+  --secondary-foreground: 222 33% 95%;
+  --ring: 218 44% 72%;
+  --overview-warning-bg: #3c3020;
+  --overview-warning-text: #f2cd8e;
+  --overview-success-bg: #203a2e;
+  --overview-success-text: #a2dbb6;
+}
+
+.dym-personnel-content .dym-registry-panel { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; box-shadow: none; overflow: hidden; }
+.personnel-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:24px 24px 16px; }
+.personnel-panel-heading h2 { font-size:18px; line-height:28px; font-weight:500; margin:0; }
+.personnel-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:0 24px 20px; border-bottom:1px solid hsl(var(--border)); }
+.personnel-role-tabs { min-width:0; max-width:100%; overflow-x:auto; }
+.personnel-role-tabs [role="tablist"] { height:40px; gap:4px; padding:4px; background:hsl(var(--muted)); }
+.personnel-role-tabs [role="tab"] { gap:8px; height:32px; padding:0 12px; font-size:14px; font-weight:400; }
+.personnel-role-tabs [role="tab"][data-state="active"] { font-weight:500; background:hsl(var(--card)); color:hsl(var(--foreground)); }
+.personnel-tab-count { font-size:12px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
+.personnel-role-tabs .personnel-tab-count { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:16px; height:20px; font-size:14px; line-height:20px; font-weight:inherit; }
+.personnel-filter-controls { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+.personnel-inactive-filter { display:flex; align-items:center; gap:8px; min-height:40px; font-size:14px; line-height:20px; color:hsl(var(--foreground)); cursor:pointer; }
+.personnel-search { position:relative; width:280px; max-width:100%; }
+.personnel-search > svg { position:absolute; left:12px; top:12px; width:16px; height:16px; stroke-width:1.5; color:hsl(var(--muted-foreground)); pointer-events:none; }
+.personnel-search input { height:40px; padding:0 40px 0 36px; font-size:14px; background:hsl(var(--card)); }
+.personnel-search input::-webkit-search-cancel-button { display:none; }
+.personnel-search > button { position:absolute; right:4px; top:4px; width:32px; height:32px; }
+.personnel-header-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.personnel-header-actions .personnel-header-button { height:40px; gap:8px; padding:0 12px; font-size:14px; font-weight:500; box-shadow:none; }
+.personnel-header-actions svg { width:16px; height:16px; stroke-width:1.5; }
+.dym-personnel-content .personnel-empty { min-height:320px; padding:48px 24px; gap:24px; border:0; border-radius:0; }
+.personnel-empty [data-slot="empty-header"] { max-width:440px; gap:8px; }
+.personnel-empty [data-slot="empty-title"] { font-size:20px; line-height:28px; letter-spacing:0; font-weight:500; }
+.personnel-empty [data-slot="empty-description"] { font-size:14px; line-height:24px; }
+.personnel-empty button { height:40px; gap:8px; }
+.dym-personnel-content .dym-table-precision { min-width:1152px; background:hsl(var(--card)); }
+.dym-personnel-content .dym-table-precision th { padding:12px 16px; font-size:12px; font-weight:500; text-transform:none; letter-spacing:0; background:hsl(var(--muted)); color:hsl(var(--muted-foreground)); }
+.dym-personnel-content .dym-table-precision td { padding:16px; font-size:14px; border-color:hsl(var(--border)); }
+.dym-personnel-content .dym-table-precision tr { background:transparent; }
+.dym-personnel-content .dym-patient-name { font-size:14px; font-weight:500; text-transform:none; white-space:normal; overflow-wrap:anywhere; }
+.dym-personnel-content .dym-patient-block { min-width:200px; }
+.dym-personnel-content .dym-table-actions-group > button { min-height:36px; }
+.dym-personnel-content .dym-contact-phone { white-space:nowrap; font-size:14px; }
+.dym-personnel-content .dym-roster-code-badge { background:hsl(var(--muted)); color:hsl(var(--foreground)); border-color:hsl(var(--border)); font-size:12px; font-weight:500; }
+.dym-personnel-content .dym-pagination-bar { background:hsl(var(--card)); border-color:hsl(var(--border)); }
+@media (hover:hover) and (pointer:fine) { .dym-personnel-content .dym-table-precision tbody tr:hover { background:hsl(var(--muted)); } }
+@media (max-width:640px) {
+ .personnel-panel-heading { padding:20px 16px 16px; }
+ .personnel-toolbar { padding:0 16px 16px; }
+ .personnel-filter-controls, .personnel-search { width:100%; }
+ .personnel-search input { font-size:16px; }
+ .dym-personnel-content .personnel-empty { min-height:280px; padding:32px 20px; }
+}
+
+.dym-admin-header-bar:has(.personnel-header-actions) { background:var(--header-surface); }
+
+/* Personnel form polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+/* Operational dashboard polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.personnel-form-dialog {
+  --background: 220 18% 97%;
+  --foreground: 222 32% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 32% 18%;
+  --muted: 220 18% 96%;
+  --muted-foreground: 219 14% 40%;
+  --border: 220 14% 87%;
+  --input: 220 14% 82%;
+  --primary: 227 50% 25%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 220 18% 96%;
+  --accent-foreground: 222 32% 18%;
+  --secondary: 220 18% 96%;
+  --secondary-foreground: 222 32% 18%;
+  --ring: 227 50% 25%;
+  --overview-warning-bg: #fff6e9;
+  --overview-warning-text: #8b510c;
+  --overview-success-bg: #edf7f0;
+  --overview-success-text: #18734c;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+.dark .personnel-form-dialog {
+  --background: 220 25% 10%;
+  --foreground: 222 33% 95%;
+  --card: 220 28% 15%;
+  --card-foreground: 222 33% 95%;
+  --muted: 220 24% 19%;
+  --muted-foreground: 217 22% 73%;
+  --border: 219 21% 27%;
+  --input: 219 19% 35%;
+  --primary: 224 41% 34%;
+  --accent: 220 24% 19%;
+  --accent-foreground: 222 33% 95%;
+  --secondary: 220 24% 19%;
+  --secondary-foreground: 222 33% 95%;
+  --ring: 218 44% 72%;
+  --overview-warning-bg: #3c3020;
+  --overview-warning-text: #f2cd8e;
+  --overview-success-bg: #203a2e;
+  --overview-success-text: #a2dbb6;
+}
+
+
+.personnel-form-dialog { background:hsl(var(--card)); color:hsl(var(--foreground)); border-color:hsl(var(--border)); border-radius:16px; }
+.personnel-form-header { flex-shrink:0; padding:24px; gap:8px; text-align:left; border-bottom:1px solid hsl(var(--border)); }
+.personnel-form-header h2 { font-size:20px; line-height:28px; font-weight:500; letter-spacing:0; }
+.personnel-form-header p { font-size:14px; line-height:24px; }
+.personnel-form { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.personnel-form-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:24px; }
+.personnel-form-body > [data-slot="alert"] { margin-bottom:16px; }
+.personnel-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 16px; }
+.personnel-form-grid > [data-slot="field"] { min-width:0; gap:8px; }
+.personnel-form-dialog [data-slot="field-label"], .personnel-form-dialog [data-slot="field-legend"] { font-size:14px; line-height:20px; font-weight:500; }
+.personnel-form-dialog :is(input,[role="combobox"]) { height:40px; font-family:inherit; font-size:14px; font-weight:400; border-radius:8px; background:hsl(var(--card)); border-color:hsl(var(--input)); color:hsl(var(--foreground)); }
+.personnel-form-dialog [data-slot="field-description"] { font-size:12px; line-height:20px; }
+.personnel-specialties { gap:12px; margin:0; padding:0; border:0; }
+.personnel-specialties > legend { margin-bottom:12px; }
+.personnel-specialty-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.personnel-specialty { min-width:0; gap:8px; padding:8px 12px; border:1px solid hsl(var(--border)); border-radius:8px; }
+.personnel-specialty:has([data-state="checked"]) { background:hsl(var(--muted)); border-color:hsl(var(--input)); }
+.personnel-specialty [data-slot="field-label"] { flex:1; min-width:0; min-height:24px; align-items:center; cursor:pointer; font-weight:400; }
+.personnel-specialty:focus-within { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
+.personnel-form-footer { flex-shrink:0; display:flex; flex-direction:row; justify-content:flex-end; gap:8px; padding:16px 24px; border-top:1px solid hsl(var(--border)); }
+.personnel-form-footer button { height:40px; padding-inline:20px; font-size:14px; font-weight:500; box-shadow:none; }
+@media (max-width:639px) {
+ .personnel-form-header { padding:20px; }
+ .personnel-form-body { padding:20px; }
+ .personnel-form-grid { grid-template-columns:minmax(0,1fr); }
+ .personnel-specialty-grid { grid-template-columns:minmax(0,1fr); }
+ .personnel-form-footer { padding:16px 20px; }
+ .personnel-form-dialog :is(input,[role="combobox"]) { font-size:16px; }
+}

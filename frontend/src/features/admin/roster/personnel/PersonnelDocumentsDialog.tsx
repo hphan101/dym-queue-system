@@ -1,6 +1,7 @@
-import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import { useEffect, useId, useState } from 'react';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import {
   Dialog,
   DialogContent,
@@ -179,14 +180,14 @@ export function PersonnelDocumentsDialog({
           cập.
         </p>
         {error && (
-          <p role="alert" className="break-words text-sm text-destructive">
+          <Alert variant="destructive"><AlertDescription className="break-words">
             {error}
-          </p>
+          </AlertDescription></Alert>
         )}
         {message && (
-          <p role="status" className="text-sm text-foreground">
+          <Alert variant="success" role="status" aria-live="polite"><AlertDescription>
             {message}
-          </p>
+          </AlertDescription></Alert>
         )}
         {pendingDelete && (
           <div

@@ -13,41 +13,6 @@ function load(file, imports = {}, globals = {}) {
   return exports;
 }
 
-test('sidebar disclosure animates only opacity and transform on opening and skips keyboard/reduced motion', () => {
-  const refs = [], animations = [];
-  let cursor = 0, effect, height = 144, opacity = '1', reduce = false, cancelled = 0;
-  const react = { useRef(value) { return refs[cursor++] ??= { current: value }; }, useLayoutEffect(fn) { effect = fn; } };
-  const view = { matchMedia: () => ({ matches: reduce }), getComputedStyle: () => ({ opacity, getPropertyValue: () => 'cubic-bezier(0.23, 1, 0.32, 1)' }) };
-  const panel = { ownerDocument: { defaultView: view }, scrollHeight: 144, getBoundingClientRect: () => ({ height }), animate(frames, options) {
-    animations.push({ frames, options }); return { cancel: () => cancelled++ };
-  } };
-  const { useSidebarDisclosureMotion } = load('features/admin/hooks/useSidebarDisclosureMotion.ts', { react });
-  function render(open) { cursor = 0; return useSidebarDisclosureMotion(open); }
-  let hook = render(true);
-  hook.panelRef.current = panel;
-  assert.equal(effect(), undefined);
-  hook.prepare(1);
-  hook = render(false);
-  const cleanup = effect();
-  assert.equal(cleanup, undefined);
-  assert.equal(animations.length, 0);
-  height = 60; opacity = '0.4';
-  hook.prepare(1);
-  hook = render(true);
-  const stop = effect();
-  assert.deepEqual(animations[0].frames, [
-    { opacity: 0, transform: 'translateY(-4px)' },
-    { opacity: 1, transform: 'translateY(0)' },
-  ]);
-  assert.equal(animations[0].options.duration, 180);
-  stop();
-  assert.equal(cancelled, 1);
-  hook.prepare(0); render(false); assert.equal(effect(), undefined);
-  reduce = true;
-  hook.prepare(1); render(true); assert.equal(effect(), undefined);
-  assert.equal(animations.length, 1);
-});
-
 test('sidebar navigation opts into motion only for plain pointer clicks and retains native modified links', () => {
   const dataset = {}, calls = [];
   const location = { origin: 'https://clinic.invalid', href: 'https://clinic.invalid/?page=admin' };
@@ -64,19 +29,65 @@ test('sidebar navigation opts into motion only for plain pointer clicks and reta
   assert.equal(calls.length, 4);
 });
 
-test('closed sidebar menus are inert and hidden from assistive technology while their exit animation runs', () => {
+test('sidebar uses flat task links in the same order when expanded or collapsed and filters by permission', () => {
   const symbols = new Proxy({}, { get: (_, key) => String(key) });
-  const source = fs.readFileSync(path.join(root, 'features/admin/AdminSidebar.tsx'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'features/admin/shell/AdminSidebar.tsx'), 'utf8');
   const imports = Object.fromEntries([...source.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => [match[1], symbols]));
-  imports.react = { useState: () => [false, () => {}] };
-  imports['./hooks/useStaffPermissions'] = { useStaffPermissions: () => ({ can: () => true }), DESTINATION_PERMISSIONS: new Proxy({}, { get: () => 'clinic' }) };
+  let allowed = null;
+  const destinations = { 'roster-dashboard': 'overview', 'roster-insite': 'clinic', 'roster-onsite': 'onsite', 'roster-personnel': 'personnel', 'roster-settlement': 'settlement' };
+  imports['../shared/useStaffPermissions'] = { useStaffPermissions: () => ({ can: (key) => !allowed || allowed.includes(key) }), DESTINATION_PERMISSIONS: destinations };
+  imports.react = { useRef: () => ({ current: null }), useLayoutEffect() {} };
   imports['react/jsx-runtime'] = require('react/jsx-runtime');
-  imports['./hooks/useSidebarDisclosureMotion'] = { useSidebarDisclosureMotion: () => ({ panelRef: { current: null }, prepare() {} }) };
-  const { AdminSidebar } = load('features/admin/AdminSidebar.tsx', imports);
-  const tree = AdminSidebar({ activePage: 'roster-dashboard', branch: 'q1', staffName: 'Admin', isAdmin: true, themeMode: 'light', isCollapsed: false });
+  const { AdminSidebar } = load('features/admin/shell/AdminSidebar.tsx', imports);
   function elements(node) { if (!node || typeof node !== 'object') return []; if (Array.isArray(node)) return node.flatMap(elements); return [node, ...elements(node.props?.children)]; }
-  const panel = elements(tree).find((node) => node.props?.inert === true);
-  assert.equal(panel.props['aria-hidden'], true);
-  assert.equal(panel.props.style.height, 0);
-  assert.equal(panel.props.style.overflow, 'hidden');
+  function render(isCollapsed) {
+    return elements(AdminSidebar({ activePage: 'roster-dashboard', branch: 'q1', date: '2026-11-15', staffName: 'Admin', isAdmin: true, themeMode: 'light', isCollapsed }));
+  }
+  for (const collapsed of [false, true]) {
+    const nodes = render(collapsed);
+    const links = nodes.filter((node) => node.type === 'a' && node.props.href.includes('page=roster-'));
+    assert.deepEqual(links.map((link) => new URL(link.props.href, 'https://clinic.invalid').searchParams.get('page')), Object.keys(destinations));
+    assert.equal(links[0].props['aria-current'], 'page');
+    assert.ok(links.every((link) => link.props.onClick));
+    assert.ok(!nodes.some((node) => node.props?.['aria-controls'] === 'dym-sidebar-roster-panel'));
+    assert.ok(!nodes.some((node) => node.type === 'SidebarMenuSub'));
+  }
+  allowed = ['clinic', 'personnel'];
+  const links = render(false).filter((node) => node.type === 'a' && node.props.href.includes('page=roster-'));
+  assert.deepEqual(links.map((link) => new URL(link.props.href, 'https://clinic.invalid').searchParams.get('page')), ['roster-insite', 'roster-personnel']);
+});
+
+test('active sidebar item is fully revealed on entry and resize without scrolling when already visible', () => {
+  const source = fs.readFileSync(path.join(root, 'features/admin/shell/AdminSidebar.tsx'), 'utf8');
+  const ast = ts.createSourceFile('sidebar.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let callback;
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(ast) === 'useLayoutEffect') callback = node.arguments[0].getText(ast);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.ok(callback);
+  let top = 180, bottom = 216, resize, observed, disconnected = false;
+  const content = { clientHeight: 100, scrollTop: 0,
+    getBoundingClientRect: () => ({ top: 100, bottom: 200 }),
+    querySelector: () => ({ getBoundingClientRect: () => ({ top, bottom }) }) };
+  class Observer {
+    constructor(fn) { resize = fn; }
+    observe(node) { observed = node; }
+    disconnect() { disconnected = true; }
+  }
+  const code = ts.transpileModule(`exports.run = ${callback}`, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const result = {};
+  new Function('exports', 'contentRef', 'ResizeObserver', code)(result, { current: content }, Observer);
+  const cleanup = result.run();
+  assert.equal(content.scrollTop, 24);
+  assert.equal(observed, content);
+  top = 120; bottom = 156;
+  resize();
+  assert.equal(content.scrollTop, 24);
+  top = 90; bottom = 126;
+  resize();
+  assert.equal(content.scrollTop, 6);
+  cleanup();
+  assert.equal(disconnected, true);
 });

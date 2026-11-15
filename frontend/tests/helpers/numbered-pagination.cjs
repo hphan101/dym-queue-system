@@ -9,6 +9,7 @@ const dependencies = {
   'react/jsx-runtime': require('react/jsx-runtime'),
   'lucide-react': { ChevronLeft: 'svg', ChevronRight: 'svg' },
   '@/components/ui/button': { Button: 'button' },
+  '@/components/ui/select': Object.fromEntries(['Select', 'SelectContent', 'SelectGroup', 'SelectItem', 'SelectTrigger', 'SelectValue'].map((name) => [name, name])),
   './numbered-pagination.css': {},
 };
 new Function('exports', 'require', code)(module.exports, (name) => {

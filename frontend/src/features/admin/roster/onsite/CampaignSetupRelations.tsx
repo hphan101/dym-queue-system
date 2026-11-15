@@ -1,6 +1,7 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { formatDisplayDate } from '../../utils/adminFormatters';
+import { formatDisplayDate } from '../../shared/adminFormatters';
 import {
   fetchCampaignRelations,
   type SetupRelationCampaign,
@@ -55,7 +56,7 @@ export function CampaignSetupRelations({
           : 'Lịch set-up của đợt khám'}
       </h3>
       {error?.key === key ? (
-        <div className="flex items-center gap-2" role="alert">
+        <Alert variant="destructive"><AlertDescription className="flex items-center gap-2">
           <p className="text-sm text-destructive">{error.message}</p>
           <Button
             type="button"
@@ -65,7 +66,7 @@ export function CampaignSetupRelations({
           >
             Thử lại
           </Button>
-        </div>
+        </AlertDescription></Alert>
       ) : rows ? (
         rows.length ? (
           <div className="flex flex-wrap gap-2">

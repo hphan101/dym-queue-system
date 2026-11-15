@@ -6,7 +6,7 @@ const path = require('node:path');
 const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 const root = path.resolve(__dirname, '../..');
-const directory = path.join(root, 'frontend/src/features/admin/roster');
+
 function load(file, imports = {}) {
   const result = {};
   const code = ts.transpileModule(fs.readFileSync(rosterPath(file), 'utf8'), {

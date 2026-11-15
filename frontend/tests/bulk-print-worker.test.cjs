@@ -11,7 +11,7 @@ function loadClient() {
     postMessage(request) { this.request = request; }
     terminate() { this.terminated++; }
   }
-  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/bulkPrintPdf.ts'), 'utf8')
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/features/registration/printing/bulkPrintPdf.ts'), 'utf8')
     .replace('import.meta.url', JSON.stringify('https://example.test/bulkPrintPdf.ts'));
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const api = {};

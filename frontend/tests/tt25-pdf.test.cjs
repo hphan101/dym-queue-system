@@ -6,7 +6,7 @@ const ts = require('typescript');
 const { PDFDocument, PDFPage } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const frontend = path.resolve(__dirname, '..');
-const layout = require('../src/features/registration/tt25TemplateFields.json');
+const layout = require('../src/features/registration/printing/tt25TemplateFields.json');
 function execute(file, dependencies, fetchAsset) {
   const code = ts.transpileModule(fs.readFileSync(path.join(frontend, file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
@@ -20,12 +20,12 @@ function execute(file, dependencies, fetchAsset) {
 }
 function loadService() {
   const date = { ...execute('src/lib/date.ts', {}), getTodayInVietnam: () => '2026-11-02' };
-  const drawing = execute('src/features/registration/pdfDrawing.ts', { 'pdf-lib': require('pdf-lib') });
+  const drawing = execute('src/features/registration/printing/pdfDrawing.ts', { 'pdf-lib': require('pdf-lib') });
   const types = execute('src/features/registration/tt25Types.ts', {});
-  return execute('src/features/registration/tt25HcmPdfService.ts', {
-    'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit, '../../lib/date': date,
-    './pdfDrawing': drawing, './tt25Types': types, './tt25TemplateFields.json': layout,
-    './tt25Constants': execute('src/features/registration/tt25Constants.ts', {}),
+  return execute('src/features/registration/printing/tt25HcmPdfService.ts', {
+    'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit, '../../../lib/date': date,
+    './pdfDrawing': drawing, '../tt25Types': types, './tt25TemplateFields.json': layout,
+    '../tt25Constants': execute('src/features/registration/tt25Constants.ts', {}),
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
   }, async (url) => {
     const bytes = fs.readFileSync(path.join(frontend, 'public', url.split('?')[0]));
@@ -133,7 +133,7 @@ test('Hanoi templates fill all history answers and keep only WP duplex padding',
 });
 test('mixed TT25 bulk printing preserves the configured template lengths', async () => {
   const service = loadService();
-  const bulk = execute('src/features/registration/bulkPrintPdfDocument.ts', {
+  const bulk = execute('src/features/registration/printing/bulkPrintPdfDocument.ts', {
     'pdf-lib': require('pdf-lib'), './tt25HcmPdfService': service,
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
     './consentPdfService': { generateConsentPdf: () => { throw new Error('Consent is not selected'); } },

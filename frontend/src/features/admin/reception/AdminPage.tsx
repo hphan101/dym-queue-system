@@ -1,0 +1,644 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
+import { AdminLayout } from '../shell/AdminLayout';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { BRANCH_NAMES } from '../../../config/branches';
+import { getTodayInVietnam } from '../../../lib/date';
+import { formatQueueNumber } from '../../../lib/queueNumber';
+import { supabase } from '../../../lib/supabaseClient';
+import type { BranchCode } from '../../../types/domain';
+
+import {
+  REALTIME_REGISTRATION_COLUMNS,
+  type RealtimeConnectionState,
+} from './queueConstants';
+
+import '../shell/admin.css';
+import '../shared/reception.css';
+
+import { useStaffIdentity } from '../shared/useStaffIdentity';
+import { useDashboardQueueQuery } from './useDashboardQueueQuery';
+import { useAdminScope } from '../shared/useAdminScope';
+import { useQueryClient } from '@tanstack/react-query';
+import { normalizeSearch } from '../shared/adminFormatters';
+import { playNotificationChime } from './audioNotification';
+
+import { AdminHeader } from '../shell/AdminHeader';
+import {
+  CustomerNoticeModal,
+  type CustomerNotificationItem,
+} from '../shared/CustomerNoticeModal';
+import { QueueMetrics, type QueueStatus } from './QueueMetrics';
+import { QueueTable, type RegistrationRow } from './QueueTable';
+import { RealtimeConnectionAlert } from '../shared/RealtimeConnectionAlert';
+
+type PendingQueueAction = 'next' | 'recall' | null;
+
+interface QueueActionResult {
+  registration_id: string;
+  queue_number: string;
+  called_at: string;
+  revision: number;
+}
+
+interface UndoQueueResult {
+  registration_id: string;
+  queue_number: string;
+  display_cleared: boolean;
+}
+
+const CUSTOMER_NOTIFICATION_DURATION_MS = 8_000;
+const REALTIME_REFETCH_DEBOUNCE_MS = 700;
+
+export function AdminPage({
+  authorizedIsAdmin,
+  isActiveTab = true,
+}: {
+  authorizedIsAdmin: boolean;
+  isActiveTab?: boolean;
+}) {
+  const { can } = useStaffPermissions();
+  const queryClient = useQueryClient();
+
+  const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
+    useStaffIdentity();
+  const { branch, setBranch, date, setDate } = useAdminScope();
+
+  const [rows, setRows] = useState<RegistrationRow[]>([]);
+  const [query, setQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [statusFilter, setStatusFilter] = useState<QueueStatus | 'all'>('all');
+  const [currentQueue, setCurrentQueue] = useState('—');
+  const [currentPatient, setCurrentPatient] = useState('Chưa gọi số');
+  const [pendingQueueAction, setPendingQueueAction] =
+    useState<PendingQueueAction>(null);
+  const [pendingUndoId, setPendingUndoId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState(
+    'Chưa có số đang được gọi tại chi nhánh này.',
+  );
+  const [connectionState, setConnectionState] =
+    useState<RealtimeConnectionState>(
+      navigator.onLine ? 'connected' : 'offline',
+    );
+  const [customerNotification, setCustomerNotification] =
+    useState<CustomerNotificationItem | null>(null);
+  const [isNotificationSoundEnabled, setIsNotificationSoundEnabled] =
+    useState(false);
+
+  const notificationTimer = useRef<number | null>(null);
+  const realtimeRefetchTimer = useRef<number | null>(null);
+  const hasPendingRealtimeRefetch = useRef(false);
+  const notificationSoundEnabledRef = useRef(false);
+  const isActiveTabRef = useRef(isActiveTab);
+  isActiveTabRef.current = isActiveTab;
+
+  const branchId = branchIds[branch];
+  const isMutating = pendingQueueAction !== null || pendingUndoId !== null;
+
+  const {
+    data: dashboardData,
+    isPending: isQueryPending,
+    isFetching: isQueryFetching,
+    error: queryError,
+    refetch: refetchDashboard,
+  } = useDashboardQueueQuery({
+    branch,
+    branchId,
+    date,
+  });
+
+  const [syncedDashboardData, setSyncedDashboardData] =
+    useState<typeof dashboardData>(undefined);
+  if (dashboardData !== syncedDashboardData) {
+    setSyncedDashboardData(dashboardData);
+    if (dashboardData) {
+      setRows(dashboardData.rows);
+      setCurrentQueue(dashboardData.activeQueue);
+      setCurrentPatient(dashboardData.activePatient);
+      setAnnouncement(dashboardData.announcement);
+    }
+  }
+
+  const hasAvailableBranches = Object.keys(branchIds).length > 0;
+  const isWaitingForBranchSync = hasAvailableBranches && !branchId;
+  const isDataLoading =
+    isLoadingIdentity ||
+    isWaitingForBranchSync ||
+    (Boolean(branchId) &&
+      !identityError &&
+      !queryError &&
+      (isQueryPending || (isQueryFetching && !dashboardData)));
+
+  const dataError =
+    actionError || (queryError ? 'Không thể tải dữ liệu từ máy chủ.' : null);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timer = window.setTimeout(() => {
+      setActionError(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [actionError]);
+
+  useEffect(() => {
+    if (!isActiveTab) return;
+    document.title = 'Tiếp nhận | DYM Medical Center';
+    if (hasPendingRealtimeRefetch.current) {
+      hasPendingRealtimeRefetch.current = false;
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
+    }
+  }, [branch, date, isActiveTab, queryClient]);
+
+  // Sync branch selection if initial branch is not in allowed list
+  useEffect(() => {
+    const availableCodes = Object.keys(branchIds) as BranchCode[];
+    if (availableCodes.length > 0 && !branchIds[branch]) {
+      setBranch(availableCodes[0]);
+    }
+  }, [branchIds, branch, setBranch]);
+
+  const showCustomerNotification = useCallback(
+    (record: { id?: string; queue_number?: number; full_name?: string }) => {
+      if (!record.id || !record.queue_number || !record.full_name) return;
+
+      if (notificationTimer.current !== null) {
+        window.clearTimeout(notificationTimer.current);
+      }
+
+      setCustomerNotification({
+        id: record.id,
+        queueNumber: formatQueueNumber(record.queue_number),
+        fullName: record.full_name,
+      });
+
+      notificationTimer.current = window.setTimeout(() => {
+        notificationTimer.current = null;
+        setCustomerNotification(null);
+      }, CUSTOMER_NOTIFICATION_DURATION_MS);
+
+      if (notificationSoundEnabledRef.current) {
+        void playNotificationChime(0.1);
+      }
+    },
+    [],
+  );
+
+  const toggleNotificationSound = async () => {
+    const nextEnabled = !notificationSoundEnabledRef.current;
+    notificationSoundEnabledRef.current = nextEnabled;
+    setIsNotificationSoundEnabled(nextEnabled);
+
+    if (nextEnabled) {
+      void playNotificationChime(0.1);
+    }
+  };
+
+  useEffect(() => {
+    const handleOffline = () => setConnectionState('offline');
+    const handleOnline = () => {
+      setConnectionState('connecting');
+      void refetchDashboard();
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [refetchDashboard]);
+
+  useEffect(() => {
+    if (!branchId) return;
+
+    let isCurrentChannel = true;
+    if (!navigator.onLine) {
+      setConnectionState('offline');
+    }
+
+    const scheduleDashboardInvalidation = () => {
+      if (!isActiveTabRef.current) {
+        hasPendingRealtimeRefetch.current = true;
+        return;
+      }
+      if (realtimeRefetchTimer.current !== null) return;
+      realtimeRefetchTimer.current = window.setTimeout(() => {
+        realtimeRefetchTimer.current = null;
+        void queryClient.invalidateQueries({
+          queryKey: ['dashboardQueue', branch, date],
+        });
+      }, REALTIME_REFETCH_DEBOUNCE_MS);
+    };
+
+    const channel = supabase
+      .channel(`admin:${branchId}:${date}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'registrations',
+          filter: `branch_id=eq.${branchId}`,
+          select: REALTIME_REGISTRATION_COLUMNS,
+        },
+        (payload) => {
+          if (
+            isActiveTabRef.current &&
+            payload.eventType === 'INSERT' &&
+            String(payload.new.queue_date ?? '') === date
+          ) {
+            showCustomerNotification(payload.new);
+          }
+          scheduleDashboardInvalidation();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'branch_display_state',
+          filter: `branch_id=eq.${branchId}`,
+        },
+        () => {
+          if (!isActiveTabRef.current) {
+            hasPendingRealtimeRefetch.current = true;
+            return;
+          }
+          void queryClient.invalidateQueries({
+            queryKey: ['dashboardQueue', branch, date],
+          });
+        },
+      )
+      .subscribe((status) => {
+        if (!isCurrentChannel) return;
+
+        if (status === 'SUBSCRIBED') {
+          setConnectionState('connected');
+          return;
+        }
+
+        if (
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT' ||
+          status === 'CLOSED'
+        ) {
+          setConnectionState(navigator.onLine ? 'disconnected' : 'offline');
+          if (navigator.onLine) {
+            void refetchDashboard();
+          }
+        }
+      });
+
+    return () => {
+      isCurrentChannel = false;
+      if (notificationTimer.current !== null) {
+        window.clearTimeout(notificationTimer.current);
+      }
+      if (realtimeRefetchTimer.current !== null) {
+        window.clearTimeout(realtimeRefetchTimer.current);
+        realtimeRefetchTimer.current = null;
+      }
+      void channel.unsubscribe();
+    };
+  }, [
+    branch,
+    branchId,
+    date,
+    queryClient,
+    refetchDashboard,
+    showCustomerNotification,
+  ]);
+
+  const rowsForDay = useMemo(
+    () => rows.filter((row) => row.branch === branch && row.date === date),
+    [branch, date, rows],
+  );
+
+  const counts = useMemo(
+    () =>
+      rowsForDay.reduce<Record<QueueStatus, number>>(
+        (accumulator, row) => {
+          accumulator[row.status] += 1;
+          return accumulator;
+        },
+        { waiting: 0, called: 0 },
+      ),
+    [rowsForDay],
+  );
+
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = normalizeSearch(query);
+    if (!normalizedQuery) return rowsForDay;
+
+    return rowsForDay.filter((row) =>
+      normalizeSearch(
+        [
+          row.queueNumber,
+          row.fullName,
+          row.birthDate,
+          row.gender,
+          row.phone,
+          row.companyName,
+        ].join(' '),
+      ).includes(normalizedQuery),
+    );
+  }, [query, rowsForDay]);
+
+  const rowsForStatus = useMemo(() => statusFilter === 'all' ? filteredRows : filteredRows.filter((row) => row.status === statusFilter), [filteredRows, statusFilter]);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(rowsForStatus.length / pageSize),
+  );
+  const visiblePage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (visiblePage - 1) * pageSize;
+  const paginatedRows = useMemo(
+    () =>
+      rowsForStatus.slice(pageStartIndex, pageStartIndex + pageSize),
+    [rowsForStatus, pageStartIndex, pageSize],
+  );
+  const firstVisibleRow = rowsForStatus.length === 0 ? 0 : pageStartIndex + 1;
+  const lastVisibleRow = Math.min(
+    pageStartIndex + pageSize,
+    rowsForStatus.length,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [branch, date, query, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const callNext = async () => {
+    if (isMutating || !can('reception', 'update')) return;
+
+    setPendingQueueAction('next');
+    setActionError(null);
+    const { data, error } = await supabase.rpc('call_next_queue', {
+      p_branch_code: branch,
+    });
+
+    const result = (Array.isArray(data) ? data[0] : data) as
+      QueueActionResult | undefined;
+
+    if (error) {
+      setActionError('Không thể gọi số tiếp theo.');
+    } else if (!result) {
+      setAnnouncement('Không còn khách trong hàng chờ để gọi.');
+    } else {
+      const patient = rowsForDay.find(
+        (row) => row.id === result.registration_id,
+      );
+      const nextQueueNumber = formatQueueNumber(result.queue_number);
+      setCurrentQueue(nextQueueNumber);
+      setCurrentPatient(patient?.fullName ?? 'Khách đang được gọi');
+      setAnnouncement(
+        `Đã gọi số ${nextQueueNumber}${patient ? ` — ${patient.fullName}` : ''}.`,
+      );
+      setRows((currentRows) =>
+        currentRows.map((row) =>
+          row.id === result.registration_id
+            ? { ...row, status: 'called' }
+            : row,
+        ),
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
+    }
+    setPendingQueueAction(null);
+  };
+
+  const recallCurrent = async () => {
+    if (isMutating || !can('reception', 'update')) return;
+
+    setPendingQueueAction('recall');
+    setActionError(null);
+    const { data, error } = await supabase.rpc('recall_current_queue', {
+      p_branch_code: branch,
+    });
+    const result = (Array.isArray(data) ? data[0] : data) as
+      QueueActionResult | undefined;
+
+    if (error) {
+      setActionError('Không thể gọi lại số hiện tại.');
+    } else if (!result) {
+      setAnnouncement('Chưa có số để gọi lại.');
+    } else {
+      const nextQueueNumber = formatQueueNumber(result.queue_number);
+      setCurrentQueue(nextQueueNumber);
+      setAnnouncement(`Đã gọi lại số ${nextQueueNumber} — ${currentPatient}.`);
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
+    }
+    setPendingQueueAction(null);
+  };
+
+  const returnToWaiting = async (row: RegistrationRow) => {
+    if (isMutating || row.status !== 'called') return;
+
+    setPendingUndoId(row.id);
+    setActionError(null);
+
+    const { data, error } = await supabase.rpc(
+      'return_called_queue_to_waiting',
+      {
+        p_branch_code: branch,
+        p_registration_id: row.id,
+      },
+    );
+    const result = (Array.isArray(data) ? data[0] : data) as
+      UndoQueueResult | undefined;
+
+    if (error) {
+      if (error.message.includes('ALREADY_WAITING')) {
+        setAnnouncement(`Số ${row.queueNumber} đã ở trạng thái Chờ gọi.`);
+        void queryClient.invalidateQueries({
+          queryKey: ['dashboardQueue', branch, date],
+        });
+      } else if (error.message.includes('ONLY_TODAY_ALLOWED')) {
+        setActionError('Chỉ có thể hoàn tác lượt gọi trong ngày hiện tại.');
+      } else {
+        setActionError(`Không thể đưa số ${row.queueNumber} về Chờ gọi.`);
+      }
+    } else if (result) {
+      setRows((currentRows) =>
+        currentRows.map((currentRow) =>
+          currentRow.id === result.registration_id
+            ? { ...currentRow, status: 'waiting' }
+            : currentRow,
+        ),
+      );
+
+      if (result.display_cleared) {
+        setCurrentQueue('—');
+        setCurrentPatient('Chưa gọi số');
+        setAnnouncement('Đã xóa số đang hiển thị tại màn hình chờ.');
+      } else {
+        setAnnouncement(`Đã đưa số ${row.queueNumber} về Chờ gọi.`);
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboardQueue', branch, date],
+      });
+    }
+
+    setPendingUndoId(null);
+  };
+
+  const callNextRef = useRef(callNext);
+  const recallCurrentRef = useRef(recallCurrent);
+  useEffect(() => {
+    callNextRef.current = callNext;
+    recallCurrentRef.current = recallCurrent;
+  });
+
+  useEffect(() => {
+    if (!isActiveTab) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const activeTag = (event.target as HTMLElement)?.tagName?.toLowerCase();
+      const isInput =
+        activeTag === 'input' ||
+        activeTag === 'textarea' ||
+        activeTag === 'select' ||
+        (event.target as HTMLElement)?.isContentEditable;
+
+      // Focus search on '/'
+      if (event.key === '/' && !isInput) {
+        event.preventDefault();
+        const searchInput =
+          document.querySelector<HTMLInputElement>('.dym-search-field');
+        searchInput?.focus();
+        return;
+      }
+
+      // Space for Call Next
+      if (event.code === 'Space' && !isInput) {
+        event.preventDefault();
+        if (!isMutating && counts.waiting > 0) {
+          void callNextRef.current();
+        }
+        return;
+      }
+
+      // Alt + R for Recall
+      if (event.altKey && (event.key === 'r' || event.key === 'R')) {
+        event.preventDefault();
+        if (!isMutating && currentQueue !== '—') {
+          void recallCurrentRef.current();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActiveTab, counts.waiting, currentQueue, isMutating]);
+
+  const handleBranchChange = (nextBranch: BranchCode) => {
+    setBranch(nextBranch);
+    setQuery('');
+  };
+
+  const handleDateChange = (nextDate: string) => {
+    setDate(nextDate);
+    setQuery('');
+  };
+
+  const branchOptions = useMemo(
+    () =>
+      (Object.keys(branchIds) as BranchCode[]).map((code) => ({
+        value: code,
+        label: BRANCH_NAMES[code],
+      })),
+    [branchIds],
+  );
+
+  return (
+    <AdminLayout
+      activePage="dashboard"
+      branch={branch}
+      date={date}
+      staffName={staffName}
+      isAdmin={authorizedIsAdmin}
+      staffRole={authorizedIsAdmin ? 'admin' : staffRole}
+    >
+      <AdminHeader
+        registrationHref={
+          !isLoadingIdentity &&
+          can('registrations', 'create')
+            ? `/?branch=${branch}&staff=1`
+            : undefined
+        }
+        branch={branch}
+        branchOptions={branchOptions}
+        onBranchChange={handleBranchChange}
+        date={date}
+        onDateChange={handleDateChange}
+        isNotificationSoundEnabled={isNotificationSoundEnabled}
+        onToggleNotificationSound={() => void toggleNotificationSound()}
+      />
+
+      <CustomerNoticeModal
+        notification={customerNotification}
+        onClose={() => setCustomerNotification(null)}
+      />
+
+      <main id="overview" className="dym-admin-content dym-reception-page">
+        <RealtimeConnectionAlert state={connectionState} />
+        {(dataError || identityError) && (
+          <Alert variant="destructive" className="mb-4" aria-live="polite"><AlertDescription>
+            {dataError || identityError}
+          </AlertDescription></Alert>
+        )}
+
+        <QueueMetrics
+          currentQueue={currentQueue}
+          currentPatient={currentPatient}
+          branchName={BRANCH_NAMES[branch]}
+          announcement={announcement}
+          isMutating={isMutating || !can('reception', 'update')}
+          isDataLoading={isDataLoading}
+          counts={counts}
+          totalDayCount={rowsForDay.length}
+          pendingAction={pendingQueueAction}
+          onCallNext={() => void callNext()}
+          onRecallCurrent={() => void recallCurrent()}
+        />
+
+        <QueueTable
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          filteredRows={filteredRows}
+          paginatedRows={paginatedRows}
+          query={query}
+          onQueryChange={setQuery}
+          isDataLoading={isDataLoading}
+          isMutating={isMutating}
+          pendingUndoId={pendingUndoId}
+          branchName={BRANCH_NAMES[branch]}
+          date={date}
+          today={getTodayInVietnam()}
+          visiblePage={visiblePage}
+          totalPages={totalPages}
+          firstVisibleRow={firstVisibleRow}
+          lastVisibleRow={lastVisibleRow}
+          onPageChange={setCurrentPage}
+          onReturnToWaiting={(row) => void returnToWaiting(row)}
+        />
+      </main>
+    </AdminLayout>
+  );
+}
+
+export default AdminPage;

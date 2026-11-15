@@ -1,6 +1,6 @@
 import { useContext } from 'react';
-import { PermissionModuleContext } from '../../hooks/useStaffPermissions';
-import { useStaffPermissions } from '@/features/admin/hooks/useStaffPermissions';
+import { PermissionModuleContext } from '../../shared/useStaffPermissions';
+import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import { useMemo, useState } from 'react';
 import {
   CheckIcon,
@@ -10,7 +10,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
-import { PermissionButton as Button } from '@/features/admin/components/PermissionButton';
+import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { Input } from '@/components/ui/input';
 import {
   Popover,
