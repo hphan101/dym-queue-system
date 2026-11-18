@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/search-field';
 import { NumberedPagination } from '@/components/numbered-pagination';
 import { Alert,AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -10,12 +11,7 @@ DialogHeader,
 DialogTitle,
 } from '@/components/ui/dialog';
 import { Empty,EmptyContent,EmptyDescription,EmptyHeader,EmptyTitle } from '@/components/ui/empty';
-import { Input } from '@/components/ui/input';
-import {
-Popover,
-PopoverContent,
-PopoverTrigger,
-} from '@/components/ui/popover';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
@@ -25,12 +21,8 @@ import { cn } from '@/lib/utils';
 import {
 ArrowDownTrayIcon,
 ArrowUpTrayIcon,
-CheckCircleIcon,
-EllipsisHorizontalIcon,
-NoSymbolIcon,
-TrashIcon
 } from '@heroicons/react/24/outline';
-import { Plus,RefreshCw,Search,Upload,X } from 'lucide-react';
+import { FileText, Lock, LockOpen, Trash2, Pencil, Plus, RefreshCw, Upload } from 'lucide-react';
 import { useEffect,useId,useMemo,useRef,useState } from 'react';
 import { HighlightText } from '../../shared/HighlightText';
 import {
@@ -152,7 +144,6 @@ export function RosterPersonnelPage({
   const [formError, setFormError] = useState<string | null>(null);
 
   // Row action menu & Delete confirmation Dialog state
-  const [openMenuPersonId, setOpenMenuPersonId] = useState<string | null>(null);
   const [personPendingDelete, setPersonPendingDelete] =
     useState<MedicalPersonnel | null>(null);
 
@@ -371,7 +362,6 @@ export function RosterPersonnelPage({
   };
 
   const handleToggleActive = async (person: MedicalPersonnel) => {
-    setOpenMenuPersonId(null);
     const nextActive = !person.is_active;
     try {
       await togglePersonnelActive(person, nextActive);
@@ -727,15 +717,15 @@ export function RosterPersonnelPage({
               <Switch checked={showInactive} onCheckedChange={setShowInactive} aria-label="Hiện cả nhân sự ngừng hoạt động" />
               <span>Hiện cả người ngừng hoạt động</span>
             </label>
-            <div className="personnel-search">
-              <label htmlFor={searchInputId} className="sr-only">Tìm theo mã, tên, CCCD, chứng chỉ, số điện thoại hoặc email</label>
-              <Search aria-hidden="true" />
-              <Input id={searchInputId} type="search" value={searchQuery}
+            <SearchField
+                id={searchInputId}
+                value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); if (searchQuery) setSearchQuery(''); else e.currentTarget.blur(); } }}
-                placeholder="Tìm nhân sự…" />
-              {searchQuery && <Button type="button" variant="ghost" size="icon" onClick={() => setSearchQuery('')} aria-label="Xóa từ khóa tìm kiếm"><X /></Button>}
-            </div>
+                placeholder="Tìm nhân sự…"
+                aria-label="Tìm theo mã, tên, CCCD, chứng chỉ, số điện thoại hoặc email"
+                onClear={() => setSearchQuery('')}
+              />
           </div>
         </div>
 
@@ -844,7 +834,6 @@ export function RosterPersonnelPage({
               <TableBody>
                 {paginatedPersonnel.map((person) => {
                   const hasHistory = assignedPersonIds.has(person.id);
-                  const isMenuOpen = openMenuPersonId === person.id;
 
                   return (
                     <TableRow key={person.id} className="transition-colors">
@@ -933,97 +922,53 @@ export function RosterPersonnelPage({
                         <div className="dym-table-actions-group">
                           <Button permissionAction="update"
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => openEditModal(person)}
                             title="Chỉnh sửa thông tin nhân sự"
-                            className="h-8 px-3 text-xs font-medium"
+                            aria-label={`Sửa thông tin ${person.full_name}`}
                           >
-                            Sửa
+                            <Pencil aria-hidden="true" />
                           </Button>
                           <Button
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             permissionAction="view" permissionModule="personnel_documents"
                             onClick={() => setDocumentPerson(person)}
                             aria-label={`File hồ sơ của ${person.full_name}`}
-                            className="h-8 px-3 text-xs font-medium"
+                            title="File hồ sơ nhân sự"
                           >
-                            Hồ sơ
+                            <FileText aria-hidden="true" />
                           </Button>
 
-                          <Popover
-                            open={isMenuOpen}
-                            onOpenChange={(nextOpen) =>
-                              setOpenMenuPersonId(nextOpen ? person.id : null)
-                            }
+                          <Button permissionAction="update"
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={isMutating}
+                            onClick={() => void handleToggleActive(person)}
+                            title={person.is_active ? 'Ngừng hoạt động' : 'Kích hoạt lại'}
+                            aria-label={(person.is_active ? 'Ngừng hoạt động ' : 'Kích hoạt lại ') + person.full_name}
                           >
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon-sm"
-                                aria-label={`Thao tác khác cho ${person.full_name}`}
-                                title="Thao tác khác"
-                                className={cn(
-                                  'size-8',
-                                  isMenuOpen && 'bg-accent text-foreground',
-                                )}
-                              >
-                                <EllipsisHorizontalIcon className="size-4" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              align="end"
-                              sideOffset={4}
-                              className="w-52 p-1.5 shadow-md"
+                            {person.is_active
+                              ? <Lock aria-hidden="true" />
+                              : <LockOpen aria-hidden="true" />}
+                          </Button>
+                          {/* Keep personnel with scheduling history for reports. */}
+                          {!hasHistory && (
+                            <Button permissionAction="delete"
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              disabled={isMutating}
+                              onClick={() => setPersonPendingDelete(person)}
+                              title="Xóa nhân sự"
+                              aria-label={'Xóa nhân sự ' + person.full_name}
                             >
-                              <div className="flex flex-col gap-0.5">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    void handleToggleActive(person)
-                                  }
-                                  className="h-8 w-full justify-start gap-2 px-2.5 text-[13px] font-medium"
-                                >
-                                  {person.is_active ? (
-                                    <>
-                                      <NoSymbolIcon className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                                      <span>Ngừng hoạt động</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircleIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                                      <span>Kích hoạt lại</span>
-                                    </>
-                                  )}
-                                </Button>
-
-                                {/* Only allow permanent Delete if person has NEVER been scheduled */}
-                                {!hasHistory && (
-                                  <>
-                                    <div className="my-0.5 h-px bg-border" />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setOpenMenuPersonId(null);
-                                        setPersonPendingDelete(person);
-                                      }}
-                                      className="h-8 w-full justify-start gap-2 px-2.5 text-[13px] font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                      <TrashIcon className="size-4 shrink-0" />
-                                      <span>Xóa nhân sự</span>
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                              <Trash2 aria-hidden="true" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

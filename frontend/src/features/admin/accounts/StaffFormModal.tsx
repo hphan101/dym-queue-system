@@ -3,6 +3,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -60,9 +61,10 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
             variant="ghost"
             size="icon"
             aria-label="Đóng hộp thoại"
+            data-slot="overlay-close"
             disabled={isSaving}
             onClick={onClose}
-            className="size-8 text-muted-foreground hover:text-foreground"
+            className="dym-overlay-close"
           >
             <X aria-hidden="true" />
           </Button>
@@ -72,8 +74,8 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
           <div className="dym-staff-account-body">
           <label className="dym-staff-history-permission">
             <span>Cho phép sửa lịch cũ</span>
-            <input type="checkbox" checked={form.canEditRosterHistory} disabled={isSaving}
-              onChange={(event) => setForm((current) => ({ ...current, canEditRosterHistory: event.target.checked }))} />
+            <Checkbox checked={form.canEditRosterHistory} disabled={isSaving}
+              onCheckedChange={(checked) => setForm((current) => ({ ...current, canEditRosterHistory: checked === true }))} />
           </label>
           {formError && (
             <Alert variant="destructive"><AlertDescription>
@@ -152,13 +154,13 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="receptionist" className="text-sm">
+                    <SelectItem value="receptionist">
                       Nhân viên lễ tân
                     </SelectItem>
-                    <SelectItem value="operator" className="text-sm">
+                    <SelectItem value="operator">
                       Nhân viên vận hành
                     </SelectItem>
-                    <SelectItem value="admin" className="text-sm">
+                    <SelectItem value="admin">
                       Quản trị viên
                     </SelectItem>
                   </SelectGroup>
@@ -198,10 +200,10 @@ export const StaffFormModal: React.FC<StaffFormModalProps> = ({
             <div className="dym-staff-branch-options">
               {BRANCH_CODES.map((branchCode) => (
                 <label key={branchCode}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
+                    disabled={isSaving}
                     checked={form.branchCodes.includes(branchCode)}
-                    onChange={() => toggleBranch(branchCode)}
+                    onCheckedChange={() => toggleBranch(branchCode)}
                   />
                   <span>
                     <strong>{branchCode.toUpperCase()}</strong>

@@ -75,14 +75,14 @@ test('matrix toggles, column selection and presets keep dependent view permissio
   const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/accounts/StaffPermissionMatrix.tsx'), 'utf8');
   const exports = {};
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  const dependencies = { '@/components/ui/button': { Button: 'button' }, '@/lib/staffPermissions': require('./helpers/staff-permissions.cjs'), 'react/jsx-runtime': require('react/jsx-runtime') };
+  const dependencies = { '@/components/ui/button': { Button: 'button' }, '@/components/ui/checkbox': { Checkbox: 'checkbox' }, '@/lib/staffPermissions': require('./helpers/staff-permissions.cjs'), 'react/jsx-runtime': require('react/jsx-runtime') };
   new Function('exports', 'require', code)(exports, (name) => dependencies[name]);
   let value = getDefaultPermissions('none');
   const nodes = (node) => !node || typeof node !== 'object' ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
   const render = () => nodes(exports.StaffPermissionMatrix({ value, disabled: false, onChange(next) { value = next; } }));
-  render().find((node) => node.props?.['aria-label'] === 'Lịch tại Phòng khám: Thêm').props.onChange({ target: { checked: true } });
+  render().find((node) => node.props?.['aria-label'] === 'Lịch tại Phòng khám: Thêm').props.onCheckedChange(true);
   assert.ok(value.clinic.create && value.clinic.view);
-  render().find((node) => node.props?.['aria-label'] === 'Lịch tại Phòng khám: Xem').props.onChange({ target: { checked: false } });
+  render().find((node) => node.props?.['aria-label'] === 'Lịch tại Phòng khám: Xem').props.onCheckedChange(false);
   assert.ok(Object.values(value.clinic).every((allowed) => !allowed));
   assert.ok(parsePermissions(value));
   render().find((node) => node.type === 'button' && node.props.children === 'Chỉ xem').props.onClick();

@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import { NumberedPagination } from '@/components/numbered-pagination';
@@ -5,10 +6,9 @@ import { lazy, Suspense, useId, useMemo, useState } from 'react';
 import {
   ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
-import { Search, X } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { BranchCode } from '../../../types/domain';
@@ -239,42 +239,15 @@ export function QueueTable({
           </Tabs>
 
           {/* Search Box (shadcn Input + Clear Button / Kbd) */}
-          <div className="relative w-full sm:w-64 lg:w-72">
-            <label htmlFor={searchInputId} className="sr-only">
-              Tìm kiếm lượt đăng ký
-            </label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              id={searchInputId}
-              type="search"
-              placeholder="Tìm tên, SĐT, số thứ tự, công ty..."
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
-            />
-            {query ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => onQueryChange('')}
-                aria-label="Xóa từ khóa tìm kiếm"
-                className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X aria-hidden="true" />
-              </Button>
-            ) : (
-              <kbd
-                className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                title="Phím tắt: /"
-              >
-                /
-              </kbd>
-            )}
-          </div>
+          <SearchField
+                id={searchInputId}
+                placeholder="Tìm tên, SĐT, số thứ tự, công ty..."
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+                aria-label="Tìm kiếm lượt đăng ký"
+                onClear={() => onQueryChange('')}
+                shortcut
+              />
         </div>
       </div>
 

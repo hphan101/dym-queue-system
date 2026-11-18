@@ -31,8 +31,7 @@
 .dym-registration-filters svg { width: 16px; height: 16px; stroke-width: 1.5; }
 .dym-registration-filters [data-slot="badge"] { font-size: 12px; }
 .dym-registration-filter-menu { font-family: var(--font-body); }
-.dym-registration-filter-menu :is([role="option"], input) { font-family: inherit; font-size: 14px; font-weight: 400; }
-.dym-registration-filter-menu [role="option"] { min-height: 36px; }
+.dym-registration-filter-menu input { font-family: inherit; font-size: 14px; font-weight: 400; }
 .dym-registration-filter-menu [role="option"] [class*="text-[11px]"] { font-size: 12px; }
 @media (max-width: 600px) {
   .dym-registration-filters { flex-basis: 100%; }
@@ -53,7 +52,6 @@
   background: var(--color-paper-2);
   border-color: var(--color-rule-2);
 }
-.dym-registrations-page .dym-table-precision input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--reception-accent); }
 .dym-registrations-page .dym-table-precision tr[data-selected="true"] { background: #edf0f8; }
 .dym-registrations-page .dym-table-precision tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--reception-accent); }
 .dark .dym-registrations-page .dym-table-precision tr[data-selected="true"],

@@ -1,0 +1,94 @@
+/* Assignment polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.dym-assignment-popover {
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 32% 18%;
+  --background: 0 0% 100%;
+  --foreground: 222 32% 18%;
+  --muted: 220 18% 96%;
+  --muted-foreground: 219 14% 40%;
+  --card: 0 0% 100%;
+  --border: 220 14% 87%;
+  --input: 220 14% 82%;
+  --primary: 227 50% 25%;
+  --primary-foreground: 0 0% 100%;
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --ring: 227 50% 25%;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: min(760px, var(--radix-popover-content-available-height));
+  padding: 0;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 20px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+}
+:is(.dark, [data-color-mode="dark"]) .dym-assignment-popover {
+  --popover: 220 28% 15%;
+  --popover-foreground: 222 33% 95%;
+  --background: 220 28% 15%;
+  --foreground: 222 33% 95%;
+  --card: 220 28% 15%;
+  --muted: 220 24% 19%;
+  --muted-foreground: 217 22% 73%;
+  --border: 219 21% 27%;
+  --input: 219 19% 35%;
+  --primary: 224 41% 34%;
+  --ring: 218 44% 72%;
+  box-shadow: none;
+}
+.dym-assignment-form { display: flex; flex-direction: column; max-height: inherit; min-height: 0; }
+.dym-assignment-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.dym-assignment-header > div:first-child { min-width: 0; }
+.dym-assignment-header h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; }
+.dym-assignment-header p { margin: 4px 0 0; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+.dym-assignment-selected { max-width: 180px; white-space: normal; overflow-wrap: anywhere; font-size: 12px; font-weight: 400; }
+.dym-assignment-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; gap: 20px; }
+.dym-assignment-body [data-slot="field-label"],
+.dym-assignment-body [data-slot="field-legend"] { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dym-assignment-body [data-slot="field"] { gap: 8px; }
+.dym-assignment-personnel { gap: 12px; }
+.dym-assignment-popover input { min-height: 40px; font-size: 14px; box-shadow: none; }
+.dym-assignment-role-tabs,
+.dym-assignment-shift-tabs { display: flex; width: 100%; height: 40px; gap: 4px; }
+.dym-assignment-popover [role="tab"] { flex: 1; min-width: 0; height: 32px; padding: 4px 8px; font-size: 13px; font-weight: 500; }
+.dym-assignment-popover [role="tab"][data-state="active"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); box-shadow: none; }
+.dym-assignment-popover [role="tab"]:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.dym-assignment-person-list { max-height: 176px; overflow-y: auto; padding: 4px; border: 1px solid hsl(var(--border)); border-radius: 8px; }
+.dym-assignment-person { min-height: 60px; border-radius: 4px; padding: 8px 12px; font-size: 14px; }
+.dym-assignment-person[aria-pressed="true"] { background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--ring)); }
+.dym-assignment-person-name { white-space: normal; overflow-wrap: anywhere; line-height: 20px; }
+.dym-assignment-person-meta { margin-top: 4px; font-size: 12px; line-height: 16px; }
+.dym-assignment-person-cost { font-size: 14px; font-weight: 500; white-space: nowrap; }
+.dym-assignment-person svg { color: hsl(var(--foreground)); }
+.dym-assignment-shifts { gap: 8px; }
+.dym-assignment-shifts legend { margin-bottom: 8px; }
+.dym-assignment-base-cost { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 160px); gap: 12px; align-items: center; }
+.dym-assignment-base-cost label { white-space: normal; }
+.dym-assignment-extra-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 8px; }
+.dym-assignment-extra-fields > :only-child { grid-column: 1 / -1; }
+.dym-assignment-body button[aria-expanded] { min-height: 40px; font-size: 14px; }
+.dym-assignment-footer { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid hsl(var(--border)); }
+.dym-assignment-footer button { min-height: 40px; font-size: 14px; box-shadow: none; }
+@media (max-width: 480px) {
+  .dym-assignment-header,
+  .dym-assignment-body { padding: 16px; }
+  .dym-assignment-footer { padding: 12px 16px; }
+  .dym-assignment-selected { max-width: 140px; }
+  .dym-assignment-person { padding: 8px; }
+  .dym-assignment-person-list { max-height: 144px; }
+  .dym-assignment-popover input,
+  .dym-assignment-footer button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dym-assignment-popover { animation: none; }
+}

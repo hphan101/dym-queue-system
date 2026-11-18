@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { NumberedPagination } from '@/components/numbered-pagination';
 import { AdminLayout } from '../shell/AdminLayout';
@@ -14,19 +15,12 @@ import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import {
-  Building2,
-  Check,
-  ChevronsUpDown,
-  Printer,
-  Search,
-  X,
-} from 'lucide-react';
+import { Building2, Check, ChevronsUpDown, Printer } from 'lucide-react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
-import { Input } from '@/components/ui/input';
+
 import {
   Popover,
   PopoverContent,
@@ -746,7 +740,7 @@ export function RegistrationsPage({
                   </SelectTrigger>
                   <SelectContent align="end" className="dym-registration-filter-menu min-w-[240px]">
                     <SelectGroup>
-                      <SelectItem value="all" className="text-xs tabular-nums">
+                      <SelectItem value="all" className="tabular-nums">
                         Tất cả bản in ({rows.length})
                       </SelectItem>
                       <SelectItem
@@ -832,31 +826,16 @@ export function RegistrationsPage({
                   </PopoverTrigger>
 
                   <PopoverContent align="end" className="dym-registration-filter-menu w-80 max-w-[calc(100vw-32px)] p-0">
-                    <div className="relative flex items-center border-b border-border p-2">
-                      <Search
-                        className="pointer-events-none absolute left-4 size-3.5 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <Input
+                    <div className="border-b border-border p-2">
+                      <SearchField
                         ref={companySearchInputRef}
-                        type="text"
                         value={companySearchQuery}
                         onChange={(e) => setCompanySearchQuery(e.target.value)}
+                        onClear={() => setCompanySearchQuery('')}
+                        aria-label="Tìm đơn vị"
                         placeholder="Tìm đơn vị…"
-                        className="h-9 bg-background pl-8 pr-7 text-sm shadow-none"
+                        className="w-full"
                       />
-                      {companySearchQuery && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setCompanySearchQuery('')}
-                          aria-label="Xóa tìm kiếm công ty"
-                          className="absolute right-3 size-6 text-muted-foreground hover:text-foreground"
-                        >
-                          <X aria-hidden="true" />
-                        </Button>
-                      )}
                     </div>
 
                     <div
@@ -985,42 +964,15 @@ export function RegistrationsPage({
                 </Popover>
 
                 {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-                <div className="dym-registration-search relative">
-                  <label htmlFor={searchInputId} className="sr-only">
-                    Tìm kiếm hồ sơ khách hàng
-                  </label>
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id={searchInputId}
-                    type="search"
-                    placeholder="Tìm tên, SĐT, CCCD, công ty…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="dym-search-field h-9 bg-card pl-8 pr-8 text-sm shadow-none"
-                  />
-                  {query ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setQuery('')}
-                      aria-label="Xóa từ khóa tìm kiếm"
-                      className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X aria-hidden="true" />
-                    </Button>
-                  ) : (
-                    <kbd
-                      className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                      title="Phím tắt: /"
-                    >
-                      /
-                    </kbd>
-                  )}
-                </div>
+                <SearchField
+                id={searchInputId}
+                placeholder="Tìm tên, SĐT, CCCD, công ty…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Tìm kiếm hồ sơ khách hàng"
+                onClear={() => setQuery('')}
+                shortcut
+              />
               </div>
             </div>
           </div>

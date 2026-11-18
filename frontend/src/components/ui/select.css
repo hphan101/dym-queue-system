@@ -1,0 +1,26 @@
+/* Select polish following unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+[data-slot='select-content'] {
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 32% 18%;
+  --muted: 220 14% 96%;
+  --accent: 224 32% 92%;
+  --border: 214 24% 86%;
+  --ring: 228 50% 30%;
+  max-height: min(384px, var(--radix-select-content-available-height));
+  max-width: calc(100vw - 32px);
+  font-family: var(--font-body);
+}
+:is(.dark, [data-color-mode='dark']) [data-slot='select-content'] {
+  --popover: 220 28% 15%;
+  --popover-foreground: 222 33% 95%;
+  --muted: 220 22% 20%;
+  --accent: 224 28% 28%;
+  --border: 216 22% 28%;
+  --ring: 224 60% 76%;
+}
+[data-slot='select-item'] { white-space: normal; overflow-wrap: anywhere; }
+[data-slot='select-item'][data-state='checked'] { background: hsl(var(--accent)); font-weight: 500; }
+[data-slot='select-item'][data-highlighted] { background: hsl(var(--muted)); }
+[data-slot='select-item'][data-state='checked'][data-highlighted] { background: hsl(var(--accent)); box-shadow: inset 0 0 0 1px hsl(var(--ring) / .35); }
+[data-slot='select-item'][data-highlighted] { color: hsl(var(--popover-foreground)); }
+@media (pointer: coarse) { [data-slot='select-item'] { min-height: 44px; } }

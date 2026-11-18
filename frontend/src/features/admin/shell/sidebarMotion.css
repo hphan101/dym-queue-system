@@ -42,6 +42,11 @@
   stroke-width: 1.5;
   color: inherit;
 }
+/* Vietnamese glyphs can extend beyond the text width clipped by truncate. */
+.dym-sidebar-navigation [data-sidebar="menu-button"] > span:last-child,
+.dym-sidebar-navigation [data-sidebar="menu-sub-button"] > span:last-child {
+  padding-inline-end: 4px;
+}
 .dym-sidebar-navigation [data-sidebar="menu-button"][data-active="true"],
 .dym-sidebar-navigation [data-sidebar="menu-sub-button"][data-active="true"] {
   background: var(--sidebar-selected-bg);

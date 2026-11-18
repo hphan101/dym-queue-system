@@ -6,6 +6,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTodayInVietnam } from '../../../../lib/date';
 import { formatDisplayDate } from '../../shared/adminFormatters';
 import { buildInsiteWeek, getInsiteWeekDates } from './insiteWeek';
@@ -85,13 +86,13 @@ export function RosterInsiteWeek({
     personnelMap.get(id)?.full_name ?? 'Nhân sự không còn trong danh mục';
 
   return (
-    <div className="dym-insite-week">
-      <div className="dym-week-toolbar">
-        <div className="dym-week-heading">
+    <Card className="dym-insite-week">
+      <CardHeader className="dym-week-toolbar">
+        <CardTitle className="dym-week-heading">
           <h2>
-            {formatDisplayDate(start)} đến {formatDisplayDate(end)}
+            {formatDisplayDate(start)} – {formatDisplayDate(end)}
           </h2>
-        </div>
+        </CardTitle>
         <div className="dym-week-controls">
           <Tabs
             value={selectedBranch}
@@ -136,7 +137,8 @@ export function RosterInsiteWeek({
             Tuần này
           </Button>
         </div>
-      </div>
+      </CardHeader>
+      <CardContent className="dym-week-body p-0">
       {loadError ? (
         <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-destructive">{loadError}</p>
@@ -217,10 +219,10 @@ export function RosterInsiteWeek({
                         <small>Phòng theo ngày</small>
                       )}
                     </th>
-                    {dates.map((day) => {
+                    {dates.map((day, index) => {
                       const items = room.days.get(day);
                       return (
-                        <td key={day} data-today={day === today}>
+                        <td key={day} data-today={day === today} data-weekend={index > 4}>
                           {items ? (
                             <button
                               type="button"
@@ -367,6 +369,7 @@ export function RosterInsiteWeek({
           </div>
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

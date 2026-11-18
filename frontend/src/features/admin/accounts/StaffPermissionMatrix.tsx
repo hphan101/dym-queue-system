@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PERMISSION_ACTIONS, PERMISSION_MODULES, getDefaultPermissions, type PermissionAction, type PermissionModule, type StaffPermissions } from '@/lib/staffPermissions';
 
 const LABELS = { view: 'Xem', create: 'Thêm', update: 'Sửa', delete: 'Xóa' };
@@ -36,8 +37,8 @@ export function StaffPermissionMatrix({ value, onChange, disabled }: {
         <tbody>{PERMISSION_MODULES.map(({ key, label, actions }) => <tr key={key}>
           <th scope="row">{label}</th>{PERMISSION_ACTIONS.map((action) => <td key={action}>
             {(actions as readonly string[]).includes(action)
-              ? <input type="checkbox" aria-label={`${label}: ${LABELS[action]}`} checked={Boolean(value[key][action])}
-                onChange={(event) => toggle(key, action, event.target.checked)} />
+              ? <Checkbox aria-label={`${label}: ${LABELS[action]}`} checked={Boolean(value[key][action])} disabled={disabled}
+                onCheckedChange={(checked) => toggle(key, action, checked === true)} />
               : <span aria-label="Không áp dụng">·</span>}
           </td>)}
         </tr>)}</tbody>

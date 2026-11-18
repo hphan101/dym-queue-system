@@ -28,7 +28,7 @@ export function CustomerNoticeModal({
           Số {notification.queueNumber} · {notification.fullName}
         </AlertDescription>
       </Alert>
-      <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-2"
+      <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-2 text-white hover:bg-white/15 hover:text-white focus-visible:ring-white"
         aria-label="Đóng thông báo" onClick={onClose}>
         <X aria-hidden="true" />
       </Button>

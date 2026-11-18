@@ -57,11 +57,6 @@
 .personnel-role-tabs .personnel-tab-count { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:16px; height:20px; font-size:14px; line-height:20px; font-weight:inherit; }
 .personnel-filter-controls { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
 .personnel-inactive-filter { display:flex; align-items:center; gap:8px; min-height:40px; font-size:14px; line-height:20px; color:hsl(var(--foreground)); cursor:pointer; }
-.personnel-search { position:relative; width:280px; max-width:100%; }
-.personnel-search > svg { position:absolute; left:12px; top:12px; width:16px; height:16px; stroke-width:1.5; color:hsl(var(--muted-foreground)); pointer-events:none; }
-.personnel-search input { height:40px; padding:0 40px 0 36px; font-size:14px; background:hsl(var(--card)); }
-.personnel-search input::-webkit-search-cancel-button { display:none; }
-.personnel-search > button { position:absolute; right:4px; top:4px; width:32px; height:32px; }
 .personnel-header-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .personnel-header-actions .personnel-header-button { height:40px; gap:8px; padding:0 12px; font-size:14px; font-weight:500; box-shadow:none; }
 .personnel-header-actions svg { width:16px; height:16px; stroke-width:1.5; }
@@ -76,7 +71,9 @@
 .dym-personnel-content .dym-table-precision tr { background:transparent; }
 .dym-personnel-content .dym-patient-name { font-size:14px; font-weight:500; text-transform:none; white-space:normal; overflow-wrap:anywhere; }
 .dym-personnel-content .dym-patient-block { min-width:200px; }
-.dym-personnel-content .dym-table-actions-group > button { min-height:36px; }
+.dym-personnel-content .dym-table-actions-group { gap:8px; }
+.dym-personnel-content .dym-table-actions-group > button { width:36px; height:36px; min-height:36px; padding:0; border-radius:8px; box-shadow:none; }
+.dym-personnel-content .dym-table-actions-group > button svg { width:18px; height:18px; stroke-width:1.75; }
 .dym-personnel-content .dym-contact-phone { white-space:nowrap; font-size:14px; }
 .dym-personnel-content .dym-roster-code-badge { background:hsl(var(--muted)); color:hsl(var(--foreground)); border-color:hsl(var(--border)); font-size:12px; font-weight:500; }
 .dym-personnel-content .dym-pagination-bar { background:hsl(var(--card)); border-color:hsl(var(--border)); }
@@ -84,8 +81,7 @@
 @media (max-width:640px) {
  .personnel-panel-heading { padding:20px 16px 16px; }
  .personnel-toolbar { padding:0 16px 16px; }
- .personnel-filter-controls, .personnel-search { width:100%; }
- .personnel-search input { font-size:16px; }
+ .personnel-filter-controls { width:100%; }
  .dym-personnel-content .personnel-empty { min-height:280px; padding:32px 20px; }
 }
 

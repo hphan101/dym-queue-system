@@ -104,8 +104,8 @@ test('daily category tabs separate Blood sampling from Onsite HC/setup and keep 
   const nodes = elements(tree);
   const headings = nodes.filter((node) => node.type === 'h3' && node.props.className === 'flex items-center justify-between px-1 text-sm font-semibold');
   assert.equal(headings.length, 1);
-  assert.equal(headings[0].props.children[0].props.children, 'Onsite');
-  assert.equal(headings[0].props.children[1].props.children[0], 2);
+  assert.equal(headings[0].props.children.props.children, 'Onsite');
+  assert.equal(nodes.find((node) => node.props?.className === 'dym-roster-panel-subtitle').props.children[0], 2);
   const blood = loadComponent('RosterOnsitePage.tsx', {}, context, 'blood_draw').RosterOnsitePage({});
   assert.match(JSON.stringify(blood), /TODAY_BLOOD/);
   assert.doesNotMatch(JSON.stringify(blood), /TODAY_HC|TODAY_SETUP|OTHER_DATE|OTHER_BRANCH/);

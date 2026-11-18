@@ -1,4 +1,5 @@
 import React from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import { usePrintStatus } from './usePrintStatus';
@@ -41,6 +42,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
   const isSelectable = Boolean(checkedIds && onToggleChecked);
   const allChecked =
     isSelectable && rows.length > 0 && rows.every((r) => checkedIds!.has(r.id));
+  const someChecked = isSelectable && rows.some((r) => checkedIds!.has(r.id));
 
   return (
     <div className="dym-table-scroller">
@@ -49,12 +51,11 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
           <tr>
             {isSelectable && (
               <th scope="col" className="w-10">
-                <input
-                  type="checkbox"
-                  className="size-4 cursor-pointer accent-primary align-middle"
-                  checked={allChecked}
-                  onChange={(e) =>
-                    onToggleChecked!(rows.map((r) => r.id), e.target.checked)
+                <Checkbox
+                  checked={allChecked ? true : someChecked ? 'indeterminate' : false}
+                  disabled={rows.length === 0}
+                  onCheckedChange={(checked) =>
+                    onToggleChecked!(rows.map((r) => r.id), checked === true)
                   }
                   aria-label="Chọn tất cả hồ sơ trên trang này"
                 />
@@ -84,11 +85,9 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
               <tr key={row.id} data-selected={checkedIds?.has(row.id) ?? false}>
                 {isSelectable && (
                   <td className="w-10">
-                    <input
-                      type="checkbox"
-                      className="size-4 cursor-pointer accent-primary align-middle"
+                    <Checkbox
                       checked={checkedIds!.has(row.id)}
-                      onChange={(e) => onToggleChecked!([row.id], e.target.checked)}
+                      onCheckedChange={(checked) => onToggleChecked!([row.id], checked === true)}
                       aria-label={`Chọn hồ sơ ${row.full_name}`}
                     />
                   </td>

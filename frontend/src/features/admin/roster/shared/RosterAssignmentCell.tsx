@@ -1,17 +1,19 @@
 import { useContext } from 'react';
+import { SearchField } from '@/components/search-field';
 import { PermissionModuleContext } from '../../shared/useStaffPermissions';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   CheckIcon,
   ChevronDownIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { Input } from '@/components/ui/input';
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Popover,
   PopoverContent,
@@ -34,6 +36,7 @@ import {
   type RosterAssignment,
   type ShiftPeriod,
 } from '../data/rosterService';
+import './assignmentPopover.css';
 
 export interface RosterAssignmentDraft {
   editingAssignmentId: string | null;
@@ -88,12 +91,13 @@ export function RosterAssignmentCell({
   expandExtraOnAllowance = true,
   autoSelectFirstAvailableOnSubmit = false,
   deleteChipTitle = 'Xóa khỏi phòng',
-  updateButtonLabel = 'Cập nhật (Enter)',
+  updateButtonLabel = 'Cập nhật',
   formatChipTooltip,
   onSaveAssignment,
   onDeleteAssignment,
 }: RosterAssignmentCellProps) {
   const { can } = useStaffPermissions();
+  const titleId = useId();
   const module = useContext(PermissionModuleContext) ?? 'clinic';
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(
     null,
@@ -274,7 +278,7 @@ export function RosterAssignmentCell({
 
   if (readOnly)
     return (
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="dym-assignment-cell flex flex-wrap items-center gap-2">
         {assignments.length ? (
           assignments.map((assignment) => (
             <span
@@ -301,7 +305,7 @@ export function RosterAssignmentCell({
     );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="dym-assignment-cell flex flex-wrap items-center gap-2">
       {!hasStaff ? (
         <span className="mr-1 text-[13px] text-muted-foreground">
           Chưa có người
@@ -321,7 +325,7 @@ export function RosterAssignmentCell({
             <div
               key={assign.id}
               className={cn(
-                'group inline-flex h-8 items-center rounded-md border bg-card text-[13px] shadow-2xs transition-colors',
+                'dym-assignment-chip group inline-flex h-8 items-center rounded-md border bg-card text-[13px] shadow-2xs transition-colors',
                 isEditingThisChip
                   ? 'border-primary ring-2 ring-primary/20'
                   : 'border-border hover:border-ring/60',
@@ -330,7 +334,7 @@ export function RosterAssignmentCell({
               <button
                 type="button"
                 disabled={!can(module, 'update') && !can(module, 'delete')} onClick={() => openEditPopover(assign)}
-                className="inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
+                className="dym-assignment-edit inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
                 title={chipTooltip}
               >
                 {person && (
@@ -342,7 +346,7 @@ export function RosterAssignmentCell({
                     aria-hidden="true"
                   />
                 )}
-                <span className="font-medium text-foreground">
+                <span className="dym-assignment-name font-medium text-foreground">
                   {person?.full_name || 'Nhân sự'}
                 </span>
                 {person?.personnel_code && (
@@ -409,62 +413,57 @@ export function RosterAssignmentCell({
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          sideOffset={6}
-          className="w-80 p-4 sm:w-[23.5rem]"
+          sideOffset={8}
+          collisionPadding={16}
+          aria-labelledby={titleId}
+          className="dym-assignment-popover"
         >
           <form
             onSubmit={(e) => void handleSubmit(e)}
-            className="flex flex-col gap-3"
+            className="dym-assignment-form"
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-semibold text-foreground">
-                {editingAssignmentId
-                  ? `Sửa ca trực: ${targetLabel}`
-                  : `Thêm nhân sự: ${targetLabel}`}
-              </span>
+            <div className="dym-assignment-header">
+              <div>
+                <h3 id={titleId}>{editingAssignmentId ? 'Sửa ca trực' : 'Thêm nhân sự'}</h3>
+                <p>{targetLabel}</p>
+              </div>
               {selectedPerson && (
                 <Badge
                   variant="outline"
-                  className="max-w-[10rem] truncate text-xs"
+                  className="dym-assignment-selected"
                 >
                   {selectedPerson.full_name}
                 </Badge>
               )}
             </div>
-
+            <FieldGroup className="dym-assignment-body">
             {/* Searchable Personnel Combobox with Double-Booking Lock */}
-            <div className="flex flex-col gap-2">
-              <div className="relative">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
+            <Field className="dym-assignment-personnel">
+              <FieldLabel htmlFor={`${titleId}-search`}>Nhân sự</FieldLabel>
+                <SearchField
+                  id={`${titleId}-search`}
                   autoFocus
                   value={personSearchQuery}
                   onChange={(e) => setPersonSearchQuery(e.target.value)}
-                  placeholder="Gõ tìm bác sĩ, nurse, CTV..."
-                  className="h-9 pl-8 text-[13px]"
+                  onClear={() => setPersonSearchQuery('')}
+                  placeholder="Tìm tên hoặc mã nhân sự"
+                  className="w-full"
                 />
-              </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
+              <Tabs value={personRoleFilter} onValueChange={(value) => setPersonRoleFilter(value as typeof personRoleFilter)}>
+              <TabsList aria-label="Lọc nhân sự theo vai trò" className="dym-assignment-role-tabs">
                 {ROLE_FILTER_OPTIONS.map((opt) => (
-                  <button
+                  <TabsTrigger
                     key={opt.value}
-                    type="button"
-                    onClick={() => setPersonRoleFilter(opt.value)}
-                    className={cn(
-                      'rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors',
-                      personRoleFilter === opt.value
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
-                    )}
+                    value={opt.value}
                   >
-                    {opt.label}
-                  </button>
+                    {opt.value === 'nurse' ? 'Điều dưỡng' : opt.label}
+                  </TabsTrigger>
                 ))}
-              </div>
+              </TabsList>
+              </Tabs>
 
-              <div className="max-h-48 overflow-y-auto rounded-md border border-border bg-background p-1">
+              <div className="dym-assignment-person-list" role="group" aria-label="Nhân sự phù hợp">
                 {filteredPersonnel.length === 0 ? (
                   <div className="px-2 py-3 text-center text-[13px] text-muted-foreground">
                     Không tìm thấy nhân sự phù hợp.
@@ -493,9 +492,10 @@ export function RosterAssignmentCell({
                         key={person.id}
                         type="button"
                         disabled={isLocked}
+                        aria-pressed={isSelected}
                         onClick={() => handleSelectPerson(person.id)}
                         className={cn(
-                          'flex w-full items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-[13px] transition-colors',
+                          'dym-assignment-person flex w-full items-center justify-between gap-2 text-left transition-colors',
                           isLocked
                             ? 'cursor-not-allowed opacity-55'
                             : isSelected
@@ -506,7 +506,7 @@ export function RosterAssignmentCell({
                         <div className="flex min-w-0 flex-col leading-tight">
                           <span
                             className={cn(
-                              'truncate font-medium',
+                              'dym-assignment-person-name font-medium',
                               isLocked
                                 ? 'text-muted-foreground'
                                 : 'text-foreground',
@@ -514,9 +514,9 @@ export function RosterAssignmentCell({
                           >
                             {person.full_name}
                           </span>
-                          <span className="dym-roster-tabular text-[11px] text-muted-foreground">
+                          <span className="dym-assignment-person-meta dym-roster-tabular text-muted-foreground">
                             {person.personnel_code} ·{' '}
-                            {ROLE_SHORT_LABELS[person.role_type]}
+                            {person.role_type === 'nurse' ? 'Điều dưỡng' : ROLE_SHORT_LABELS[person.role_type]}
                           </span>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -540,7 +540,7 @@ export function RosterAssignmentCell({
                                 </Badge>
                               )}
                               {showCosts && (
-                                <span className="dym-roster-tabular text-[13px] font-medium text-muted-foreground">
+                                <span className="dym-assignment-person-cost dym-roster-tabular text-muted-foreground">
                                   {formatNumberPlain(person.fixed_cost)} ₫
                                 </span>
                               )}
@@ -555,50 +555,42 @@ export function RosterAssignmentCell({
                   })
                 )}
               </div>
-            </div>
+            </Field>
 
             {/* Separate rows for Ca trực and Cost cố định */}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                Ca trực
-              </span>
-              <div className="grid grid-cols-3 gap-1 rounded-md border border-border bg-muted/50 p-1">
+            <FieldSet className="dym-assignment-shifts">
+              <FieldLegend variant="label">Ca trực</FieldLegend>
+              <Tabs value={assignShift} onValueChange={(value) => handleSelectShift(value as ShiftPeriod)}>
+              <TabsList aria-label="Chọn ca trực" className="dym-assignment-shift-tabs">
                 {SHIFT_OPTIONS.map((shift) => {
                   const shiftConflict = assignPersonId
                     ? getPersonConflictForShift(assignPersonId, shift.value)
                     : null;
                   return (
-                    <button
+                    <TabsTrigger
                       key={shift.value}
-                      type="button"
-                      onClick={() => handleSelectShift(shift.value)}
+                      value={shift.value}
                       title={
                         shiftConflict
                           ? `Nhân sự đang chọn đã xếp ca ${SHIFT_SHORT_LABELS[shiftConflict.shift_period]}`
                           : undefined
                       }
-                      className={cn(
-                        'whitespace-nowrap rounded px-2.5 py-1 text-[13px] font-medium transition-colors',
-                        assignShift === shift.value
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
                     >
                       {shift.label}
-                    </button>
+                    </TabsTrigger>
                   );
                 })}
-              </div>
-            </div>
+              </TabsList>
+              </Tabs>
+            </FieldSet>
 
             {showCosts && (
-              <div className="flex items-center justify-between gap-3">
-                <label
+              <Field orientation="horizontal" className="dym-assignment-base-cost">
+                <FieldLabel
                   htmlFor={`base-cost-${rowKey}`}
-                  className="text-[13px] font-medium text-muted-foreground"
                 >
-                  Cost cố định (VNĐ)
-                </label>
+                  Chi phí cố định (VNĐ)
+                </FieldLabel>
                 <Input
                   id={`base-cost-${rowKey}`}
                   type="text"
@@ -608,15 +600,17 @@ export function RosterAssignmentCell({
                   onChange={(e) =>
                     setAssignBaseCost(parseCurrencyInput(e.target.value))
                   }
-                  className="dym-roster-tabular h-8 w-40 text-right text-[13px]"
+                  className="dym-roster-tabular text-right"
                 />
-              </div>
+              </Field>
             )}
 
             {/* Collapsible Allowance & Notes */}
             <div className="flex flex-col gap-2 border-t border-border pt-2">
               <button
                 type="button"
+                aria-expanded={isExtraExpanded}
+                aria-controls={`${titleId}-extras`}
                 onClick={() => setIsExtraExpanded((prev) => !prev)}
                 className="flex items-center justify-between text-left text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out-quint hover:text-foreground"
               >
@@ -630,15 +624,15 @@ export function RosterAssignmentCell({
               </button>
 
               {isExtraExpanded && (
-                <div className="dym-roster-collapsible-enter grid grid-cols-2 gap-2 pt-1">
+                <FieldGroup id={`${titleId}-extras`} className="dym-assignment-extra-fields dym-roster-collapsible-enter">
                   {showCosts && (
-                    <div className="flex flex-col gap-1">
-                      <label
+                    <Field>
+                      <FieldLabel
                         htmlFor={`allowance-${rowKey}`}
                         className="text-xs font-medium text-muted-foreground"
                       >
                         Phụ cấp (VNĐ)
-                      </label>
+                      </FieldLabel>
                       <Input
                         id={`allowance-${rowKey}`}
                         type="text"
@@ -650,16 +644,16 @@ export function RosterAssignmentCell({
                         }
                         className="dym-roster-tabular h-8 text-right text-[13px]"
                       />
-                    </div>
+                    </Field>
                   )}
 
-                  <div className="flex flex-col gap-1">
-                    <label
+                  <Field>
+                    <FieldLabel
                       htmlFor={`note-${rowKey}`}
                       className="text-xs font-medium text-muted-foreground"
                     >
                       Ghi chú
-                    </label>
+                    </FieldLabel>
                     <Input
                       id={`note-${rowKey}`}
                       type="text"
@@ -667,12 +661,12 @@ export function RosterAssignmentCell({
                       onChange={(e) => setAssignNote(e.target.value)}
                       className="h-8 text-[13px]"
                     />
-                  </div>
-                </div>
+                  </Field>
+                </FieldGroup>
               )}
             </div>
-
-            <div className="flex items-center justify-between gap-1.5 pt-1">
+            </FieldGroup>
+            <div className="dym-assignment-footer">
               {editingAssignmentId ? (
                 <Button permissionAction="delete"
                   type="button"
@@ -702,7 +696,7 @@ export function RosterAssignmentCell({
                   disabled={isSubmitDisabled || !can(module, editingAssignmentId ? 'update' : 'create')}
                   className="h-8 px-3.5 text-[13px] font-medium"
                 >
-                  {editingAssignmentId ? updateButtonLabel : 'Lưu (Enter)'}
+                  {editingAssignmentId ? updateButtonLabel : 'Lưu'}
                 </Button>
               </div>
             </div>

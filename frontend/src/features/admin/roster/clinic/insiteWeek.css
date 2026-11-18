@@ -1,31 +1,91 @@
+/* Clinic polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+:is(.dym-clinic-content, .dym-onsite-content, .dym-room-catalog, .dym-campaign-form-dialog) {
+  --background: 220 18% 97%;
+  --foreground: 222 32% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: var(--foreground);
+  --muted: 220 18% 96%;
+  --muted-foreground: 219 14% 40%;
+  --border: 220 14% 87%;
+  --input: 220 14% 82%;
+  --primary: 227 50% 25%;
+  --primary-foreground: 0 0% 100%;
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --ring: 227 50% 25%;
+  --color-paper: hsl(var(--background));
+  --color-paper-2: hsl(var(--card));
+  --color-paper-3: hsl(var(--muted));
+  --color-paper-raised: hsl(var(--card));
+  --color-ink: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-rule: hsl(var(--border));
+  --color-rule-2: hsl(var(--input));
+  --color-overlay-hover-soft: hsl(var(--foreground) / 0.04);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+:is(.dark, [data-color-mode="dark"]) :is(.dym-clinic-content, .dym-onsite-content, .dym-room-catalog, .dym-campaign-form-dialog) {
+  --background: 220 25% 10%;
+  --foreground: 222 33% 95%;
+  --card: 220 28% 15%;
+  --muted: 220 24% 19%;
+  --muted-foreground: 217 22% 73%;
+  --border: 219 21% 27%;
+  --input: 219 19% 35%;
+  --primary: 224 41% 34%;
+  --ring: 218 44% 72%;
+}
+:is(.dym-clinic-content, .dym-onsite-content) [role="tablist"] { height: 40px; }
+:is(.dym-clinic-content, .dym-onsite-content) [role="tab"] { height: 32px; padding-inline: 16px; font-size: 14px; }
+:is(.dym-clinic-content, .dym-onsite-content) [role="tab"][data-state="active"] {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: none;
+}
+:is(.dym-clinic-content, .dym-onsite-content) [role="tab"]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
 .dym-insite-week {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
+  overflow: hidden;
+  border-color: var(--color-rule);
+  box-shadow: none;
 }
 .dym-week-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  flex-direction: row;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-rule);
 }
+.dym-week-toolbar > * { margin: 0; }
 .dym-week-heading h2 {
   margin: 0;
   color: var(--color-ink);
   font-size: 20px;
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 .dym-week-heading h2 > span {
   color: var(--color-muted);
   font-weight: 400;
 }
 .dym-week-heading p {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   color: var(--color-muted);
   font-size: 13px;
 }
@@ -37,24 +97,24 @@
   gap: 8px;
 }
 .dym-week-desktop {
-  padding: 12px;
-  border: 1px solid var(--color-rule);
-  border-radius: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: var(--color-paper-2);
   scrollbar-width: thin;
   scrollbar-color: var(--color-rule-2) transparent;
 }
 .dym-week-desktop:focus-visible {
   outline: 2px solid var(--color-ink);
-  outline-offset: 3px;
+  outline-offset: -2px;
 }
 .dym-week-table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1040px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 .dym-week-table th,
 .dym-week-table td {
@@ -76,7 +136,7 @@
   background: var(--color-paper-3);
 }
 .dym-week-table .dym-week-room-heading {
-  width: 152px;
+  width: 160px;
   padding: 20px;
   text-align: left;
   color: var(--color-muted);
@@ -92,7 +152,7 @@
 .dym-week-date {
   display: flex;
   width: 100%;
-  min-height: 116px;
+  min-height: 100px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -105,11 +165,11 @@
   font-size: 13px;
 }
 .dym-week-day-number {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 .dym-week-day-meta {
   min-height: 18px;
@@ -117,18 +177,19 @@
   font-size: 12px;
 }
 .dym-week-table th[data-today='true'] {
-  box-shadow: inset 0 2px 0 var(--color-ink);
-  background: var(--color-paper-3);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }
-.dym-week-table th[data-today='true'] .dym-week-day-meta {
-  color: var(--color-ink);
-  font-weight: 600;
+.dym-week-table th[data-today='true'] :is(.dym-week-date, .dym-week-weekday, .dym-week-day-meta) {
+  color: inherit;
 }
+.dym-week-table th[data-today='true'] .dym-week-day-meta { font-weight: 500; }
 .dym-week-table td {
   padding: 4px;
   vertical-align: top;
   background: var(--color-paper-2);
 }
+.dym-week-table td[data-weekend='true'],
 .dym-week-table td[data-today='true'] {
   background: var(--color-paper-3);
 }
@@ -136,13 +197,14 @@
   padding: 20px;
   text-align: left;
   vertical-align: top;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-ink);
   overflow-wrap: anywhere;
 }
 .dym-week-room small {
   display: block;
-  margin-top: 5px;
+  margin-top: 4px;
   font-size: 12px;
   font-weight: 400;
   color: var(--color-muted);
@@ -150,11 +212,11 @@
 .dym-week-cell {
   display: flex;
   width: 100%;
-  min-height: 88px;
+  min-height: 80px;
   flex-direction: column;
   gap: 8px;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   text-align: left;
   color: var(--color-ink);
   transition: background-color 120ms ease;
@@ -168,22 +230,26 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 12px;
   width: 100%;
   border: 1px solid var(--color-rule);
-  border-radius: 6px;
+  border-inline-start: 3px solid hsl(var(--primary));
+  border-radius: 8px;
   background: var(--color-paper-2);
 }
 .dym-week-person {
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 600;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 .dym-week-empty {
   display: flex;
-  min-height: 64px;
+  min-height: 56px;
   width: 100%;
   align-items: center;
   justify-content: center;
@@ -192,12 +258,19 @@
 .dym-week-add {
   display: none;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  justify-content: center;
+  gap: 8px;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
 }
 .dym-week-add svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke-width: 1.5;
 }
 .dym-week-cell:focus-visible .dym-week-add {
   display: inline-flex;
@@ -245,14 +318,15 @@
 }
 @media (max-width: 767px) {
   .dym-week-heading h2 {
-    font-size: 17px;
+    font-size: 18px;
   }
   .dym-week-toolbar {
+    padding: 16px;
     align-items: stretch;
     gap: 16px;
   }
   .dym-week-controls {
-    gap: 10px;
+    gap: 8px;
   }
   .dym-week-controls > button,
   .dym-week-navigation > button {
@@ -265,6 +339,7 @@
     display: none;
   }
   .dym-week-mobile {
+    padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -295,11 +370,11 @@
     gap: 12px;
     border-top: 1px solid var(--color-rule);
     padding: 12px 16px;
-    font-size: 13px;
+    font-size: 14px;
     overflow-wrap: anywhere;
   }
   .dym-week-agenda-room > span {
-    font-weight: 600;
+    font-weight: 500;
   }
   .dym-week-agenda-room p {
     margin: 0 0 4px;
@@ -317,7 +392,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dym-week-content,
   .dym-insite-day {
-    transition-duration: 40ms;
+    transition: none;
   }
   .dym-week-cell,
   .dym-week-date {
@@ -326,4 +401,30 @@
   .dym-week-loading * {
     animation: none;
   }
+}
+@media (min-width: 768px) {
+  .dym-week-controls > button,
+  .dym-week-navigation > button { min-height: 40px; }
+}
+.dym-week-assignment [data-slot="badge"] {
+  border: 0;
+  border-radius: 4px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+}
+.dym-week-table tfoot > tr > * {
+  border-top: 1px solid var(--color-rule);
+  background: var(--color-paper-3);
+}
+.dym-week-table tfoot .dym-week-room { vertical-align: middle; }
+.dym-week-table tfoot .dym-week-cell {
+  min-height: 48px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-week-cell:hover { box-shadow: inset 0 0 0 1px var(--color-rule); }
 }

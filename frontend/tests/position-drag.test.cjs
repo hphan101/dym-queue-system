@@ -67,6 +67,7 @@ test('dragging follows the pointer, previews the new order immediately and persi
   api = g.render();
   assert.equal(api.drag.offset, 95);
   assert.deepEqual(api.drop, { target: 'C', edge: 'after' });
+  assert.deepEqual(api.positions, ['B', 'C', 'A']);
   assert.equal(g.writes.length, 0);
   api.handleProps('A').onPointerUp(g.event(215));
   assert.deepEqual(g.render().positions, ['B', 'C', 'A']);
@@ -81,9 +82,20 @@ test('cancelled or locked gestures never save, and a failed save restores the pr
   const cancelled = gesture();
   let api = cancelled.render();
   api.handleProps('A').onPointerDown(cancelled.event(120));
+  api.handleProps('A').onPointerMove(cancelled.event(215));
+  assert.deepEqual(cancelled.render().positions, ['B', 'C', 'A']);
   api.handleProps('A').onPointerCancel();
+  assert.deepEqual(cancelled.render().positions, ['A', 'B', 'C']);
   api.handleProps('A').onPointerUp(cancelled.event(215));
   assert.equal(cancelled.writes.length, 0);
+  const outside = gesture();
+  api = outside.render();
+  api.handleProps('A').onPointerDown(outside.event(120));
+  api.handleProps('A').onPointerMove(outside.event(215));
+  api = outside.render();
+  api.handleProps('A').onPointerUp({ ...outside.event(215), clientX: 700 });
+  assert.deepEqual(outside.render().positions, ['A', 'B', 'C']);
+  assert.equal(outside.writes.length, 0);
   const locked = gesture({ disabled: true });
   locked.render().handleProps('A').onPointerDown(locked.event(120));
   assert.equal(locked.render().drag, null);

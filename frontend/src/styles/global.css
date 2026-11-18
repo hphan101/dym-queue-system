@@ -5,6 +5,37 @@
 @tailwind components;
 @tailwind utilities;
 
+button.dym-overlay-close[data-slot='overlay-close'] {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #b91c1c;
+  color: #fff;
+  opacity: 1;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+button.dym-overlay-close[data-slot='overlay-close'] > svg { width: 16px; height: 16px; stroke-width: 1.75; }
+button.dym-overlay-close[data-slot='overlay-close']:focus-visible { outline: 2px solid #b91c1c; outline-offset: 3px; }
+button.dym-overlay-close[data-slot='overlay-close']:disabled { opacity: .5; cursor: not-allowed; pointer-events: none; }
+@media (hover: hover) and (pointer: fine) {
+  button.dym-overlay-close[data-slot='overlay-close']:hover:not(:disabled) { background: #991b1b; color: #fff; }
+}
+@media (pointer: coarse) {
+  button.dym-overlay-close[data-slot='overlay-close'],
+  [role='dialog'] button.dym-overlay-close[data-slot='overlay-close'] { width: 44px; height: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.dym-overlay-close[data-slot='overlay-close'] { transition: none; }
+}
+
 :root {
   --warning: 40 100% 47%;
   --warning-foreground: 222 32% 12%;

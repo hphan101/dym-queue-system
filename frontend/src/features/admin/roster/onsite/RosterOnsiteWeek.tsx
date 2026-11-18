@@ -13,6 +13,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { getTodayInVietnam } from '../../../../lib/date';
 import { formatDisplayDate } from '../../shared/adminFormatters';
 import { getInsiteWeekDates } from '../clinic/insiteWeek';
@@ -91,13 +92,13 @@ export function RosterOnsiteWeek({
   const loadError = error?.key === key ? error.message : '';
 
   return (
-    <div className="dym-onsite-week">
-      <div className="dym-week-toolbar">
+    <Card className="dym-onsite-week">
+      <CardHeader className="dym-week-toolbar">
         <div className="dym-week-heading">
-          <h2>
+          <CardTitle><h2>
             {formatDisplayDate(start)} <span aria-hidden="true">—</span>{' '}
             {formatDisplayDate(end)}
-          </h2>
+          </h2></CardTitle>
           <p>{loaded ? `${count} đoàn trong tuần` : 'Đang tải lịch đoàn…'}</p>
         </div>
         <div className="dym-week-controls">
@@ -152,12 +153,12 @@ export function RosterOnsiteWeek({
             }
           >
             <SelectTrigger
-              className="dym-campaign-select w-44"
+              className="w-44"
               aria-label="Lọc loại đoàn trên lịch"
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="dym-campaign-select">
+            <SelectContent>
               <SelectGroup>
                 <SelectItem value="all">Tất cả</SelectItem>
                 {(['blood_draw', 'onsite_exam', 'setup'] as const).map(
@@ -171,7 +172,8 @@ export function RosterOnsiteWeek({
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </CardHeader>
+      <CardContent className="dym-onsite-week-body">
       <div className="dym-onsite-legend" aria-label="Màu loại đoàn">
         {(['blood_draw', 'onsite_exam', 'setup'] as const).map((value) => (
           <span key={value} data-type={value}>
@@ -204,6 +206,7 @@ export function RosterOnsiteWeek({
                 key={day}
                 className="dym-onsite-calendar-day"
                 data-today={day === today}
+                data-weekend={index > 4}
               >
                 <header>
                   <span>{index === 6 ? 'Chủ nhật' : `Thứ ${index + 2}`}</span>
@@ -266,6 +269,7 @@ export function RosterOnsiteWeek({
           </div>
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

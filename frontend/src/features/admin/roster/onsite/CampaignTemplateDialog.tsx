@@ -1,6 +1,8 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +36,7 @@ export function CampaignTemplateDialog({
   onClose: () => void;
   onSaved: (type: CampaignType, positions: string[]) => void;
 }) {
+  const typeId = useId();
   const [type, setType] = useState<CampaignType>('onsite_exam');
   const [positions, setPositions] = useState(templates.onsite_exam);
   const [busy, setBusy] = useState(false);
@@ -60,8 +63,8 @@ export function CampaignTemplateDialog({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="dym-campaign-form-dialog sm:max-w-xl">
-        <DialogHeader>
+      <DialogContent className="dym-campaign-form-dialog dym-campaign-template-dialog">
+        <DialogHeader className="dym-campaign-form-header">
           <DialogTitle>Vị trí mẫu chung</DialogTitle>
           <DialogDescription>
             Dùng cho các đoàn tạo sau. Danh sách của đoàn đã lưu không thay đổi.
@@ -69,8 +72,11 @@ export function CampaignTemplateDialog({
         </DialogHeader>
         <form
           onSubmit={(event) => void save(event)}
-          className="flex flex-col gap-4"
+          className="dym-campaign-form"
         >
+          <FieldGroup className="dym-campaign-template-body">
+          <Field>
+          <FieldLabel htmlFor={typeId}>Loại đoàn áp dụng mẫu</FieldLabel>
           <Select
             value={type}
             disabled={busy}
@@ -81,10 +87,10 @@ export function CampaignTemplateDialog({
               setError('');
             }}
           >
-            <SelectTrigger aria-label="Loại đoàn áp dụng mẫu">
+            <SelectTrigger id={typeId} aria-label="Loại đoàn áp dụng mẫu">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="dym-campaign-select">
+            <SelectContent>
               <SelectGroup>
                 {(['blood_draw', 'onsite_exam', 'setup'] as const).map(
                   (value) => (
@@ -96,6 +102,11 @@ export function CampaignTemplateDialog({
               </SelectGroup>
             </SelectContent>
           </Select>
+          </Field>
+          <div className="dym-campaign-position-count">
+            <span>Danh sách vị trí</span>
+            <Badge variant="secondary">{positions.length} vị trí</Badge>
+          </div>
           <CampaignPositionsEditor
             positions={positions}
             onChange={setPositions}
@@ -106,7 +117,8 @@ export function CampaignTemplateDialog({
               {error}
             </AlertDescription></Alert>
           )}
-          <DialogFooter>
+          </FieldGroup>
+          <DialogFooter className="dym-campaign-form-footer">
             <Button
               type="button"
               variant="outline"

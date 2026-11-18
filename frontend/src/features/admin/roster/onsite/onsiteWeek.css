@@ -1,8 +1,64 @@
+/* Onsite polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
 .dym-onsite-week {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 18px;
+  gap: 0;
+  overflow: hidden;
+  border-color: var(--color-rule);
+  box-shadow: none;
+}
+.dym-onsite-week-body {
+  padding: 0;
+}
+.dym-onsite-week .dym-week-heading h2 {
+  letter-spacing: 0;
+}
+.dym-onsite-content .dym-onsite-page {
+  gap: 16px;
+}
+.dym-onsite-view-bar > div:last-child > button {
+  min-height: 36px;
+}
+.dym-onsite-view-bar [role='tablist'] {
+  height: 48px;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+}
+.dym-onsite-view-bar [role='tab'] {
+  height: 38px;
+  min-width: 120px;
+  padding-inline: 20px;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.dym-onsite-view-bar [role='tab'][data-state='active'] {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  outline: none;
+  box-shadow: none;
+}
+.dym-onsite-view-bar [role='tab']:focus-visible {
+  outline: none;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-onsite-view-bar [role='tab'][data-state='inactive']:hover {
+    background: hsl(var(--card));
+  }
+}
+.dym-onsite-view-bar > div:last-child > button {
+  font-size: 14px;
+}
+.dym-onsite-week .dym-week-controls > button[role='combobox'] {
+  height: 40px;
+  font-size: 14px;
 }
 .dym-onsite-view-bar {
   display: flex;
@@ -14,7 +70,9 @@
 .dym-onsite-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 24px;
+  gap: 8px 24px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-rule);
   font-size: 13px;
 }
 .dym-onsite-legend > span {
@@ -31,8 +89,8 @@
 }
 .dym-onsite-calendar-scroll {
   overflow-x: auto;
-  border: 1px solid var(--color-rule);
-  border-radius: 12px;
+  border: 0;
+  border-radius: 0;
   scrollbar-width: thin;
 }
 .dym-onsite-calendar {
@@ -53,8 +111,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 18px 12px;
+  gap: 4px;
+  padding: 20px 12px;
   border-bottom: 1px solid var(--color-rule);
   font-variant-numeric: tabular-nums;
 }
@@ -68,18 +126,24 @@
 }
 .dym-onsite-calendar-day > header > strong {
   color: var(--color-ink);
-  font-size: 23px;
+  font-size: 24px;
   font-weight: 600;
 }
 .dym-onsite-calendar-day[data-today='true'] > header {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.dym-onsite-calendar-day[data-today='true'] > header > * {
+  color: inherit;
+}
+.dym-onsite-calendar-day[data-weekend='true'] {
   background: var(--color-paper-3);
-  box-shadow: inset 0 2px var(--color-ink);
 }
 .dym-onsite-calendar-events {
   display: flex;
-  min-height: 340px;
+  min-height: 280px;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 12px;
 }
 .dym-onsite-calendar-event {
@@ -89,19 +153,21 @@
   align-items: flex-start;
   gap: 8px;
   padding: 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: var(--campaign-paper);
-  color: var(--campaign-ink);
+  border: 1px solid var(--campaign-solid);
+  border-radius: 8px;
+  background: var(--campaign-solid);
+  color: hsl(var(--primary-foreground));
   text-align: left;
   font-family: var(--font-body);
   cursor: pointer;
   overflow-wrap: anywhere;
   transition:
     transform 120ms var(--ease-out),
-    border-color 120ms ease;
+      border-color 120ms ease,
+      background-color 120ms ease;
 }
 .dym-onsite-calendar-event > span {
+    color: inherit;
   font-size: 12px;
   font-weight: 500;
 }
@@ -114,9 +180,10 @@
 .dym-onsite-calendar-event > strong {
   font-size: 14px;
   line-height: 1.5;
-  font-weight: 600;
+  font-weight: 500;
 }
 .dym-onsite-calendar-event > small {
+  color: inherit;
   line-height: 1.5;
 }
 .dym-onsite-calendar-event:focus-visible {
@@ -128,15 +195,30 @@
 }
 .dym-onsite-calendar-add {
   width: 100%;
+  min-height: 40px;
+  font-size: 14px;
   border-style: dashed;
   box-shadow: none;
 }
 @media (hover: hover) and (pointer: fine) {
   .dym-onsite-calendar-event:hover {
-    border-color: var(--campaign-ink);
+    border-color: color-mix(in srgb, var(--campaign-solid) 88%, black);
+    background: color-mix(in srgb, var(--campaign-solid) 88%, black);
   }
 }
 @media (max-width: 800px) {
+  .dym-onsite-view-bar {
+    align-items: stretch;
+  }
+  .dym-onsite-view-bar > div:last-child > button,
+  .dym-onsite-week .dym-week-controls > button,
+  .dym-onsite-calendar-add {
+    min-height: 44px;
+  }
+  .dym-onsite-legend {
+    padding: 16px;
+    gap: 8px 16px;
+  }
   .dym-onsite-calendar {
     min-width: 0;
     grid-template-columns: 1fr;

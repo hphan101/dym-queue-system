@@ -3,6 +3,11 @@
   cursor: pointer;
   transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
 }
+.dym-admin-shell .dym-table-actions-group [data-slot="button"][data-variant="destructive"] {
+  background: #b91c1c;
+  color: #fff;
+  border-color: transparent;
+}
 @media (prefers-reduced-motion: reduce) {
   .dym-admin-shell :is([data-slot="button"], .dym-btn-table-action, .dym-btn-undo, .dym-btn-recall) { transition: none; }
 }
@@ -10,7 +15,7 @@
   cursor: not-allowed;
 }
 @media (hover: hover) and (pointer: fine) {
-  .dym-admin-shell [data-slot="button"][data-variant="outline"]:hover:not(:disabled):not([aria-disabled="true"]):not(.dym-staff-delete-button),
+  .dym-admin-shell [data-slot="button"][data-variant="outline"]:hover:not(:disabled):not([aria-disabled="true"]):not(.dym-campaign-related-link),
   .dym-admin-shell [data-slot="button"][data-variant="ghost"]:hover:not(:disabled):not([aria-disabled="true"]),
   .dym-admin-shell :is(.dym-btn-table-action, .dym-btn-undo, .dym-btn-recall):hover:not(:disabled):not([aria-disabled="true"]) {
     background: color-mix(in srgb, hsl(var(--foreground)) 10%, hsl(var(--card)));
@@ -28,9 +33,10 @@
     color: hsl(var(--primary-foreground));
     box-shadow: none;
   }
-  .dym-admin-shell [data-slot="button"].dym-staff-delete-button:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: color-mix(in srgb, hsl(var(--destructive)) 12%, hsl(var(--card)));
-    border-color: hsl(var(--destructive));
+  .dym-admin-shell .dym-table-actions-group [data-slot="button"][data-variant="destructive"]:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: #991b1b;
+    color: #fff;
+    border-color: transparent;
     box-shadow: none;
   }
 }

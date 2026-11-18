@@ -50,7 +50,7 @@
 .dym-staff-compact-dialog button[data-variant="outline"] { background: hsl(var(--card)); border-color: hsl(var(--input)); color: hsl(var(--foreground)); }
 .dym-staff-compact-dialog button[data-variant="default"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 .dym-staff-password-header { flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; }
-.dym-staff-password-header > button.dym-staff-password-close { width: 32px; height: 32px; padding: 0; color: hsl(var(--muted-foreground)); }
+.dym-staff-password-header > button.dym-staff-password-close { width: 32px; height: 32px; padding: 0; }
 .dym-staff-password-close svg { width: 18px; height: 18px; stroke-width: 1.5; }
 .dym-staff-password-form { display: grid; gap: 16px; }
 .dym-staff-password-form label { font-size: 14px; line-height: 20px; font-weight: 500; }
@@ -97,30 +97,11 @@
   box-shadow: none;
 }
 .dym-staff-content .dym-table-actions-group button svg { width: 18px; height: 18px; stroke-width: 1.75; }
-.dym-staff-content .dym-table-actions-group button:not(.dym-staff-delete-button) { color: var(--color-ink-2); }
+.dym-staff-content .dym-table-actions-group button:not([data-variant="destructive"]) { color: var(--color-ink-2); }
 .dym-staff-content [role="tablist"] { height: 40px; }
 .dym-staff-content [role="tab"] { height: 32px; }
-.dym-staff-content .dym-search-field { height: 40px; }
 .dym-staff-content .dym-staff-avatar { flex-shrink: 0; }
 .dym-staff-content .dym-table-precision tr:focus-within { outline: 2px solid var(--reception-accent); outline-offset: -2px; }
-
-.dym-staff-page .dym-staff-delete-button {
-  color: #b42323;
-}
-
-.dym-staff-page .dym-staff-delete-button:hover {
-  color: #b42323;
-  background-color: #fef2f2;
-}
-
-.dym-staff-page[data-color-mode="dark"] .dym-staff-delete-button {
-  color: #f28b82;
-}
-
-.dym-staff-page[data-color-mode="dark"] .dym-staff-delete-button:hover {
-  color: #f28b82;
-  background-color: #3a2428;
-}
 
 .dym-staff-page .dym-staff-avatar > div > div {
   color: #334155;
@@ -481,7 +462,7 @@
 .dym-staff-account-dialog legend { padding: 0 0 12px; }
 .dym-staff-account-dialog small { font-size: 12px; line-height: 20px; }
 .dym-staff-account-dialog .dym-staff-branch-options > label { padding: 12px; border-radius: 8px; background: hsl(var(--card)); }
-.dym-staff-account-dialog .dym-staff-branch-options > label:has(input:checked) { border-color: hsl(var(--primary)); background: hsl(var(--muted)); }
+.dym-staff-account-dialog .dym-staff-branch-options > label:has([role="checkbox"][data-state="checked"]) { border-color: hsl(var(--primary)); background: hsl(var(--muted)); }
 .dym-staff-account-dialog .dym-staff-branch-options strong { font-size: 14px; line-height: 20px; font-weight: 500; margin-bottom: 4px; }
 .dym-staff-account-dialog .dym-staff-branch-options span { font-size: 12px; line-height: 20px; }
 .dym-staff-account-dialog .dym-staff-permission-matrix { display: grid; gap: 12px; }

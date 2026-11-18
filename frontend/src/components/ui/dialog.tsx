@@ -48,8 +48,8 @@ const DialogContent = React.forwardRef<
     >
       {children}
       {!hideCloseButton && (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-70 ring-offset-background transition-[opacity,background-color,color,transform] duration-150 ease-out-quint hover:bg-muted hover:text-foreground hover:opacity-100 active:scale-95 focus:outline-none focus:ring-1 focus:ring-ring disabled:pointer-events-none">
-          <X className="size-4" />
+        <DialogPrimitive.Close data-slot="overlay-close" aria-label="Đóng" className="dym-overlay-close absolute right-4 top-4">
+          <X aria-hidden="true" />
           <span className="sr-only">Đóng</span>
         </DialogPrimitive.Close>
       )}

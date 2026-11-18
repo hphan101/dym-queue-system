@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Field, FieldGroup } from '@/components/ui/field';
 
 export function CampaignPositionsEditor({
   positions,
@@ -12,11 +13,12 @@ export function CampaignPositionsEditor({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex max-h-60 flex-col gap-2 overflow-y-auto">
+    <FieldGroup className="min-w-0 gap-3">
+      <div className="flex min-w-0 max-h-72 flex-col gap-2 overflow-y-auto overflow-x-hidden p-1">
         {positions.map((position, index) => (
-          <div key={index} className="flex items-center gap-2">
+          <Field key={index} orientation="horizontal" className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-2">
             <Input
+              className="min-w-0"
               value={position}
               required
               maxLength={200}
@@ -37,24 +39,24 @@ export function CampaignPositionsEditor({
               size="icon"
               disabled={disabled}
               aria-label={`Xóa vị trí ${position || index + 1}`}
+              title={`Xóa vị trí ${position || index + 1}`}
               onClick={() => onChange(positions.filter((_, i) => i !== index))}
             >
               <X data-icon="inline-start" />
             </Button>
-          </div>
+          </Field>
         ))}
       </div>
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="self-start"
+        className="w-full"
         disabled={disabled || positions.length >= 100}
         onClick={() => onChange([...positions, ''])}
       >
         <Plus data-icon="inline-start" />
         Thêm vị trí
       </Button>
-    </div>
+    </FieldGroup>
   );
 }

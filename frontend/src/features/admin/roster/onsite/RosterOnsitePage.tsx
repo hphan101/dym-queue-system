@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
@@ -10,16 +11,7 @@ import {
   SparklesIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import {
-  Search,
-  X,
-  Eye,
-  EyeOff,
-  GripVertical,
-  ArrowDownAZ,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Eye, EyeOff, GripVertical, ArrowDownAZ, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
@@ -31,6 +23,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Card, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 import {
   Popover,
   PopoverContent,
@@ -46,6 +43,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { animateDetails } from '@/lib/animateDetails';
 import type { BranchCode } from '../../../../types/domain';
 import { formatDisplayDate } from '../../shared/adminFormatters';
 import { exportScheduleCostExcel } from '../shared/exportRosterExcel';
@@ -197,7 +195,9 @@ export function RosterOnsitePage({
   // Campaign Header Actions menu & Delete Campaign confirmation Dialog
   const [isCampaignMenuOpen, setIsCampaignMenuOpen] = useState(false);
   const [campaignPendingDelete, setCampaignPendingDelete] =
-    useState<RosterSchedule | null>(null);
+    useState<{ campaign: RosterSchedule; assignmentCount: number } | null>(null);
+  const [isDeleteCampaignOpen, setIsDeleteCampaignOpen] = useState(false);
+  const cancelDeleteCampaignId = useId();
 
   // Campaign-level "Phụ cấp mỗi người" input state
   const [allowanceDraft, setAllowanceDraft] = useState<number>(0);
@@ -755,8 +755,8 @@ export function RosterOnsitePage({
 
   const handleConfirmDeleteCampaign = async () => {
     if (!campaignPendingDelete) return;
-    const target = campaignPendingDelete;
-    setCampaignPendingDelete(null);
+    const target = campaignPendingDelete.campaign;
+    setIsDeleteCampaignOpen(false);
     try {
       await removeCampaign(target);
       showNotice(`Đã xóa đoàn khám "${target.company_name}".`);
@@ -936,12 +936,6 @@ export function RosterOnsitePage({
           : posAssigns.length * 10 + 10,
       });
 
-      const person = personnelMap.get(draft.personnelId);
-      showNotice(
-        draft.editingAssignmentId
-          ? `Đã cập nhật ca của ${person?.full_name ?? 'nhân sự'} tại ${positionName}.`
-          : `Đã xếp ${person?.full_name ?? 'nhân sự'} vào vị trí ${positionName}.`,
-      );
       return true;
     } catch (err) {
       setErrorMessage(
@@ -956,7 +950,6 @@ export function RosterOnsitePage({
   const handleDeleteAssignment = async (assignmentId: string) => {
     try {
       await removeAssignment(assignmentId);
-      showNotice('Đã gỡ nhân sự khỏi vị trí khám.');
     } catch (err) {
       setErrorMessage(
         err instanceof Error ? err.message : 'Không thể xóa phân công.',
@@ -967,6 +960,7 @@ export function RosterOnsitePage({
   return (
     <RosterShell
       activePage="roster-onsite"
+      contentClassName="dym-onsite-content"
       breadcrumbs={view === 'details' ? [
         { label: 'Điều phối Y khoa' },
         { label: 'Đoàn khám Onsite', onSelect: () => setView('week') },
@@ -1046,7 +1040,7 @@ export function RosterOnsitePage({
         ) : (
           <>
             {/* Daily scope and search */}
-            <div className="dym-roster-scope-bar">
+            <div className="dym-roster-scope-bar dym-onsite-daily-filters">
               <div className="dym-roster-scope-left">
                 <Tabs
                   value={selectedBranch}
@@ -1111,50 +1105,23 @@ export function RosterOnsitePage({
               </div>
 
               <div className="dym-roster-scope-right">
-                <div className="relative w-full sm:w-64 lg:w-72">
-                  <label htmlFor={searchInputId} className="sr-only">
-                    Tìm kiếm đoàn khám
-                  </label>
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id={searchInputId}
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Tìm mã đoàn, công ty, phụ trách..."
-                    className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
-                  />
-                  {searchQuery ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSearchQuery('')}
-                      aria-label="Xóa từ khóa tìm kiếm"
-                      className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X aria-hidden="true" />
-                    </Button>
-                  ) : (
-                    <kbd
-                      className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                      title="Phím tắt: /"
-                    >
-                      /
-                    </kbd>
-                  )}
-                </div>
+                <SearchField
+                id={searchInputId}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm mã đoàn, công ty, phụ trách..."
+                aria-label="Tìm kiếm đoàn khám"
+                onClear={() => setSearchQuery('')}
+                shortcut
+              />
               </div>
             </div>
 
             {/* Master-Detail Split Layout */}
             <div className="dym-roster-split-layout">
               {/* Left Rail: Campaign List sorted by exam date */}
-              <aside className="dym-roster-panel">
-                <header className="dym-roster-panel-header">
+              <Card role="complementary" aria-label="Danh sách đoàn trong ngày" className="dym-roster-panel dym-onsite-daily-list">
+                <CardHeader className="dym-roster-panel-header">
                   <div className="dym-roster-panel-title-group">
                     <h2 className="dym-roster-panel-title">
                       Đoàn ngày {formatDisplayDate(selectedDate)}
@@ -1184,7 +1151,7 @@ export function RosterOnsitePage({
                       <span>Tạo đoàn</span>
                     </Button>
                   </div>
-                </header>
+                </CardHeader>
 
                 {isLoading ? (
                   <div
@@ -1225,9 +1192,6 @@ export function RosterOnsitePage({
                         >
                           <h3 className="flex items-center justify-between px-1 text-sm font-semibold">
                             <span>{group.label}</span>
-                            <span className="text-xs font-normal text-muted-foreground">
-                              {group.items.length} đoàn
-                            </span>
                           </h3>
                           <div className="flex flex-col gap-2">
                             {!group.items.length && (
@@ -1249,8 +1213,6 @@ export function RosterOnsitePage({
                                 getCountedProvisionalCost(camp, today),
                               );
                               const isSelected = camp.id === selectedCampaignId;
-                              const branchLabel =
-                                camp.branch_code === 'q7' ? 'D7' : 'D1';
 
                               return (
                                 <button
@@ -1268,7 +1230,6 @@ export function RosterOnsitePage({
                                   }}
                                 >
                                   <div className="dym-roster-campaign-card-top">
-                                    <div className="flex items-center gap-1.5">
                                       <span className="dym-campaign-type-label">
                                         {
                                           SCHEDULE_TYPE_LABELS[
@@ -1276,18 +1237,13 @@ export function RosterOnsitePage({
                                           ]
                                         }
                                       </span>
-                                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                        {branchLabel}
-                                      </span>
-                                    </div>
-                                    <span className="dym-roster-tabular text-xs font-semibold">
-                                      {formatDisplayDate(camp.schedule_date)}
-                                    </span>
+                                    {isSelected && <Badge variant="secondary" className="dym-campaign-current">Đang xem</Badge>}
                                   </div>
 
                                   <div className="dym-roster-campaign-company">
                                     {camp.company_name}
                                   </div>
+                                  <div className="dym-campaign-list-code dym-roster-tabular">{camp.campaign_code}</div>
                                   {camp.schedule_type === 'setup' && (
                                     <p className="dym-campaign-reference text-xs">
                                       {setupCaption(camp)}
@@ -1296,7 +1252,6 @@ export function RosterOnsitePage({
 
                                   <div className="dym-roster-campaign-meta">
                                     <span className="dym-roster-tabular">
-                                      {camp.campaign_code} ·{' '}
                                       {campAssigns.length} người
                                     </span>
                                     {showCosts && (
@@ -1313,10 +1268,10 @@ export function RosterOnsitePage({
                       ))}
                   </div>
                 )}
-              </aside>
+              </Card>
 
               {/* Right Detail Panel: Selected Campaign */}
-              <section className="dym-roster-panel">
+              <Card role="region" aria-label="Chi tiết và phân công đoàn khám" className="dym-roster-panel dym-onsite-detail-panel">
                 {isLoading ? (
                   <div
                     className="flex flex-col gap-4 p-6"
@@ -1347,23 +1302,23 @@ export function RosterOnsitePage({
                     />
                   </div>
                 ) : !selectedCampaign ? (
-                  <div className="dym-roster-empty-slot">
-                    <span>
-                      <strong>
-                        Chọn một đoàn khám bên trái hoặc tạo đoàn khám mới
-                      </strong>{' '}
-                      để khởi tạo danh sách vị trí và phân công nhân sự.
-                    </span>
+                  <Empty className="dym-onsite-detail-empty">
+                    <EmptyHeader>
+                      <EmptyTitle>Chọn đoàn khám</EmptyTitle>
+                      <EmptyDescription>
+                        Chọn đoàn trong danh sách để xem vị trí và phân công nhân sự, hoặc tạo đoàn mới.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
                     <Button permissionAction="create"
                       type="button"
-                      size="sm"
                       onClick={() => void openCreateCampaignModal()}
-                      className="h-9 gap-1.5 px-3 text-[13px] font-medium"
                     >
-                      <PlusIcon className="size-4" aria-hidden="true" />
+                      <PlusIcon data-icon="inline-start" aria-hidden="true" />
                       <span>Tạo đoàn khám</span>
                     </Button>
-                  </div>
+                    </EmptyContent>
+                  </Empty>
                 ) : (
                   <>
                     {/* 1. Campaign Header & Labeled Info Boxes */}
@@ -1491,10 +1446,13 @@ export function RosterOnsitePage({
                                   disabled={historyLocked}
                                   onClick={() => {
                                     setIsCampaignMenuOpen(false);
-                                    if (!historyLocked)
-                                      setCampaignPendingDelete(
-                                        selectedCampaign,
-                                      );
+                                    if (!historyLocked) {
+                                      setCampaignPendingDelete({
+                                        campaign: selectedCampaign,
+                                        assignmentCount: selectedCampaignAssignments.length,
+                                      });
+                                      setIsDeleteCampaignOpen(true);
+                                    }
                                   }}
                                   className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] font-medium text-destructive transition-colors hover:bg-destructive/10"
                                 >
@@ -1593,8 +1551,8 @@ export function RosterOnsitePage({
                       />
                     )}
                     {/* 2. Top Cost Summary Strip (3 Numbers + Headcount) & Per-Person Allowance Control */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 px-5 py-3">
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <div className="dym-onsite-cost-summary">
+                      <div className="dym-onsite-summary-metrics">
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-xs font-medium text-muted-foreground">
                             Nhân sự:
@@ -1610,14 +1568,9 @@ export function RosterOnsitePage({
 
                         {showCosts && (
                           <>
-                            <div
-                              className="h-4 w-px bg-border"
-                              aria-hidden="true"
-                            />
-
                             <div className="flex items-baseline gap-1.5">
                               <span className="text-xs font-medium text-muted-foreground">
-                                Cost cố định:
+                                Chi phí cố định:
                               </span>
                               <span className="dym-roster-tabular text-sm font-semibold text-foreground">
                                 {formatVndCurrency(campaignBaseCost)}
@@ -1662,7 +1615,7 @@ export function RosterOnsitePage({
                       {showCosts && (
                         <form
                           onSubmit={(e) => void handleApplyCampaignAllowance(e)}
-                          className="flex items-center gap-2"
+                          className="dym-onsite-allowance-form"
                         >
                           <label
                             htmlFor="campaign-default-allowance"
@@ -1741,13 +1694,13 @@ export function RosterOnsitePage({
 
                       {/* 3. Position-Grouped 3-Column Table (Vị trí / Bàn khám | Nhân sự trực | Chi phí vị trí) */}
                       <div className="dym-roster-table-wrap">
-                        <table className="dym-roster-table">
+                        <table className="dym-roster-table" aria-label="Phân công theo vị trí">
                           <thead>
                             <tr>
                               <th className="dym-position-handle-cell">
                                 <span className="sr-only">Sắp xếp vị trí</span>
                               </th>
-                              <th className="w-[260px]">Vị trí / Bàn khám</th>
+                              <th className="dym-onsite-position-column">Vị trí / Bàn khám</th>
                               <th>Nhân sự trực</th>
                               {showCosts && (
                                 <th className="is-right w-[160px]">
@@ -1809,6 +1762,7 @@ export function RosterOnsitePage({
                                   <tr
                                     key={positionName}
                                     data-position={positionName}
+                                    data-staffed={posAssignments.length > 0}
                                     data-dragging={
                                       positionDrag.drag?.source === positionName
                                     }
@@ -2196,7 +2150,7 @@ export function RosterOnsitePage({
                     </fieldset>
                   </>
                 )}
-              </section>
+              </Card>
             </div>
 
             {/* Create / Edit / Clone Campaign Dialog (shadcn Dialog) */}
@@ -2232,34 +2186,35 @@ export function RosterOnsitePage({
           open={isCampaignModalOpen}
           onOpenChange={(open) => setIsCampaignModalOpen(open)}
         >
-          <DialogContent className="dym-campaign-form-dialog sm:max-w-xl">
-            <DialogHeader>
+          <DialogContent className="dym-campaign-form-dialog" data-mode={campaignModalMode}>
+            <DialogHeader className="dym-campaign-form-header">
               <DialogTitle>
                 {campaignModalMode === 'edit'
                   ? 'Cập nhật thông tin đoàn khám'
                   : campaignModalMode === 'clone'
                     ? 'Nhân bản đoàn khám'
-                    : 'Tạo đoàn khám Onsite / Lấy máu mới'}
+                    : 'Tạo đoàn khám'}
               </DialogTitle>
               <DialogDescription>
                 {campaignModalMode === 'clone'
                   ? `Sao chép thông tin từ đoàn "${cloneSourceCampaign?.company_name ?? ''}" sang ngày khám mới.`
-                  : 'Nhập thông tin đơn vị khám, ngày thực hiện và phụ cấp đi xa mặc định cho đoàn.'}
+                  : 'Thông tin đơn vị khám và lịch phân công'}
               </DialogDescription>
             </DialogHeader>
 
             <form
               onSubmit={(e) => void handleSaveCampaign(e)}
-              className="flex flex-col gap-3.5"
+              className="dym-campaign-form"
             >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label
+              <FieldGroup className="dym-campaign-form-body">
+              <FieldGroup className="dym-campaign-main-fields">
+                <Field className="flex flex-col gap-1.5">
+                  <FieldLabel
                     htmlFor="camp-code-input"
                     className="text-xs font-medium text-foreground"
                   >
                     Mã đoàn khám (ID Đoàn)
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-code-input"
                     type="text"
@@ -2277,15 +2232,15 @@ export function RosterOnsitePage({
                     }
                     className="dym-roster-tabular h-9"
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5">
-                  <label
+                <Field className="flex flex-col gap-1.5">
+                  <FieldLabel
                     htmlFor="camp-type-select"
                     className="text-xs font-medium text-foreground"
                   >
                     Loại đoàn ngoại viện
-                  </label>
+                  </FieldLabel>
                   <Select
                     value={campaignForm.schedule_type}
                     onValueChange={(value) => {
@@ -2307,27 +2262,27 @@ export function RosterOnsitePage({
                     <SelectTrigger id="camp-type-select" className="h-9">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="dym-campaign-select">
+                    <SelectContent>
                       <SelectGroup>
                         <SelectItem value="blood_draw">
                           Blood sampling
                         </SelectItem>
                         <SelectItem value="onsite_exam">Onsite HC</SelectItem>
                         <SelectItem value="setup">
-                          Onsite set-up (bổ sung)
+                          Onsite set-up
                         </SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5">
-                  <label
+                <Field className="flex flex-col gap-1.5">
+                  <FieldLabel
                     htmlFor="camp-branch-select"
                     className="text-xs font-medium text-foreground"
                   >
                     Cơ sở ký hợp đồng
-                  </label>
+                  </FieldLabel>
                   <Select
                     value={campaignForm.branch_code}
                     onValueChange={(value) =>
@@ -2341,16 +2296,16 @@ export function RosterOnsitePage({
                     <SelectTrigger id="camp-branch-select" className="h-9">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="dym-campaign-select">
+                    <SelectContent>
                       <SelectGroup>
                         <SelectItem value="q1">D1 — Quận 1</SelectItem>
                         <SelectItem value="q7">D7 — Quận 7</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5">
+                <Field className="flex flex-col gap-1.5">
                   <span className="text-xs font-medium text-foreground">
                     {campaignForm.schedule_type === 'setup'
                       ? 'Ngày set-up'
@@ -2401,7 +2356,7 @@ export function RosterOnsitePage({
                       Ngày đã qua cần quyền sửa lịch cũ.
                     </p>
                   )}
-                </div>
+                </Field>
 
                 {campaignForm.schedule_type === 'setup' && (
                   <SetupTargetPicker
@@ -2423,13 +2378,13 @@ export function RosterOnsitePage({
                     }
                   />
                 )}
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label
+                <Field className="flex flex-col gap-1.5 sm:col-span-2">
+                  <FieldLabel
                     htmlFor="camp-company-input"
                     className="text-xs font-medium text-foreground"
                   >
                     Tên công ty / Đơn vị khám
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-company-input"
                     type="text"
@@ -2447,20 +2402,20 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
+                </Field>
 
-                <div
+                <Field
                   className={cn(
                     'flex flex-col gap-1.5',
                     !showCosts && 'sm:col-span-2',
                   )}
                 >
-                  <label
+                  <FieldLabel
                     htmlFor="camp-contact-input"
                     className="text-xs font-medium text-foreground"
                   >
                     Người phụ trách đoàn
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-contact-input"
                     type="text"
@@ -2473,16 +2428,16 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
+                </Field>
 
                 {showCosts && (
-                  <div className="flex flex-col gap-1.5">
-                    <label
+                  <Field className="flex flex-col gap-1.5">
+                    <FieldLabel
                       htmlFor="camp-allowance-input"
                       className="text-xs font-medium text-foreground"
                     >
                       Phụ cấp mỗi người (VNĐ)
-                    </label>
+                    </FieldLabel>
                     <Input
                       id="camp-allowance-input"
                       type="text"
@@ -2499,16 +2454,16 @@ export function RosterOnsitePage({
                       }
                       className="dym-roster-tabular h-9 text-right"
                     />
-                  </div>
+                  </Field>
                 )}
 
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label
+                <Field className="flex flex-col gap-1.5 sm:col-span-2">
+                  <FieldLabel
                     htmlFor="camp-sales_person"
                     className="text-xs font-medium text-foreground"
                   >
                     Sales phụ trách
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-sales_person"
                     type="text"
@@ -2522,15 +2477,15 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label
+                <Field className="flex flex-col gap-1.5 sm:col-span-2">
+                  <FieldLabel
                     htmlFor="camp-departure_address"
                     className="text-xs font-medium text-foreground"
                   >
                     Địa chỉ xuất phát
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-departure_address"
                     type="text"
@@ -2544,15 +2499,15 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label
+                <Field className="flex flex-col gap-1.5 sm:col-span-2">
+                  <FieldLabel
                     htmlFor="camp-address-input"
                     className="text-xs font-medium text-foreground"
                   >
                     Địa chỉ thực hiện khám
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-address-input"
                     type="text"
@@ -2565,15 +2520,15 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label
+                <Field className="flex flex-col gap-1.5 sm:col-span-2">
+                  <FieldLabel
                     htmlFor="camp-notes-input"
                     className="text-xs font-medium text-foreground"
                   >
                     Ghi chú điều phối
-                  </label>
+                  </FieldLabel>
                   <Input
                     id="camp-notes-input"
                     type="text"
@@ -2586,18 +2541,19 @@ export function RosterOnsitePage({
                     }
                     className="h-9"
                   />
-                </div>
-              </div>
+                </Field>
+              </FieldGroup>
 
               {/* Template initialization toggle on Create */}
+              <FieldGroup className="dym-campaign-options">
               {campaignModalMode === 'create' && (
-                <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/25 p-3">
+                <div className="dym-campaign-option-panel">
+                  <div className="dym-campaign-option-heading">
                   <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={startFromTemplate}
-                      onChange={(e) => {
-                        const enabled = e.target.checked;
+                      onCheckedChange={(checked) => {
+                        const enabled = checked === true;
                         setStartFromTemplate(enabled);
                         const template =
                           campaignTemplates[campaignForm.schedule_type];
@@ -2618,38 +2574,36 @@ export function RosterOnsitePage({
                       }}
                       className="size-4 rounded border-border accent-primary"
                     />
-                    <span>
-                      Bắt đầu từ danh sách vị trí mẫu (
-                      {campaignTemplates[campaignForm.schedule_type].length} vị
-                      trí)
-                    </span>
+                    <span>Dùng vị trí mẫu</span>
                   </label>
                   {authorizedIsAdmin && (
                     <Button permissionAction="update"
                       type="button"
-                      variant="link"
+                      variant="outline"
                       size="sm"
-                      className="self-start"
+                      className="dym-campaign-edit-template"
                       onClick={() => void openTemplateDialog()}
                     >
                       Chỉnh mẫu chung
                     </Button>
                   )}
+                  </div>
+                  <div className="dym-campaign-position-count">
+                    <span>Vị trí trong đoàn</span>
+                    <Badge variant="secondary">{(campaignForm.position_list ?? []).length} vị trí</Badge>
+                  </div>
                   {(campaignForm.position_list ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 pl-6">
+                    <ul className="dym-campaign-position-preview" aria-label="Vị trí trong đoàn">
                       {(campaignForm.position_list ?? []).map((pos, index) => (
-                        <span
-                          key={index}
-                          className="rounded border border-border/80 bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-                        >
+                        <li key={index}>
                           {pos}
-                        </span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                  <details className="flex flex-col gap-2">
-                    <summary className="cursor-pointer select-none text-sm font-medium">
-                      Thêm / sửa vị trí cho đoàn này
+                  <details className="dym-campaign-position-details">
+                    <summary onClick={animateDetails} className="cursor-pointer select-none text-sm font-medium">
+                      Chỉnh vị trí cho đoàn này
                     </summary>
                     <div className="pt-3">
                       <CampaignPositionsEditor
@@ -2669,15 +2623,14 @@ export function RosterOnsitePage({
 
               {campaignModalMode === 'create' &&
                 campaignForm.schedule_type === 'onsite_exam' && (
-                  <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+                  <section className="dym-campaign-option-panel">
                     <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         className="size-4 accent-primary"
                         checked={createSetupTogether}
                         disabled={isMutating}
-                        onChange={(event) =>
-                          setCreateSetupTogether(event.target.checked)
+                        onCheckedChange={(checked) =>
+                          setCreateSetupTogether(checked === true)
                         }
                       />
                       <span>Tạo kèm lịch set-up</span>
@@ -2694,8 +2647,7 @@ export function RosterOnsitePage({
                             label="ngày set-up"
                           />
                           <p className="text-xs text-muted-foreground">
-                            Tự liên kết với toàn bộ ngày HC đang tạo. Công ty và
-                            thông tin liên hệ được dùng chung.
+                            Dùng chung thông tin đơn vị và liên kết với các ngày khám đã chọn.
                           </p>
                           {setupDates.some((date) =>
                             isRosterDateLocked(date, today, canEditHistory),
@@ -2706,7 +2658,7 @@ export function RosterOnsitePage({
                           )}
                         </div>
                         <details>
-                          <summary className="cursor-pointer select-none text-sm font-medium">
+                          <summary onClick={animateDetails} className="cursor-pointer select-none text-sm font-medium">
                             Vị trí set-up ({setupPositions.length})
                           </summary>
                           <div className="pt-3">
@@ -2725,11 +2677,10 @@ export function RosterOnsitePage({
               {campaignModalMode === 'clone' && (
                 <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/25 p-3">
                   <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={copyAssignmentsOnClone}
-                      onChange={(e) =>
-                        setCopyAssignmentsOnClone(e.target.checked)
+                      onCheckedChange={(checked) =>
+                        setCopyAssignmentsOnClone(checked === true)
                       }
                       className="size-4 rounded border-border accent-primary"
                     />
@@ -2740,12 +2691,14 @@ export function RosterOnsitePage({
                 </div>
               )}
 
+              </FieldGroup>
               {campaignFormError && (
                 <Alert variant="destructive"><AlertDescription>
                   {campaignFormError}
                 </AlertDescription></Alert>
               )}
-              <DialogFooter className="pt-1">
+              </FieldGroup>
+              <DialogFooter className="dym-campaign-form-footer">
                 <Button
                   type="button"
                   variant="outline"
@@ -2792,51 +2745,64 @@ export function RosterOnsitePage({
 
         {/* Delete Campaign Confirmation Dialog */}
         <Dialog
-          open={Boolean(campaignPendingDelete) && !historyLocked}
-          onOpenChange={(open) => {
-            if (!open) setCampaignPendingDelete(null);
-          }}
+          open={isDeleteCampaignOpen && !historyLocked}
+          onOpenChange={setIsDeleteCampaignOpen}
         >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Xác nhận xóa đoàn khám</DialogTitle>
-              <DialogDescription>
-                Bạn có chắc chắn muốn xóa đoàn khám{' '}
-                <strong className="text-foreground">
-                  {campaignPendingDelete?.company_name}
-                </strong>{' '}
-                ({campaignPendingDelete?.campaign_code}) ngày{' '}
-                <strong className="dym-roster-tabular text-foreground">
-                  {campaignPendingDelete
-                    ? formatDisplayDate(campaignPendingDelete.schedule_date)
-                    : ''}
-                </strong>
-                ? Toàn bộ{' '}
-                <strong className="dym-roster-tabular text-foreground">
-                  {selectedCampaignAssignments.length} ca nhân sự
-                </strong>{' '}
-                đã xếp trong đoàn sẽ bị xóa.
+          <DialogContent
+            role="alertdialog"
+            hideCloseButton
+            className="dym-campaign-delete-dialog"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              document.getElementById(cancelDeleteCampaignId)?.focus();
+            }}
+          >
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg">Xóa đoàn khám?</DialogTitle>
+              <DialogDescription className="text-sm">
+                Đoàn khám và các phân công trong đoàn sẽ bị xóa.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <Card className="dym-campaign-delete-summary">
+              <p className="break-words text-base font-semibold text-foreground">
+                {campaignPendingDelete?.campaign.company_name}
+              </p>
+              <p className="break-words text-sm text-muted-foreground">
+                {campaignPendingDelete?.campaign.campaign_code}
+              </p>
+              <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Ngày khám</dt>
+                  <dd className="mt-1 font-medium text-foreground">
+                    {campaignPendingDelete
+                      ? formatDisplayDate(campaignPendingDelete.campaign.schedule_date)
+                      : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Phân công sẽ xóa</dt>
+                  <dd className="mt-1 font-medium text-foreground">
+                    {campaignPendingDelete?.assignmentCount ?? 0} ca nhân sự
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+            <DialogFooter className="dym-campaign-delete-footer">
               <Button
+                id={cancelDeleteCampaignId}
                 type="button"
                 variant="outline"
-                size="sm"
-                onClick={() => setCampaignPendingDelete(null)}
-                className="h-9 px-3 text-xs font-medium"
+                onClick={() => setIsDeleteCampaignOpen(false)}
               >
                 Hủy
               </Button>
               <Button permissionAction="delete"
                 type="button"
                 variant="destructive"
-                size="sm"
                 disabled={isMutating || historyLocked}
                 onClick={() => void handleConfirmDeleteCampaign()}
-                className="h-9 px-3 text-xs font-medium"
               >
-                Xác nhận xóa đoàn
+                Xóa đoàn khám
               </Button>
             </DialogFooter>
           </DialogContent>

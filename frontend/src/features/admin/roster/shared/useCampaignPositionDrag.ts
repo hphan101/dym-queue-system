@@ -29,9 +29,13 @@ export function useCampaignPositionDrag({
   const pointer = useRef<{
     source: string;
     startY: number;
-    scrollY: number;
+    top: number;
+    clientY: number;
+    handle: HTMLButtonElement;
+    pointerId: number;
   } | null>(null);
   const saving = useRef(false);
+  const liveOrder = useRef<string[] | null>(null);
   const rects = useRef<Map<string, number>>(new Map());
   const [drag, setDrag] = useState<{ source: string; offset: number } | null>(
     null,
@@ -49,8 +53,19 @@ export function useCampaignPositionDrag({
         'tr[data-position]',
       ) ?? [],
     );
+  const layoutTop = (row: HTMLTableRowElement) => {
+    const transform = bodyRef.current?.ownerDocument.defaultView?.getComputedStyle?.(row).transform;
+    const offset = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0;
+    return row.getBoundingClientRect().top - offset;
+  };
 
   useLayoutEffect(() => {
+    const source = pointer.current;
+    if (source?.handle.isConnected)
+      source.handle.setPointerCapture(source.pointerId);
+    const movingRow = source && rows().find((row) => row.dataset.position === source.source);
+    if (source && movingRow)
+      setDrag({ source: source.source, offset: source.top + source.clientY - source.startY - layoutTop(movingRow) });
     if (!rects.current.size) return;
     const view = bodyRef.current?.ownerDocument.defaultView;
     if (view && !view.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -60,8 +75,10 @@ export function useCampaignPositionDrag({
           .getPropertyValue('--ease-out')
           .trim() || 'cubic-bezier(0.23, 1, 0.32, 1)';
       for (const row of rows()) {
+        if (row.dataset.position === pointer.current?.source) continue;
         const oldTop = rects.current.get(row.dataset.position!);
         if (oldTop === undefined) continue;
+        row.getAnimations?.().forEach((animation) => animation.cancel());
         const delta = oldTop - row.getBoundingClientRect().top;
         if (Math.abs(delta) > 1)
           row.animate?.(
@@ -76,10 +93,13 @@ export function useCampaignPositionDrag({
     rects.current.clear();
   }, [displayed]);
 
-  const cancel = () => {
+  const cancel = (resetPreview = true) => {
     pointer.current = null;
+    liveOrder.current = null;
+    if (resetPreview) rects.current.clear();
     setDrag(null);
     setDrop(null);
+    if (resetPreview) setPreview(null);
   };
   const targetAt = (event: PointerEvent<HTMLButtonElement>) => {
     const bounds = bodyRef.current?.getBoundingClientRect();
@@ -97,7 +117,7 @@ export function useCampaignPositionDrag({
         const rect = row.getBoundingClientRect();
         return {
           name: row.dataset.position!,
-          top: rect.top,
+          top: layoutTop(row),
           height: rect.height,
         };
       }),
@@ -110,7 +130,7 @@ export function useCampaignPositionDrag({
       !campaignId ||
       disabled ||
       saving.current ||
-      next.every((item, index) => item === displayed[index])
+      next.every((item, index) => item === positions[index])
     ) {
       cancel();
       return;
@@ -124,7 +144,7 @@ export function useCampaignPositionDrag({
       );
     saving.current = true;
     setPreview({ id: campaignId, items: next });
-    cancel();
+    cancel(false);
     try {
       await onSave(next);
     } catch (cause) {
@@ -148,36 +168,54 @@ export function useCampaignPositionDrag({
       pointer.current = {
         source: position,
         startY: event.clientY,
-        scrollY: event.currentTarget.ownerDocument.defaultView?.scrollY ?? 0,
+        top: layoutTop(rows().find((row) => row.dataset.position === position)!),
+        clientY: event.clientY,
+        handle: event.currentTarget,
+        pointerId: event.pointerId,
       };
+      liveOrder.current = [...displayed];
       setDrag({ source: position, offset: 0 });
     },
     onPointerMove(event: PointerEvent<HTMLButtonElement>) {
       if (!pointer.current) return;
+      pointer.current.clientY = event.clientY;
       const view = event.currentTarget.ownerDocument.defaultView;
       if (view && event.clientY > view.innerHeight - 72) view.scrollBy(0, 16);
       else if (view && event.clientY < 72) view.scrollBy(0, -16);
+      const movingRow = rows().find((row) => row.dataset.position === pointer.current!.source);
       setDrag({
         source: pointer.current.source,
         offset:
-          event.clientY -
-          pointer.current.startY +
-          (view?.scrollY ?? 0) -
-          pointer.current.scrollY,
+          pointer.current.top + event.clientY - pointer.current.startY -
+          (movingRow ? layoutTop(movingRow) : pointer.current.top),
       });
-      setDrop(targetAt(event));
+      const target = targetAt(event);
+      setDrop(target);
+      if (target && campaignId && liveOrder.current) {
+        const next = insertCampaignPosition(liveOrder.current, pointer.current.source, target);
+        if (next.some((item, index) => item !== liveOrder.current![index])) {
+          rects.current = new Map(rows().map((row) => [row.dataset.position!, row.getBoundingClientRect().top]));
+          liveOrder.current = next;
+          setPreview({ id: campaignId, items: next });
+        }
+      }
     },
     onPointerUp(event: PointerEvent<HTMLButtonElement>) {
       const target = targetAt(event);
       if (pointer.current && target)
         void commit(
-          insertCampaignPosition(displayed, pointer.current.source, target),
+          insertCampaignPosition(liveOrder.current ?? displayed, pointer.current.source, target),
           true,
         );
       else cancel();
     },
-    onPointerCancel: cancel,
-    onLostPointerCapture: cancel,
+    onPointerCancel: () => cancel(),
+    onLostPointerCapture(event: PointerEvent<HTMLButtonElement>) {
+      if (!pointer.current) return;
+      if (event.buttons === 1 && event.currentTarget.isConnected)
+        event.currentTarget.setPointerCapture(event.pointerId);
+      else cancel();
+    },
     onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
       if (event.key === 'Escape') {
         cancel();

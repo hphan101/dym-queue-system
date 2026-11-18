@@ -1,0 +1,49 @@
+/* UI polish follows unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.personnel-documents-dialog {
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 32px);
+  max-width: 880px;
+  max-height: calc(100dvh - 32px);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.personnel-documents-header {
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 24px;
+  padding-right: 56px;
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+}
+.personnel-documents-header h2 { font-size: 20px; line-height: 28px; }
+.personnel-documents-header p { font-size: 14px; line-height: 24px; }
+.personnel-documents-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px;
+}
+.personnel-documents-guidance { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.personnel-documents-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.personnel-documents-group { min-width: 0; box-shadow: none; }
+.personnel-documents-group > div:first-child { padding: 20px; gap: 8px; }
+.personnel-documents-group-title { font-size: 16px; line-height: 24px; letter-spacing: 0; }
+.personnel-documents-group > div:first-child > * + * { margin-top: 0; }
+.personnel-documents-group > div:nth-child(2) { padding: 0 20px 20px; }
+.personnel-documents-group p { line-height: 24px; }
+.personnel-documents-empty { min-height: 96px; padding: 20px; background: hsl(var(--muted) / .5); }
+.personnel-document-row { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 16px; border-top: 1px solid hsl(var(--border)); }
+.personnel-documents-dialog button:not([aria-label='Đóng']) { min-height: 40px; font-size: 14px; }
+.personnel-documents-footer { flex-shrink: 0; padding: 16px 24px; border-top: 1px solid hsl(var(--border)); }
+@media (max-width: 639px) {
+  .personnel-documents-groups { grid-template-columns: minmax(0,1fr); }
+  .personnel-documents-header, .personnel-documents-body { padding: 20px; }
+  .personnel-documents-header { padding-right: 52px; }
+  .personnel-documents-footer { padding: 16px 20px; }
+  .personnel-documents-dialog button:not([aria-label='Đóng']) { min-height: 44px; }
+}

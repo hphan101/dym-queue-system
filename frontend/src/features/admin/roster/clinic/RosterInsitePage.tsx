@@ -16,6 +16,8 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
@@ -27,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Popover,
   PopoverContent,
@@ -35,7 +38,6 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -659,7 +661,6 @@ export function RosterInsitePage({
         sort_order: targetRoom.displayOrder,
       });
 
-      showNotice('Đã lưu phân công vào lịch phòng khám.');
       return true;
     } catch (err) {
       setErrorMessage(
@@ -672,7 +673,6 @@ export function RosterInsitePage({
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
-    showNotice('Đã xóa phân công khỏi phòng.');
     try {
       await removeAssignment(assignmentId);
     } catch (err) {
@@ -716,6 +716,7 @@ export function RosterInsitePage({
   return (
     <RosterShell
       activePage="roster-insite"
+      contentClassName="dym-clinic-content"
       breadcrumbs={view === 'day' ? [
         { label: 'Điều phối Y khoa' },
         { label: 'Lịch tại Phòng khám', onSelect: () => setView('week') },
@@ -780,7 +781,8 @@ export function RosterInsitePage({
         />
       ) : (
         <div className="dym-insite-day">
-          <div className="dym-day-intro">
+          <Card className="dym-day-context">
+          <CardHeader className="dym-day-intro">
             <Button
               type="button"
               variant="outline"
@@ -792,17 +794,17 @@ export function RosterInsitePage({
             >
               <ChevronLeftIcon data-icon="inline-start" /> Về lịch tuần
             </Button>
-            <h2>Lịch ngày {formatDisplayDate(selectedDate)}</h2>
-            <span className="dym-day-state">
+            <CardTitle className="dym-day-title"><h2>Lịch ngày {formatDisplayDate(selectedDate)}</h2></CardTitle>
+            <Badge variant="secondary" className="dym-day-state">
               {historyLocked
                 ? 'Chỉ xem'
                 : selectedDate < today
                   ? 'Được sửa lịch cũ'
                   : 'Có thể chỉnh sửa'}
-            </span>
-          </div>
+            </Badge>
+          </CardHeader>
           {/* Top Bar: [D1] [D7] ◀ Date ▶ Hôm nay [Sao chép từ hôm qua] | Tổng ngày: X đ ⚙ */}
-          <div className="dym-roster-scope-bar">
+          <CardContent className="dym-roster-scope-bar">
             <div className="dym-roster-scope-left">
               <Tabs
                 value={selectedBranch}
@@ -831,7 +833,7 @@ export function RosterInsitePage({
                 </TabsList>
               </Tabs>
 
-              <div className="flex items-center gap-1">
+              <div className="dym-day-date-navigation flex items-center gap-1">
                 <Button
                   type="button"
                   variant="outline"
@@ -905,10 +907,10 @@ export function RosterInsitePage({
 
             <div className="dym-roster-scope-right">
               {/* Tổng ngày with instant hover breakdown: "Cố định X + Phụ cấp Y" */}
-              <div
+              <Tooltip>
+              <TooltipTrigger asChild><div
                 tabIndex={0}
-                title={dayCostBreakdownText}
-                className="dym-day-total group relative outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                className="dym-day-total outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
               >
                 <span className="text-muted-foreground">
                   {selectedDate < today ? 'Chi phí thực tế:' : 'Tổng dự kiến:'}
@@ -921,15 +923,13 @@ export function RosterInsitePage({
                     +
                   </span>
                 )}
-                <div
-                  role="tooltip"
-                  className="pointer-events-none invisible absolute right-0 top-full z-40 mt-1.5 w-max rounded-md border border-border bg-popover px-3 py-1.5 text-[13px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
-                >
+              </div></TooltipTrigger>
+                <TooltipContent side="bottom" align="end">
                   <span className="dym-roster-tabular">
                     {dayCostBreakdownText}
                   </span>
-                </div>
-              </div>
+                </TooltipContent>
+              </Tooltip>
 
               <Button permissionAction="update"
                 type="button"
@@ -944,7 +944,8 @@ export function RosterInsitePage({
                 <Cog6ToothIcon className="size-4" />
               </Button>
             </div>
-          </div>
+          </CardContent>
+          </Card>
 
           {historyLocked && (
             <Alert variant="warning" role="status" className="my-3"><AlertDescription>Lịch đã khóa: từ hôm qua trở về trước chỉ tài khoản được cấp quyền
@@ -967,20 +968,20 @@ export function RosterInsitePage({
             />
 
             {/* Room-Grouped List with Per-Day Room Adjustments */}
-            <section className="dym-roster-panel dym-day-room-panel">
-              <header className="dym-day-room-header">
-                <h3>Phân công theo phòng</h3>
+            <Card className="dym-roster-panel dym-day-room-panel">
+              <CardHeader className="dym-day-room-header">
+                <CardTitle><h3>Phân công theo phòng</h3></CardTitle>
                 <span>
                   {staffedRoomsCount}/{effectiveRooms.length} phòng đã xếp ·{' '}
                   {visibleInsiteAssignments.length} ca trực
                 </span>
-              </header>
-              <div className="dym-roster-table-wrap">
+              </CardHeader>
+              <CardContent className="dym-roster-table-wrap p-0">
                 <span id="clinic-room-order-help" className="sr-only">
                   Giữ tay nắm để kéo phòng rồi thả tại vị trí mới. Có thể dùng
                   phím mũi tên lên hoặc xuống, Escape để hủy.
                 </span>
-                <table className="dym-roster-table">
+                <table className="dym-roster-table" role="table" aria-label="Phân công theo phòng">
                   <thead>
                     <tr>
                       <th className="dym-position-handle-cell">
@@ -1034,6 +1035,7 @@ export function RosterInsitePage({
                             <tr
                               key={roomRow.key}
                               data-position={roomRow.key}
+                              data-staffed={hasStaff}
                               data-dragging={
                                 roomDrag.drag?.source === roomRow.key
                               }
@@ -1134,7 +1136,7 @@ export function RosterInsitePage({
 
                                   <span
                                     className={cn(
-                                      'text-[15px] font-semibold',
+                                      'dym-day-room-name',
                                       hasStaff
                                         ? 'text-foreground'
                                         : 'text-foreground/80',
@@ -1183,7 +1185,7 @@ export function RosterInsitePage({
                                   isMutating={isMutating}
                                   autoSelectFirstAvailableOnSubmit
                                   deleteChipTitle="Xóa khỏi phòng"
-                                  updateButtonLabel="Cập nhật (Enter)"
+                                  updateButtonLabel="Cập nhật"
                                   onSaveAssignment={(draft) =>
                                     handleSaveAssignment(roomRow, draft)
                                   }
@@ -1194,9 +1196,9 @@ export function RosterInsitePage({
                               <td
                                 title={roomBreakdownTitle}
                                 className={cn(
-                                  'is-right dym-roster-tabular align-middle text-[15px] font-semibold',
+                                  'is-right dym-day-room-cost dym-roster-tabular align-middle',
                                   roomTotalCost === 0 &&
-                                    'font-normal text-muted-foreground/60',
+                                    'font-normal text-muted-foreground',
                                 )}
                               >
                                 <div className="inline-flex items-center justify-end gap-1">
@@ -1251,7 +1253,7 @@ export function RosterInsitePage({
                                   }
                                   className="h-9 px-3.5 text-[13px] font-medium"
                                 >
-                                  Lưu (Enter)
+                                  Lưu
                                 </Button>
                                 <Button
                                   type="button"
@@ -1338,27 +1340,25 @@ export function RosterInsitePage({
                           </div>
                         </td>
                         <td
-                          title={dayCostBreakdownText}
                           className="is-right dym-roster-tabular text-[15px] text-foreground"
                         >
-                          <div className="group relative inline-flex cursor-default items-center justify-end gap-1">
+                          <Tooltip>
+                          <TooltipTrigger asChild><span tabIndex={0} className="dym-day-footer-total">
                             <span>{formatVndCurrency(dayTotalCost)}</span>
-                            <div
-                              role="tooltip"
-                              className="pointer-events-none invisible absolute bottom-full right-0 z-40 mb-1.5 w-max rounded-md border border-border bg-popover px-3 py-1.5 text-[13px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:visible group-hover:opacity-100"
-                            >
+                          </span></TooltipTrigger>
+                            <TooltipContent side="top" align="end">
                               <span className="dym-roster-tabular">
                                 {dayCostBreakdownText}
                               </span>
-                            </div>
-                          </div>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
                       </tr>
                     </tfoot>
                   )}
                 </table>
-              </div>
-            </section>
+              </CardContent>
+            </Card>
           </fieldset>
         </div>
       )}
@@ -1419,43 +1419,42 @@ export function RosterInsitePage({
       >
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-5 sm:max-w-md"
+          className="dym-room-catalog"
+          aria-describedby={undefined}
         >
-          <SheetHeader className="text-left">
+          <SheetHeader className="dym-room-catalog-header">
             <SheetTitle>
-              Danh mục phòng cố định ({ROSTER_BRANCH_LABELS[selectedBranch]})
+              Danh mục phòng cố định
             </SheetTitle>
-            <SheetDescription>
-              Thay đổi tại đây áp dụng cố định cho mọi ngày. Khi bỏ một phòng,
-              phòng sẽ ngừng hiển thị từ ngày {formatDisplayDate(selectedDate)}{' '}
-              trở đi nhưng vẫn giữ nguyên trong lịch và báo cáo của các ngày
-              trước đó.
-            </SheetDescription>
           </SheetHeader>
 
           <form
             onSubmit={(e) => void handleAddRoom(e)}
-            className="flex items-center gap-2"
+            className="dym-room-catalog-add"
           >
+            <Field>
+            <FieldLabel htmlFor="catalog-room-name">Tên phòng mới</FieldLabel>
             <Input
+              id="catalog-room-name"
               type="text"
               value={newRoomName}
               onChange={(e) => setNewRoomName(e.target.value)}
-              placeholder="Tên phòng"
-              className="h-9 min-w-0 flex-1 text-sm"
+              placeholder="VD: IMD 3"
+              className="min-w-0"
             />
+            </Field>
             <Button
               type="submit"
               size="sm"
               disabled={isMutating || !newRoomName.trim()}
-              className="h-9 shrink-0 gap-1.5 px-3"
+              className="shrink-0 gap-2 px-4"
             >
-              <PlusIcon className="size-4" />
+              <PlusIcon data-icon="inline-start" />
               <span>Thêm phòng</span>
             </Button>
           </form>
 
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1">
+          <div className="dym-room-catalog-list">
             {catalogRoomsForDate.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 Chưa có phòng cố định nào tại{' '}
@@ -1465,10 +1464,10 @@ export function RosterInsitePage({
               catalogRoomsForDate.map((room) => (
                 <div
                   key={room.id}
-                  className="group flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm shadow-sm"
+                  className="dym-room-catalog-row"
                 >
                   {editingRoomId === room.id ? (
-                    <div className="flex w-full items-center gap-1.5">
+                    <div className="dym-room-catalog-edit">
                       <Input
                         type="text"
                         autoFocus
@@ -1510,7 +1509,7 @@ export function RosterInsitePage({
                           setEditingRoomId(room.id);
                           setEditingRoomName(room.room_name);
                         }}
-                        className="min-w-0 flex-1 truncate text-left font-medium text-foreground hover:underline"
+                        className="dym-room-catalog-name"
                         title="Bấm để đổi tên phòng"
                       >
                         {room.room_name}
@@ -1538,7 +1537,7 @@ export function RosterInsitePage({
                         >
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="dym-room-catalog-options">
                           <SelectGroup>
                             <SelectItem value="unconfigured">
                               Chưa chọn chuyên môn
@@ -1557,7 +1556,7 @@ export function RosterInsitePage({
                       <button
                         type="button"
                         onClick={() => requestDeactivateCatalogRoom(room)}
-                        className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-focus-within:opacity-100 group-hover:opacity-100"
+                        className="dym-room-catalog-remove"
                         title={`Ngừng dùng phòng ${room.room_name} từ ngày ${formatDisplayDate(selectedDate)}`}
                         aria-label={`Ngừng dùng phòng ${room.room_name}`}
                       >

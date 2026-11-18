@@ -94,8 +94,31 @@
 }
 .dym-reception-page .dym-pagination-bar { background: var(--color-paper-2); border-radius: 0 0 12px 12px; }
 .dym-reception-page [role="tab"] { font-size: 14px; font-weight: 500; }
-.dym-reception-page .dym-search-field { font-family: inherit; font-size: 14px; border-radius: 8px; background: var(--color-paper-2); }
-.dym-reception-page .dym-search-field:focus { border-color: var(--reception-accent); box-shadow: none; outline: 2px solid var(--reception-accent); outline-offset: 2px; }
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tablist"] {
+  background: var(--color-paper-3);
+  box-shadow: inset 0 0 0 1px var(--color-rule);
+}
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tab"] {
+  color: var(--color-ink-2);
+}
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tab"]:hover {
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tab"][data-state="active"] {
+  background: var(--reception-accent);
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-rule-2);
+}
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tab"]:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+:is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tab"] [data-slot="badge"] {
+  background: var(--color-paper-2);
+  color: inherit;
+  font-size: 12px;
+}
 .dym-reception-page :is(.dym-btn-call-next, .dym-btn-recall, .dym-btn-table-action):focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
 @media (max-width: 600px) {
   .dym-reception-page :is(.dym-terminal-hero, .dym-terminal-ledger) { padding: 16px; }

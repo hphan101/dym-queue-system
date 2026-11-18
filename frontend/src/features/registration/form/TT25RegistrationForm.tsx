@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import React, { useState, useEffect } from 'react';
 import {
   Activity,
@@ -1074,7 +1075,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             <Info className="w-4 h-4 text-dym-blue-600 shrink-0 mt-0.5" />
             <p>
               {isEn
-                ? 'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical Facility (CS KBCB).'
+                ? 'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical facility.'
                 : 'Vui lòng chọn thông tin đối tượng và nguồn chi trả theo mẫu Thông tư 25/2026/TT-BYT. Địa điểm khám được tự động tích chọn là Cơ sở KBCB (CS KBCB).'}
             </p>
           </div>
@@ -1260,17 +1261,17 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 {isEn ? '3. Examination Location' : '3. Địa điểm khám'}
               </h3>
               <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
-                {isEn ? 'Auto-selected: CS KBCB' : 'Mặc định: CS KBCB'}
+                {isEn ? 'Auto-selected: Medical facility' : 'Mặc định: CS KBCB'}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
               {([
-                { id: 'cs_kbcb', label: 'CS KBCB', active: true },
-                { id: 'kham_luu_dong', label: 'Khám lưu động', active: false },
-                { id: 'tram_y_te', label: 'Trạm Y tế', active: false },
-                { id: 'truong_hoc', label: 'Trường học', active: false },
-                { id: 'ksk_tai_nha', label: 'KSK tại nhà', active: false },
+                { id: 'cs_kbcb', label: isEn ? 'Medical facility' : 'CS KBCB', active: true },
+                { id: 'kham_luu_dong', label: isEn ? 'Mobile clinic' : 'Khám lưu động', active: false },
+                { id: 'tram_y_te', label: isEn ? 'Health station' : 'Trạm Y tế', active: false },
+                { id: 'truong_hoc', label: isEn ? 'School' : 'Trường học', active: false },
+                { id: 'ksk_tai_nha', label: isEn ? 'Home health check' : 'KSK tại nhà', active: false },
               ] as const).map((loc) => (
                 <div
                   key={loc.id}
@@ -1436,12 +1437,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 </span>
                 <span className="font-medium text-slate-700">
                   {targetPayment.targetGroup === '14'
-                    ? '14 – Sinh viên, học viên'
+                    ? (isEn ? '14 – Student / Trainee' : '14 – Sinh viên, học viên')
                     : targetPayment.targetGroup === '15'
-                      ? '15 – NLĐ chính thức'
+                      ? (isEn ? '15 – Official employee' : '15 – NLĐ chính thức')
                       : targetPayment.targetGroup === '16'
-                        ? '16 – NLĐ phi chính thức'
-                        : targetPayment.targetOtherDetails || 'Đối tượng khác'}
+                        ? (isEn ? '16 – Informal worker' : '16 – NLĐ phi chính thức')
+                        : targetPayment.targetOtherDetails || (isEn ? 'Other target category' : 'Đối tượng khác')}
                 </span>
               </div>
               <div>
@@ -1450,17 +1451,17 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 </span>
                 <span className="font-medium text-slate-700">
                   {targetPayment.paymentSource === 'employer'
-                    ? 'Người sử dụng lao động'
+                    ? (isEn ? 'Paid by employer' : 'Người sử dụng lao động')
                     : targetPayment.paymentSource === 'self'
-                      ? 'Người dân tự chi trả'
-                      : targetPayment.paymentOtherDetails || 'Nguồn khác'}
+                      ? (isEn ? 'Self-paid by examinee' : 'Người dân tự chi trả')
+                      : targetPayment.paymentOtherDetails || (isEn ? 'Other payment source' : 'Nguồn khác')}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
                   {isEn ? 'Exam Location:' : 'Địa điểm khám:'}
                 </span>
-                <span className="font-semibold text-dym-blue-700">CS KBCB</span>
+                <span className="font-semibold text-dym-blue-700">{isEn ? 'Medical facility' : 'CS KBCB'}</span>
               </div>
             </div>
           </div>
@@ -1468,16 +1469,15 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Cam đoan */}
           <div className="p-3.5 bg-slate-50 rounded-md text-xs space-y-2">
             <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={medicalHistory.commitmentAgreed}
-                onChange={(e) =>
+                onCheckedChange={(checked) =>
                   setMedicalHistory((prev) => ({
                     ...prev,
-                    commitmentAgreed: e.target.checked,
+                    commitmentAgreed: checked === true,
                   }))
                 }
-                className="mt-0.5 rounded border-slate-300 text-dym-blue-600 focus:ring-dym-blue-500 w-4 h-4"
+                className="mt-0.5"
               />
               <span className="text-slate-700 leading-relaxed font-medium">
                 {isEn

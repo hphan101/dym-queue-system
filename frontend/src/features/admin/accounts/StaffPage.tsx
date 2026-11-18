@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/search-field';
 import { NumberedPagination } from '@/components/numbered-pagination';
 import { getDefaultPermissions } from '@/lib/staffPermissions';
 import { Avatar } from '@astryxdesign/core/Avatar';
@@ -5,14 +6,14 @@ import {
 ArrowPathIcon,
 PlusIcon,
 } from '@heroicons/react/24/outline';
-import { KeyRound,LoaderCircle,Lock,LockOpen,Pencil,Search,Trash2,X } from 'lucide-react';
+import { KeyRound, LoaderCircle, Lock, LockOpen, Pencil, Trash2 } from 'lucide-react';
 import { useEffect,useId,useMemo,useState } from 'react';
 import { FeedbackBanner } from '../shared/FeedbackBanner';
 import { AdminLayout } from '../shell/AdminLayout';
 import { apiErrorMessage,requestStaffApi } from './staffApi';
 
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
@@ -677,42 +678,15 @@ export function StaffPage({
               </Tabs>
 
               {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-              <div className="relative w-full sm:w-64 lg:w-72">
-                <label htmlFor={searchInputId} className="sr-only">
-                  Tìm kiếm nhân viên
-                </label>
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  id={searchInputId}
-                  type="search"
-                  placeholder="Tìm tên, tài khoản, chi nhánh..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="dym-search-field h-10 bg-card pl-8 pr-8 text-sm shadow-none"
-                />
-                {query ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setQuery('')}
-                    aria-label="Xóa từ khóa tìm kiếm"
-                    className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X aria-hidden="true" />
-                  </Button>
-                ) : (
-                  <kbd
-                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-xs font-medium text-muted-foreground"
-                    title="Phím tắt: /"
-                  >
-                    /
-                  </kbd>
-                )}
-              </div>
+              <SearchField
+                id={searchInputId}
+                placeholder="Tìm tên, tài khoản, chi nhánh..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Tìm kiếm nhân viên"
+                onClear={() => setQuery('')}
+                shortcut
+              />
             </div>
           </div>
 
@@ -937,13 +911,12 @@ export function StaffPage({
 
                           <Button permissionAction="delete"
                             type="button"
-                            variant="ghost"
+                            variant="destructive"
                             size="icon"
                             disabled={pendingAccountId === account.userId}
                             onClick={() => requestAccountDelete(account)}
                             title="Xóa tài khoản này"
                             aria-label={`Xóa ${account.displayName}`}
-                            className="dym-staff-delete-button"
                           >
                             <Trash2 aria-hidden="true" />
                           </Button>

@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import { useEffect, useId, useState } from 'react';
+import { Upload, FileText, LockKeyhole } from 'lucide-react';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import {
   Dialog,
@@ -8,9 +9,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
+import './personnelDocuments.css';
 import type { MedicalPersonnel } from '../data/rosterService';
 import {
   deletePersonnelDocument,
@@ -29,7 +33,7 @@ const GROUPS: Array<{
 }> = [
   {
     kind: 'identity',
-    label: 'Scan CCCD',
+    label: 'CCCD',
     hint: 'Có thể tải riêng mặt trước và mặt sau.',
   },
   {
@@ -166,19 +170,20 @@ export function PersonnelDocumentsDialog({
       }}
     >
       <DialogContent
-        className="max-h-[85svh] overflow-y-auto sm:max-w-2xl"
+        className="personnel-documents-dialog"
         aria-busy={isBusy}
       >
-        <DialogHeader>
-          <DialogTitle>File hồ sơ nhân sự</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="personnel-documents-header">
+          <DialogTitle>Hồ sơ nhân sự</DialogTitle>
+          <DialogDescription className="break-words">
             {person.personnel_code} · {person.full_name}
           </DialogDescription>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          PDF, JPG, PNG · Tối đa 10 MB/file. File riêng tư, chỉ admin được truy
-          cập.
-        </p>
+        <div className="personnel-documents-body">
+        <div className="personnel-documents-guidance text-sm text-muted-foreground">
+          <p>PDF, JPG, PNG · Tối đa 10 MB/file</p>
+          <p className="flex items-center gap-2"><LockKeyhole className="size-4 shrink-0" aria-hidden="true" />Hồ sơ riêng tư, chỉ admin được truy cập</p>
+        </div>
         {error && (
           <Alert variant="destructive"><AlertDescription className="break-words">
             {error}
@@ -237,46 +242,61 @@ export function PersonnelDocumentsDialog({
             Tải lại hồ sơ
           </Button>
         ) : (
-          GROUPS.map(({ kind, label, hint }) => (
-            <section
+          <div className="personnel-documents-groups">{GROUPS.map(({ kind, label, hint }) => (
+            <Card
               key={kind}
-              className="flex flex-col gap-3 rounded-lg border border-border p-4"
+              className="personnel-documents-group"
               aria-labelledby={`${inputId}-${kind}-label`}
             >
-              <div className="flex flex-col gap-1">
-                <label
+              <CardHeader>
+                <CardTitle
                   id={`${inputId}-${kind}-label`}
-                  htmlFor={`${inputId}-${kind}`}
-                  className="text-sm font-semibold"
+                  className="personnel-documents-group-title"
+                  role="heading"
+                  aria-level={3}
                 >
                   {label}
-                </label>
-                <p className="text-sm text-muted-foreground">{hint}</p>
-              </div>
-              <Input
+                </CardTitle>
+                <CardDescription>{hint}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+              <input
                 id={`${inputId}-${kind}`}
+                aria-label={`Tải file ${label}`}
                 type="file"
                 multiple
                 accept={PERSONNEL_FILE_ACCEPT}
                 disabled={isBusy || !can('personnel_documents', 'create')}
-                className="h-auto min-h-10 cursor-pointer py-2"
+                className="hidden"
+                tabIndex={-1}
                 onChange={(event) => {
                   const files = Array.from(event.target.files ?? []);
                   event.target.value = '';
                   void upload(kind, files);
                 }}
               />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isBusy || !can('personnel_documents', 'create')}
+                aria-label={`Tải file ${label} lên`}
+                onClick={() => document.getElementById(`${inputId}-${kind}`)?.click()}
+              >
+                <Upload data-icon="inline-start" aria-hidden="true" />
+                Tải file lên
+              </Button>
               <ul className="flex flex-col gap-2">
                 {documents
                   .filter((document) => document.kind === kind)
                   .map((document) => (
                     <li
                       key={document.id}
-                      className="flex items-center justify-between gap-3 border-t border-border pt-2"
+                      className="personnel-document-row"
                     >
                       <div className="min-w-0">
-                        <p className="break-words text-sm font-medium">
-                          {document.file_name}
+                        <p className="flex items-start gap-2 break-words text-sm font-medium">
+                          <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span className="min-w-0 break-words">{document.file_name}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {Math.ceil(document.file_size / 1024).toLocaleString(
@@ -315,16 +335,21 @@ export function PersonnelDocumentsDialog({
                   ))}
               </ul>
               {!documents.some((document) => document.kind === kind) && (
-                <p className="text-sm text-muted-foreground">Chưa có file.</p>
+                <Empty className="personnel-documents-empty">
+                  <EmptyDescription>Chưa có file</EmptyDescription>
+                </Empty>
               )}
-            </section>
-          ))
+              </CardContent>
+            </Card>
+          ))}</div>
         )}
         {isBusy && (
           <p role="status" className="text-sm text-muted-foreground">
             Đang xử lý, vui lòng giữ cửa sổ này mở…
           </p>
         )}
+        </div>
+        <DialogFooter className="personnel-documents-footer">
         <Button
           type="button"
           variant="outline"
@@ -333,6 +358,7 @@ export function PersonnelDocumentsDialog({
         >
           Đóng
         </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

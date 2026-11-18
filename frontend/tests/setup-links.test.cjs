@@ -33,7 +33,7 @@ test('setup picker selects an HC event, lets users choose its dates and never sh
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   let index = 0;
   const react = { useState(initial) { return [index++ === 0 ? { branch: 'q1', items: [a, b] } : initial, () => {}]; }, useEffect() {} };
-  const imports = { react, 'react/jsx-runtime': require('react/jsx-runtime'), './setupLinks': load('setupLinks.ts'), '../shared/adminFormatters': { formatDisplayDate: (date) => date } };
+  const imports = { react, 'react/jsx-runtime': require('react/jsx-runtime'), '@/components/ui/checkbox': { Checkbox: 'checkbox' }, './setupLinks': load('setupLinks.ts'), '../shared/adminFormatters': { formatDisplayDate: (date) => date } };
   const exports = {};
   new Function('exports', 'require', code)(exports, (name) => imports[rosterImport(name)] ?? {});
   let chosen;
@@ -42,10 +42,10 @@ test('setup picker selects an HC event, lets users choose its dates and never sh
   const nodes = elements(exports.SetupTargetPicker(props));
   nodes.find((node) => node.props?.onValueChange).props.onValueChange('group');
   assert.deepEqual(chosen.map((item) => item.id), ['a', 'b']);
-  nodes.find((node) => node.type === 'input').props.onChange({ target: { checked: false } });
+  nodes.find((node) => node.type === 'checkbox').props.onCheckedChange(false);
   assert.deepEqual(chosen.map((item) => item.id), ['b']);
   index = 0;
-  assert.equal(elements(exports.SetupTargetPicker({ ...props, branch: 'q7' })).some((node) => node.type === 'input'), false);
+  assert.equal(elements(exports.SetupTargetPicker({ ...props, branch: 'q7' })).some((node) => node.type === 'checkbox'), false);
 });
 
 test('database links are atomic, preserve history and branch permissions and cannot point at the wrong HC event', async () => {

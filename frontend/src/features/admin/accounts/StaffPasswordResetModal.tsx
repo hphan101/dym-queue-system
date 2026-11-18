@@ -42,9 +42,10 @@ export const StaffPasswordResetModal: React.FC<StaffPasswordResetModalProps> = (
             variant="ghost"
             size="icon"
             aria-label="Đóng hộp thoại"
+            data-slot="overlay-close"
             disabled={isResetting}
             onClick={onClose}
-            className="dym-staff-password-close"
+            className="dym-staff-password-close dym-overlay-close"
           >
             <X aria-hidden="true" />
           </Button>

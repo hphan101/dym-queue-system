@@ -92,7 +92,7 @@ export function ReceptionTrendChart({ date, today, branch, isActiveTab, refresh 
               formatter={(value) => <div className="flex flex-1 items-center justify-between gap-4"><span>Tiếp nhận</span><span className="tabular-nums">{formatCount(Number(value))} lượt</span></div>}
             />} />
             <Area type="monotone" dataKey="count" stroke="var(--color-count)" strokeWidth={2} fill={`url(#${gradientId})`} dot={points.length === 1 ? { r: 3 } : false} activeDot={{ r: 4, strokeWidth: 2 }}
-              isAnimationActive={!reduceMotion} animationBegin={0} animationDuration={600} animationEasing="ease-in-out" />
+              isAnimationActive={!reduceMotion} animationBegin={0} animationDuration={1000} animationEasing="ease-in-out" />
           </AreaChart>
         </ChartContainer>
         <details className="reception-trend-data">

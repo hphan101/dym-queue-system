@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { lazy, startTransition, Suspense, useEffect, useState } from 'react';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { TooltipProvider } from '../components/ui/tooltip';
 import LoginPage from '../features/auth/LoginPage';
 import { APP_NAVIGATION_EVENT } from '../lib/navigation';
 import { queryClient } from '../lib/queryClient';
@@ -49,15 +50,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-        <Suspense fallback={null}>
-          {route.kind === 'display' && <QueueDisplayPage />}
-          {route.kind === 'registration-qr' && <RegistrationQrPage />}
-          {route.kind === 'login' && <LoginPage />}
-          {route.kind === 'admin' && (
-            <AdminApplication destination={route.destination} />
-          )}
-          {route.kind === 'registration' && <RegistrationFlowPage />}
-        </Suspense>
+        <TooltipProvider delayDuration={120}>
+          <Suspense fallback={null}>
+            {route.kind === 'display' && <QueueDisplayPage />}
+            {route.kind === 'registration-qr' && <RegistrationQrPage />}
+            {route.kind === 'login' && <LoginPage />}
+            {route.kind === 'admin' && (
+              <AdminApplication destination={route.destination} />
+            )}
+            {route.kind === 'registration' && <RegistrationFlowPage />}
+          </Suspense>
+        </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>
   );

@@ -67,7 +67,7 @@ export function TT25PrintModal({ isOpen, onClose, data, onPrinted, allowPrint = 
       <div className="flex flex-wrap items-center gap-2">
         {allowPrint && <button type="button" onClick={handleDownload} disabled={!pdfUrl || isLoading} className="inline-flex items-center gap-1.5 rounded border border-slate-600 px-3 py-2 text-xs disabled:opacity-50"><Download className="size-4" />Tải PDF</button>}
         {allowPrint && <button type="button" onClick={handlePrint} disabled={!pdfUrl || isLoading || !isPreviewReady || Boolean(error)} className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Printer className="size-4" />In phiếu khám</button>}
-        <button type="button" onClick={onClose} aria-label="Đóng phiếu TT25" className="rounded p-2"><X className="size-5" /></button>
+        <button type="button" onClick={onClose} aria-label="Đóng phiếu TT25" data-slot="overlay-close" className="dym-overlay-close"><X aria-hidden="true" /></button>
       </div>
     </div>
     {printStatusError && <Alert variant="destructive" className="no-print"><AlertDescription>{printStatusError}</AlertDescription></Alert>}

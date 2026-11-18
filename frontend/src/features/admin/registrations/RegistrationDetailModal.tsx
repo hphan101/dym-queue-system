@@ -302,7 +302,8 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               )}
               <button
                 type="button"
-                className="dym-clinical-drawer-close-btn"
+                className="dym-clinical-drawer-close-btn dym-overlay-close"
+                data-slot="overlay-close"
                 onClick={onClose}
                 aria-label="Đóng bảng chi tiết"
                 title="Đóng (Esc)"

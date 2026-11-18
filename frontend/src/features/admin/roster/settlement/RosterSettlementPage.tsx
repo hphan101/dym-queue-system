@@ -1,23 +1,35 @@
+import { SearchField } from '@/components/search-field';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
-import { Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { MonthPicker } from '@/components/ui/date-picker';
-import { Input } from '@/components/ui/input';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { NumberedPagination } from '@/components/numbered-pagination';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { BranchCode } from '@/types/domain';
 import {
   formatVndCurrency,
-  getProvisionalCost,
-  getCountedProvisionalCost,
+  ROSTER_BRANCH_LABELS,
   ROLE_SHORT_LABELS,
-  summarizeAssignmentCosts,
-  type MedicalPersonnel,
   type PersonnelRoleType,
 } from '../data/rosterService';
 import { exportMonthlyPersonnelCostExcel } from '../shared/exportRosterExcel';
 import { useRosterData } from '../data/useRosterData';
 import { RosterShell } from '../shared/RosterShell';
+import { buildSettlementMetrics } from './settlementMetrics';
+import { SettlementMetricCards } from './SettlementMetricCards';
+import { buildSettlementRows, type SettlementLocation, type SettlementRow, type SettlementSort } from './settlementRows';
+import { PersonnelCostSheet } from './PersonnelCostSheet';
+import { CampaignCostTable } from './CampaignCostTable';
+import './settlement.css';
 
 export function RosterSettlementPage({
   authorizedIsAdmin = true,
@@ -26,15 +38,14 @@ export function RosterSettlementPage({
   authorizedIsAdmin?: boolean;
   isActiveTab?: boolean;
 }) {
+  const queryClient = useQueryClient();
   const {
     rosterToday,
     selectedMonth,
     setSelectedMonth,
     personnelList,
-    personnelMap,
     roomMap,
     schedules,
-    scheduleMap,
     assignments,
     isLoading,
     reloadAll,
@@ -46,6 +57,16 @@ export function RosterSettlementPage({
     'all',
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [branchFilter, setBranchFilter] = useState<'all' | BranchCode>('all');
+  const [locationFilter, setLocationFilter] = useState<SettlementLocation>('all');
+  const [sortBy, setSortBy] = useState<SettlementSort>('totalGrand');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [pageSize, setPageSize] = useState(20);
+  const [pagination, setPagination] = useState({ key: '', page: 1 });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [detailRow, setDetailRow] = useState<SettlementRow | null>(null);
+  const [detailMonth, setDetailMonth] = useState(selectedMonth);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     if (!isActiveTab) return;
@@ -66,119 +87,58 @@ export function RosterSettlementPage({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isActiveTab]);
 
-  const monthlySummary = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        person: MedicalPersonnel;
-        shiftCount: number;
-        insiteCount: number;
-        onsiteCount: number;
-        totalBase: number;
-        totalAllowance: number;
-        totalGrand: number;
-      }
-    >();
-
-    for (const a of assignments) {
-      const sched = scheduleMap.get(a.schedule_id);
-      const person = personnelMap.get(a.personnel_id);
-      if (!sched || !person) continue;
-
-      if (roleFilter !== 'all' && person.role_type !== roleFilter) continue;
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const hay =
-          `${person.personnel_code} ${person.full_name} ${person.phone_number} ${person.email}`.toLowerCase();
-        if (!hay.includes(q)) continue;
-      }
-
-      const cur = map.get(person.id) ?? {
-        person,
-        shiftCount: 0,
-        insiteCount: 0,
-        onsiteCount: 0,
-        totalBase: 0,
-        totalAllowance: 0,
-        totalGrand: 0,
-      };
-
-      const base = Number(a.base_cost_snapshot ?? 0);
-      const allow = Number(a.allowance_cost ?? 0);
-
-      cur.shiftCount += 1;
-      if (sched.schedule_type === 'insite') {
-        cur.insiteCount += 1;
-      } else {
-        cur.onsiteCount += 1;
-      }
-      cur.totalBase += base;
-      cur.totalAllowance += allow;
-      cur.totalGrand += base + allow;
-
-      map.set(person.id, cur);
-    }
-
-    return Array.from(map.values()).sort((a, b) => b.totalGrand - a.totalGrand);
-  }, [assignments, scheduleMap, personnelMap, roleFilter, searchQuery]);
-
-  const maxPersonCost = useMemo(
-    () =>
-      monthlySummary.length > 0
-        ? Math.max(...monthlySummary.map((r) => r.totalGrand), 1)
-        : 1,
-    [monthlySummary],
+  const monthlySummary = useMemo(() => buildSettlementRows(schedules, assignments, personnelList, {
+    month: selectedMonth, role: roleFilter, query: searchQuery, branch: branchFilter,
+    location: locationFilter, sortBy, sortDirection,
+  }), [schedules, assignments, personnelList, selectedMonth, roleFilter, searchQuery, branchFilter, locationFilter, sortBy, sortDirection]);
+  const allMonthRows = useMemo(() => buildSettlementRows(schedules, assignments, personnelList, { month: selectedMonth }), [schedules, assignments, personnelList, selectedMonth]);
+  const pageKey = JSON.stringify([selectedMonth, roleFilter, searchQuery, branchFilter, locationFilter, sortBy, sortDirection, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(monthlySummary.length / pageSize));
+  const visiblePage = pagination.key === pageKey ? Math.min(pagination.page, totalPages) : 1;
+  const pageStart = (visiblePage - 1) * pageSize;
+  const visibleRows = monthlySummary.slice(pageStart, pageStart + pageSize);
+  const hasFilters = Boolean(searchQuery.trim() || roleFilter !== 'all' || branchFilter !== 'all' || locationFilter !== 'all');
+  const totals = monthlySummary.reduce((total, row) => ({
+    base: total.base + row.totalBase,
+    allowance: total.allowance + row.totalAllowance, grand: total.grand + row.totalGrand,
+  }), { base: 0, allowance: 0, grand: 0 });
+  const exportExcel = (filtered: boolean) => {
+    setExportOpen(false);
+    exportMonthlyPersonnelCostExcel({
+      monthStr: selectedMonth, schedules, assignments, personnelList, roomMap,
+      scope: filtered ? 'filtered' : 'month',
+      ...(filtered ? { filterRole: roleFilter, filterPersonnelQuery: searchQuery, filterBranch: branchFilter, filterLocation: locationFilter, sortBy, sortDirection } : {}),
+    });
+  };
+  const sortColumn = (column: SettlementSort, label: string) => (
+    <button type="button" className="settlement-sort-button" onClick={() => {
+      setSortBy(column);
+      setSortDirection(sortBy === column ? (sortDirection === 'asc' ? 'desc' : 'asc') : column === 'name' ? 'asc' : 'desc');
+    }} aria-label={`Sắp xếp theo ${label.toLowerCase()}`}>
+      {label}{sortBy !== column ? <ArrowUpDown aria-hidden="true" /> : sortDirection === 'asc' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
+    </button>
   );
 
-  const monthReserve = schedules.reduce(
-    (sum, schedule) => sum + getCountedProvisionalCost(schedule, rosterToday),
-    0,
+  const metrics = useMemo(
+    () => buildSettlementMetrics(schedules, assignments, selectedMonth, rosterToday),
+    [schedules, assignments, selectedMonth, rosterToday],
   );
-  const monthForecast =
-    summarizeAssignmentCosts(assignments).totalCost + monthReserve;
-  const monthActual = summarizeAssignmentCosts(
-    assignments.filter((assignment) => {
-      const schedule = scheduleMap.get(assignment.schedule_id);
-      return schedule && schedule.schedule_date < rosterToday;
-    }),
-  ).totalCost;
+  const [year, month] = selectedMonth.split('-');
 
   return (
     <RosterShell
       activePage="roster-settlement"
       title="Quyết toán chi phí nhân sự"
+      contentClassName={`dym-settlement-content${isActiveTab ? ' settlement-page-enter' : ''}`}
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
-        <div className="flex items-center gap-2">
-          <Button permissionAction="view" permissionModule="export"
-            type="button"
-            size="sm"
-            disabled={
-              assignments.length === 0 &&
-              !schedules.some((schedule) => getProvisionalCost(schedule) > 0)
-            }
-            onClick={() =>
-              exportMonthlyPersonnelCostExcel({
-                monthStr: selectedMonth,
-                schedules,
-                assignments,
-                personnelList,
-                roomMap,
-                filterRole: roleFilter,
-                filterPersonnelQuery: searchQuery,
-              })
-            }
-            className="h-9 gap-1.5 px-3 text-xs font-medium shadow-sm"
-          >
-            <ArrowDownTrayIcon className="size-3.5 shrink-0" />
-            <span>Xuất Excel Tháng ({selectedMonth})</span>
-          </Button>
+        <div className="settlement-header-actions">
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={isLoading}
-            onClick={() => void reloadAll(true)}
+            onClick={() => { void reloadAll(true); void queryClient.invalidateQueries({ queryKey: ['roster', 'settlement-campaign'] }); }}
             className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
           >
             <ArrowPathIcon
@@ -190,43 +150,41 @@ export function RosterSettlementPage({
         </div>
       }
     >
-      <div className="dym-roster-scope-bar">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-muted-foreground">
-            Tháng quyết toán
-          </span>
-          <MonthPicker
-            value={selectedMonth}
-            onChange={setSelectedMonth}
-            ariaLabel="Chọn tháng quyết toán"
-          />
-        </div>
+      <div className="settlement-month-context">
+        <h2>Tháng {Number(month)}/{year}</h2>
+        <p>Chi phí tại phòng khám và đoàn khám ngoại viện</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {[
-          { label: 'Chi phí dự kiến', value: monthForecast },
-          { label: 'Dự phòng còn thiếu', value: monthReserve },
-          { label: 'Thực tế đến hết hôm qua', value: monthActual },
-        ].map((item) => (
-          <section key={item.label} className="dym-roster-panel p-5">
-            <h2 className="text-sm text-muted-foreground">{item.label}</h2>
-            <p className="mt-3 text-2xl font-semibold tabular-nums">
-              {isLoading ? '…' : formatVndCurrency(item.value)}
-            </p>
-          </section>
-        ))}
-      </div>
+      <SettlementMetricCards data={metrics} month={selectedMonth} isLoading={isLoading} isActiveTab={isActiveTab} />
 
       {/* Monthly Personnel Cost Settlement Table by ID */}
-      <section className="dym-roster-panel">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
+      <Card className="settlement-panel">
+        <div className="settlement-panel-header">
+          <div className="settlement-panel-heading">
           <div className="dym-registry-title-block">
             <h2 className="dym-registry-title">
-              Bảng Quyết Toán Chi Phí Nhân Sự Theo ID — Tháng {selectedMonth}
+              Chi phí theo nhân sự
             </h2>
+            <p className="text-sm text-muted-foreground">{monthlySummary.length} nhân sự trong bảng · Bộ lọc bên dưới chỉ áp dụng cho bảng này</p>
+          </div>
+            <div className="settlement-table-actions">
+          <MonthPicker value={selectedMonth} onChange={setSelectedMonth} ariaLabel="Chọn tháng quyết toán" />
+          <Popover open={exportOpen} onOpenChange={setExportOpen}>
+            <PopoverTrigger asChild>
+              <Button permissionAction="view" permissionModule="export" type="button" disabled={isLoading || (allMonthRows.length === 0 && metrics.totals.reserve === 0)}>
+                <ArrowDownTrayIcon aria-hidden="true" />Xuất Excel<ChevronDown aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-2" aria-label="Chọn phạm vi xuất Excel">
+              <div className="flex flex-col gap-1">
+                <Button permissionAction="view" permissionModule="export" type="button" variant="ghost" className="justify-start" onClick={() => exportExcel(false)}>Xuất toàn tháng ({allMonthRows.length} nhân sự)</Button>
+                <Button permissionAction="view" permissionModule="export" type="button" variant="ghost" className="justify-start" disabled={monthlySummary.length === 0} onClick={() => exportExcel(true)}>Xuất bảng đang lọc ({monthlySummary.length} nhân sự)</Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="settlement-table-toolbar">
             {/* Role Filter Tabs (shadcn Tabs) */}
             <Tabs
               value={roleFilter}
@@ -262,7 +220,7 @@ export function RosterSettlementPage({
                     className="size-1.5 rounded-full bg-emerald-500"
                     aria-hidden="true"
                   />
-                  <span>Điều dưỡng (Nurse)</span>
+                  <span>Điều dưỡng</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="technician"
@@ -282,73 +240,38 @@ export function RosterSettlementPage({
                     className="size-1.5 rounded-full bg-amber-500"
                     aria-hidden="true"
                   />
-                  <span>Cộng tác viên (CTV)</span>
+                  <span>Cộng tác viên</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Search Field (shadcn Input + Clear Button / Kbd) */}
-              <div className="relative w-full sm:w-64 lg:w-72">
-                <label htmlFor={searchInputId} className="sr-only">
-                  Tìm nhân sự trong bảng quyết toán
-                </label>
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  ref={searchInputRef}
-                  id={searchInputId}
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm theo ID, họ tên, SĐT..."
-                  className="dym-search-field h-9 bg-card pl-8 pr-8 text-xs shadow-sm"
-                />
-                {searchQuery ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSearchQuery('')}
-                    aria-label="Xóa từ khóa tìm kiếm"
-                    className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X aria-hidden="true" />
-                  </Button>
-                ) : (
-                  <kbd
-                    className="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                    aria-hidden="true"
-                  >
-                    /
-                  </kbd>
-                )}
-              </div>
+              <SearchField
+                ref={searchInputRef}
+                id={searchInputId}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm theo ID, họ tên, SĐT..."
+                aria-label="Tìm nhân sự trong bảng quyết toán"
+                onClear={() => setSearchQuery('')}
+                shortcut
+              />
 
-              <Button permissionAction="view" permissionModule="export"
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={monthlySummary.length === 0}
-                onClick={() =>
-                  exportMonthlyPersonnelCostExcel({
-                    monthStr: selectedMonth,
-                    schedules,
-                    assignments,
-                    personnelList,
-                    roomMap,
-                    filterRole: roleFilter,
-                    filterPersonnelQuery: searchQuery,
-                  })
-                }
-                className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-              >
-                <ArrowDownTrayIcon className="size-3.5 shrink-0" />
-                <span>Xuất Excel theo ID</span>
-              </Button>
             </div>
+          </div>
+          <div className="settlement-filter-row">
+            <Select value={locationFilter} onValueChange={value => setLocationFilter(value as SettlementLocation)}>
+              <SelectTrigger aria-label="Nơi làm việc" className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem value="all">Nơi làm việc</SelectItem><SelectItem value="insite">Phòng khám</SelectItem><SelectItem value="onsite">Ngoại viện</SelectItem></SelectGroup></SelectContent>
+            </Select>
+            <Select value={branchFilter} onValueChange={value => setBranchFilter(value as 'all' | BranchCode)}>
+              <SelectTrigger aria-label="Chi nhánh" className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem value="all">Chi nhánh</SelectItem>
+                {Array.from(new Set([...Object.keys(ROSTER_BRANCH_LABELS), ...schedules.map(schedule => schedule.branch_code)])).sort().map(branch => <SelectItem key={branch} value={branch}>{ROSTER_BRANCH_LABELS[branch as 'q1' | 'q7'] ?? branch.toUpperCase()}</SelectItem>)}
+              </SelectGroup></SelectContent>
+            </Select>
+            {hasFilters && <Button type="button" variant="ghost" onClick={() => { setRoleFilter('all'); setSearchQuery(''); setLocationFilter('all'); setBranchFilter('all'); }}>Xóa bộ lọc</Button>}
           </div>
         </div>
 
@@ -366,13 +289,11 @@ export function RosterSettlementPage({
                   <th>Mã ID</th>
                   <th>Họ và tên nhân sự</th>
                   <th className="is-center">Vai trò</th>
-                  <th>Số điện thoại</th>
-                  <th className="is-right">Cost định mức</th>
-                  <th className="is-center">Số ca</th>
-                  <th className="is-center">Insite / Onsite</th>
-                  <th className="is-right">Tổng Cost cố định</th>
-                  <th className="is-right">Tổng Phụ cấp</th>
-                  <th className="is-right">Tổng thực nhận</th>
+                  <th className="is-right">Định mức / ngày</th>
+                  <th className="is-center">Ca theo nơi làm</th>
+                  <th className="is-right">Chi phí cố định</th>
+                  <th className="is-right">Phụ cấp</th>
+                  <th className="is-right">Tổng chi phí</th>
                 </tr>
               </thead>
               <tbody>
@@ -390,14 +311,8 @@ export function RosterSettlementPage({
                     <td className="is-center">
                       <Skeleton className="mx-auto h-5 w-16 rounded-full" />
                     </td>
-                    <td>
-                      <Skeleton className="h-4 w-24" />
-                    </td>
                     <td className="is-right">
                       <Skeleton className="ml-auto h-4 w-20" />
-                    </td>
-                    <td className="is-center">
-                      <Skeleton className="mx-auto h-4 w-8" />
                     </td>
                     <td className="is-center">
                       <Skeleton className="mx-auto h-4 w-16" />
@@ -417,42 +332,31 @@ export function RosterSettlementPage({
             </table>
           </div>
         ) : monthlySummary.length === 0 ? (
-          <div className="dym-roster-empty-slot">
-            <span>
-              <strong>
-                Chưa có phát sinh ca trực hoặc đoàn khám trong tháng{' '}
-                {selectedMonth}.
-              </strong>{' '}
-              Khi bạn gán nhân sự ở trang Lịch tại Phòng khám hoặc Đoàn khám
-              Onsite, chi phí sẽ tự động tổng hợp tại đây.
-            </span>
-          </div>
+          <Empty className="settlement-empty">
+            <EmptyHeader>
+              <EmptyTitle>{hasFilters ? 'Không có nhân sự phù hợp' : 'Chưa có chi phí phân công'}</EmptyTitle>
+              <EmptyDescription>{hasFilters
+                ? 'Thử từ khóa khác hoặc chọn tất cả vai trò'
+                : 'Chi phí sẽ được tổng hợp khi có nhân sự được phân công trong tháng này'}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
-          <div className="dym-roster-table-wrap">
-            <table className="dym-roster-table">
+          <div className="dym-roster-table-wrap settlement-table-scroll">
+            <table className="dym-roster-table" aria-label="Chi phí theo nhân sự">
               <thead>
                 <tr>
                   <th>Mã ID</th>
-                  <th>Họ và tên nhân sự</th>
+                  <th aria-sort={sortBy === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>{sortColumn('name', 'Họ và tên nhân sự')}</th>
                   <th className="is-center">Vai trò</th>
-                  <th>Số điện thoại</th>
-                  <th className="is-right">Cost định mức</th>
-                  <th className="is-center">Số ca</th>
-                  <th className="is-center">Insite / Onsite</th>
-                  <th className="is-right">Tổng Cost cố định</th>
-                  <th className="is-right">Tổng Phụ cấp</th>
-                  <th className="is-right">Tổng thực nhận</th>
+                  <th className="is-right">Định mức / ngày</th>
+                  <th className="is-center">Ca theo nơi làm</th>
+                  <th className="is-right">Chi phí cố định</th>
+                  <th className="is-right">Phụ cấp</th>
+                  <th className="is-right" aria-sort={sortBy === 'totalGrand' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>{sortColumn('totalGrand', 'Tổng chi phí')}</th>
                 </tr>
               </thead>
               <tbody>
-                {monthlySummary.map((row, idx) => {
-                  const pct = Math.min(
-                    100,
-                    Math.max(
-                      4,
-                      Math.round((row.totalGrand / maxPersonCost) * 100),
-                    ),
-                  );
+                {visibleRows.map((row) => {
                   return (
                     <tr key={row.person.id}>
                       <td>
@@ -462,38 +366,21 @@ export function RosterSettlementPage({
                       </td>
                       <td>
                         <div className="flex flex-col">
-                          <span className="font-medium">
+                          <button type="button" className="settlement-person-link" aria-label={`Xem chi phí của ${row.person.full_name}`} onClick={() => { setDetailRow(row); setDetailMonth(selectedMonth); setDetailOpen(true); }}>
                             {row.person.full_name}
-                          </span>
-                          <div
-                            className="dym-roster-thin-bar-track"
-                            aria-hidden="true"
-                          >
-                            <div
-                              className={`dym-roster-thin-bar-fill ${idx === 0 ? 'is-top' : ''}`}
-                              style={{ transform: `scaleX(${pct / 100})` }}
-                            />
-                          </div>
+                          </button>
                         </div>
                       </td>
                       <td className="is-center">
-                        <span
-                          className={`dym-roster-role-badge role-${row.person.role_type}`}
-                        >
-                          {ROLE_SHORT_LABELS[row.person.role_type]}
-                        </span>
+                        <Badge variant="secondary">
+                          {row.person.role_type === 'nurse' ? 'Điều dưỡng' : ROLE_SHORT_LABELS[row.person.role_type]}
+                        </Badge>
                       </td>
-                      <td className="dym-roster-tabular">
-                        {row.person.phone_number || '—'}
-                      </td>
-                      <td className="is-right dym-roster-tabular text-slate-500">
+                      <td className="is-right dym-roster-tabular text-muted-foreground">
                         {formatVndCurrency(row.person.fixed_cost)}
                       </td>
-                      <td className="is-center dym-roster-tabular font-semibold">
-                        {row.shiftCount}
-                      </td>
                       <td className="is-center dym-roster-tabular text-xs">
-                        {row.insiteCount} phòng / {row.onsiteCount} đoàn
+                        <div className="flex flex-col gap-1"><span>{row.insiteCount} ca phòng khám</span><span>{row.onsiteCount} ca ngoại viện</span></div>
                       </td>
                       <td className="is-right dym-roster-tabular">
                         {formatVndCurrency(row.totalBase)}
@@ -510,34 +397,31 @@ export function RosterSettlementPage({
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     Tổng quyết toán ({monthlySummary.length} nhân sự)
-                  </td>
-                  <td className="is-center dym-roster-tabular">
-                    {monthlySummary.reduce((s, r) => s + r.shiftCount, 0)}
                   </td>
                   <td />
                   <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalBase, 0),
-                    )}
+                    {formatVndCurrency(totals.base)}
                   </td>
                   <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalAllowance, 0),
-                    )}
+                    {formatVndCurrency(totals.allowance)}
                   </td>
                   <td className="is-right dym-roster-tabular">
-                    {formatVndCurrency(
-                      monthlySummary.reduce((s, r) => s + r.totalGrand, 0),
-                    )}
+                    {formatVndCurrency(totals.grand)}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
-      </section>
+        {!isLoading && monthlySummary.length > 0 && <div className="settlement-pagination">
+          <p>Hiển thị {pageStart + 1}–{Math.min(pageStart + pageSize, monthlySummary.length)} trong {monthlySummary.length} nhân sự</p>
+          <NumberedPagination currentPage={visiblePage} totalPages={totalPages} onPageChange={page => setPagination({ key: pageKey, page })} pageSize={pageSize} onPageSizeChange={setPageSize} label="Phân trang quyết toán" />
+        </div>}
+      </Card>
+      <CampaignCostTable schedules={schedules} assignments={assignments} personnelList={personnelList} month={selectedMonth} today={rosterToday} isLoading={isLoading} isActiveTab={isActiveTab} />
+      <PersonnelCostSheet row={detailRow} roomMap={roomMap} month={detailMonth} open={detailOpen && detailMonth === selectedMonth && isActiveTab} onOpenChange={setDetailOpen} />
     </RosterShell>
   );
 }

@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectTrigger,
@@ -79,7 +80,7 @@ export function SetupTargetPicker({
                 }
               />
             </SelectTrigger>
-            <SelectContent className="dym-campaign-select max-w-[calc(100vw-32px)]">
+            <SelectContent>
               <SelectGroup>
                 {groups.map((group) => (
                   <SelectItem
@@ -111,15 +112,13 @@ export function SetupTargetPicker({
                   key={day.id}
                   className="flex cursor-pointer items-center gap-2"
                 >
-                  <input
-                    type="checkbox"
-                    className="size-4 shrink-0 accent-primary"
+                  <Checkbox
                     checked={ids.includes(day.id)}
-                    onChange={(event) =>
+                    onCheckedChange={(checked) =>
                       onChange(
                         selected.items.filter((item) =>
                           item.id === day.id
-                            ? event.target.checked
+                            ? checked === true
                             : ids.includes(item.id),
                         ),
                       )

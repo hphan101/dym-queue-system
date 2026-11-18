@@ -1,5 +1,7 @@
 import { getTodayInVietnam } from '../../../../lib/date';
 import { orderCampaignPositions } from '../onsite/campaignPositionOrder';
+import { buildSettlementRows, type SettlementFilters } from '../settlement/settlementRows';
+import type { buildCampaignSettlementRows } from '../settlement/campaignSettlementRows';
 import {
   columnLetter,
   createZipArchive,
@@ -174,6 +176,31 @@ function triggerXlsxDownload(
   link.click();
   document.body.removeChild(link);
   window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export function exportCampaignSettlementExcel(month: string, rows: ReturnType<typeof buildCampaignSettlementRows>, scope: 'month' | 'filtered' = 'filtered'): void {
+  const headers = ['Mã đoàn', 'Công ty', 'Ngày', 'Loại đoàn', 'Chi nhánh', 'Nhân sự', 'Chi phí cố định (VNĐ)', 'Phụ cấp (VNĐ)', 'Chi phí nhân sự (VNĐ)', 'Dự phòng (VNĐ)'];
+  const xmlRows = [
+    renderRowXml(1, 26, [{ val: `CHI PHÍ ĐOÀN — ${month}`, styleId: 7 }]),
+    renderRowXml(2, 22, [{ val: 'Dự phòng tách riêng, không cộng vào chi phí nhân sự', styleId: 8 }]),
+    renderRowXml(3, 26, headers.map(val => ({ val, styleId: 1 }))),
+  ];
+  const totals = { base: 0, allowance: 0, cost: 0, reserve: 0 };
+  rows.forEach((row, index) => {
+    const { schedule } = row;
+    const values: Array<string | number> = [schedule.campaign_code ?? '', schedule.company_name, formatDisplayDate(schedule.schedule_date), SCHEDULE_TYPE_LABELS[schedule.schedule_type], ROSTER_BRANCH_LABELS[schedule.branch_code as 'q1' | 'q7'] ?? schedule.branch_code.toUpperCase(), row.personnelCount, row.baseCost, row.allowanceCost, row.totalCost, row.reserve];
+    xmlRows.push(renderRowXml(index + 4, 24, values.map((val, col) => ({ val, styleId: col >= 6 ? 4 : col === 5 ? 3 : 2, isNum: typeof val === 'number' }))));
+    totals.base += row.baseCost; totals.allowance += row.allowanceCost; totals.cost += row.totalCost; totals.reserve += row.reserve;
+  });
+  xmlRows.push(renderRowXml(rows.length + 4, 26, [
+    { val: `TỔNG (${rows.length} lịch đoàn)`, styleId: 5 },
+    ...Array.from({ length: 5 }, () => ({ val: '', styleId: 5 })),
+    ...[totals.base, totals.allowance, totals.cost, totals.reserve].map(val => ({ val, styleId: 6, isNum: true })),
+  ]));
+  const widths = [24, 36, 16, 22, 20, 12, 24, 20, 24, 24];
+  const cols = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('');
+  const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${xmlRows.join('')}</sheetData></worksheet>`;
+  triggerXlsxDownload([{ name: 'Chi phi theo doan', xml }], `Chi-Phi-Doan_${month}${scope === 'filtered' ? '_Dang-loc' : ''}.xlsx`);
 }
 
 interface CellSpec {
@@ -531,84 +558,33 @@ export function exportMonthlyPersonnelCostExcel({
   roomMap,
   filterRole,
   filterPersonnelQuery,
+  filterBranch,
+  filterLocation,
+  sortBy,
+  sortDirection,
+  scope = 'month',
 }: {
   monthStr: string;
   schedules: RosterSchedule[];
   assignments: RosterAssignment[];
   personnelList: MedicalPersonnel[];
   roomMap: Map<string, ClinicRoom>;
-  filterRole?: string;
+  filterRole?: SettlementFilters['role'];
   filterPersonnelQuery?: string;
+  filterBranch?: SettlementFilters['branch'];
+  filterLocation?: SettlementFilters['location'];
+  sortBy?: SettlementFilters['sortBy'];
+  sortDirection?: SettlementFilters['sortDirection'];
+  scope?: 'month' | 'filtered';
 }): void {
   const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
   const personnelMap = new Map(personnelList.map((p) => [p.id, p]));
 
-  const normalizedQuery = (filterPersonnelQuery ?? '').trim().toLowerCase();
-
-  // Filter assignments that belong to schedules in this month
-  const validAssignments = assignments.filter((a) => {
-    const sched = scheduleMap.get(a.schedule_id);
-    if (!sched) return false;
-    const person = personnelMap.get(a.personnel_id);
-    if (!person) return false;
-    if (filterRole && filterRole !== 'all' && person.role_type !== filterRole) {
-      return false;
-    }
-    if (normalizedQuery) {
-      const hay =
-        `${person.personnel_code} ${person.full_name} ${person.phone_number} ${person.email}`.toLowerCase();
-      if (!hay.includes(normalizedQuery)) return false;
-    }
-    return true;
+  const summaryList = buildSettlementRows(schedules, assignments, personnelList, {
+    month: monthStr, role: filterRole, query: filterPersonnelQuery,
+    branch: filterBranch, location: filterLocation, sortBy, sortDirection,
   });
-
-  // Group by personnel_id
-  interface SummaryItem {
-    person: MedicalPersonnel;
-    shiftCount: number;
-    insiteCount: number;
-    onsiteCount: number;
-    totalBase: number;
-    totalAllowance: number;
-    totalGrand: number;
-  }
-
-  const summaryByPersonId = new Map<string, SummaryItem>();
-
-  for (const item of validAssignments) {
-    const person = personnelMap.get(item.personnel_id);
-    const sched = scheduleMap.get(item.schedule_id);
-    if (!person || !sched) continue;
-
-    const existing = summaryByPersonId.get(person.id) ?? {
-      person,
-      shiftCount: 0,
-      insiteCount: 0,
-      onsiteCount: 0,
-      totalBase: 0,
-      totalAllowance: 0,
-      totalGrand: 0,
-    };
-
-    const base = Number(item.base_cost_snapshot ?? 0);
-    const allow = Number(item.allowance_cost ?? 0);
-
-    existing.shiftCount += 1;
-    if (sched.schedule_type === 'insite') {
-      existing.insiteCount += 1;
-    } else {
-      existing.onsiteCount += 1;
-    }
-    existing.totalBase += base;
-    existing.totalAllowance += allow;
-    existing.totalGrand += base + allow;
-
-    summaryByPersonId.set(person.id, existing);
-  }
-
-  const summaryList = Array.from(summaryByPersonId.values()).sort((a, b) =>
-    a.person.personnel_code.localeCompare(b.person.personnel_code),
-  );
+  const validAssignments = summaryList.flatMap(row => row.entries.map(entry => entry.assignment));
 
   // Sheet 1: Tổng hợp theo ID
   const s1ColWidths = [6, 15, 26, 16, 15, 24, 16, 14, 14, 18, 18, 20];
@@ -646,12 +622,12 @@ export function exportMonthlyPersonnelCostExcel({
     'Phân loại',
     'Số điện thoại',
     'Email',
-    'Cost định mức (VNĐ)',
+    'Định mức / ngày (VNĐ)',
     'Tổng số ca',
-    'Insite / Onsite',
-    'Tổng Cost cố định (VNĐ)',
+    'Ca phòng khám / Ca ngoại viện',
+    'Chi phí cố định (VNĐ)',
     'Tổng Phụ cấp (VNĐ)',
-    'Tổng thực nhận (VNĐ)',
+    'Tổng chi phí (VNĐ)',
   ];
   s1Rows.push(
     renderRowXml(
@@ -693,7 +669,7 @@ export function exportMonthlyPersonnelCostExcel({
   s1Rows.push(
     renderRowXml(r1++, 24, [
       { val: '', styleId: 5 },
-      { val: 'TỔNG CỘNG TOÀN THÁNG', styleId: 5 },
+      { val: 'TỔNG CỘNG DỮ LIỆU XUẤT', styleId: 5 },
       { val: `${summaryList.length} nhân sự`, styleId: 5 },
       { val: '', styleId: 5 },
       { val: '', styleId: 5 },
@@ -845,16 +821,15 @@ export function exportMonthlyPersonnelCostExcel({
     [
       { name: 'Tong hop theo ID', xml: sheet1Xml },
       { name: 'Chi tiet tung ca', xml: sheet2Xml },
-      {
+      ...(scope === 'month' ? [{
         name: 'Du phong theo ngay',
         xml: buildProvisionalSheet(monthStr, schedules),
-      },
-      {
+      }, {
         name: 'Thuc te da su dung',
         xml: buildActualCostSheet(monthStr, schedules, validAssignments),
-      },
+      }] : []),
     ],
-    `Chi-Phi-Nhan-Su-Theo-ID_${monthStr}.xlsx`,
+    `Chi-Phi-Nhan-Su-Theo-ID_${monthStr}${scope === 'filtered' ? '_Dang-loc' : ''}.xlsx`,
   );
 }
 
