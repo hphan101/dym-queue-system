@@ -206,7 +206,7 @@ test('daily Excel includes a separate provisional row and monthly provisional sh
   const xlsx = {};
   const code = ts.transpileModule(fs.readFileSync(path.join(root, 'frontend/src/lib/xlsx.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   new Function('exports', code)(xlsx);
-  const deps = { ...service(), ...positionOrder, ...xlsx, getTodayInVietnam: () => '2026-11-17', formatDisplayDate: (value) => value };
+  const deps = { ...service(), ...positionOrder, ...xlsx, ...load('shiftTime.ts'), getTodayInVietnam: () => '2026-11-17', formatDisplayDate: (value) => value };
   let sheet;
   const exported = {};
   const selected = functions.map((node) => node.getText(ast)).join('\n') + '\nexports.reserveSheet = buildProvisionalSheet; exports.actualSheet = buildActualCostSheet;';

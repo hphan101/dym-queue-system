@@ -129,7 +129,7 @@ export function RosterSettlementPage({
     <RosterShell
       activePage="roster-settlement"
       title="Quyết toán chi phí nhân sự"
-      contentClassName={`dym-settlement-content${isActiveTab ? ' settlement-page-enter' : ''}`}
+      contentClassName="dym-settlement-content"
       authorizedIsAdmin={authorizedIsAdmin}
       headerActions={
         <div className="settlement-header-actions">

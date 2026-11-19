@@ -14,7 +14,7 @@ function load(file, imports) {
 }
 const service = load('rosterService.ts', { '../../../lib/supabaseClient': { supabase: {} } });
 const week = load('insiteWeek.ts', { './rosterService': service });
-const model = load('dashboardSummary.ts', { './rosterService': service, './insiteWeek': week });
+const model = load('dashboardSummary.ts', { './rosterService': service, './insiteWeek': week, './shiftTime': load('shiftTime.ts', {}) });
 const schedule = (id, date, type = 'onsite_exam', branch = 'q1', extra = {}) => ({ id, schedule_date: date, schedule_type: type, branch_code: branch, company_name: id, position_list: ['Nội', 'Siêu âm'], provisional_cost: 100, created_at: '2026-11-01', ...extra });
 const assignment = (id, scheduleId, person, shift = 'FULL', extra = {}) => ({ id, schedule_id: scheduleId, personnel_id: person, position_label: 'Nội', shift_period: shift, base_cost_snapshot: 1000, allowance_cost: 200, created_at: '2026-11-01', sort_order: 0, ...extra });
 

@@ -94,7 +94,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 )}
                 {/* Ticket & Time */}
                 <td className="col-ticket">
-                  <div className="flex flex-col gap-1 items-start">
+                  <div className="inline-flex flex-col items-center gap-1">
                     <span className="dym-ticket-tag" data-parity={row.queue_number % 2 === 0 ? 'even' : 'odd'}>
                       <HighlightText
                         text={formatQueueNumber(row.queue_number)}

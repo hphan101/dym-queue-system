@@ -46,6 +46,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { getTodayInVietnam } from '../../../../lib/date';
 import { formatDisplayDate } from '../../shared/adminFormatters';
+import { formatAssignmentShift } from '../data/shiftTime';
 import { exportScheduleCostExcel } from '../shared/exportRosterExcel';
 import {
   RosterAssignmentCell,
@@ -59,7 +60,6 @@ import {
   updateClinicRoom,
   saveClinicRoomOrder,
   ROSTER_BRANCH_LABELS,
-  SHIFT_SHORT_LABELS,
   shiftIsoDate,
   summarizeAssignmentCosts,
   type ClinicRoom,
@@ -616,10 +616,9 @@ export function RosterInsitePage({
   const handleSaveAssignment = async (
     targetRoom: EffectiveRoomRow,
     draft: RosterAssignmentDraft,
-  ): Promise<boolean> => {
+  ): Promise<boolean | string> => {
     if (!draft.personnelId) {
-      setErrorMessage('Vui lòng chọn nhân sự chưa bị trùng ca trực.');
-      return false;
+      return 'Vui lòng chọn nhân sự chưa bị trùng ca trực.';
     }
 
     const person = personnelMap.get(draft.personnelId);
@@ -631,8 +630,7 @@ export function RosterInsitePage({
       (!existing || existing.personnel_id !== person.id) &&
       !canAssignDoctorToRoom(person, targetRoom.doctorSpecialty)
     ) {
-      setErrorMessage('Bác sĩ chưa có chuyên môn phù hợp với phòng này.');
-      return false;
+      return 'Bác sĩ chưa có chuyên môn phù hợp với phòng này.';
     }
 
     if (draft.conflictAssignment) {
@@ -641,10 +639,7 @@ export function RosterInsitePage({
       );
       const personName =
         personnelMap.get(draft.personnelId)?.full_name || 'Nhân sự';
-      setErrorMessage(
-        `${personName} đã được xếp tại ${conflictRoom} (${SHIFT_SHORT_LABELS[draft.conflictAssignment.shift_period]}).`,
-      );
-      return false;
+      return `${personName} đã được xếp tại ${conflictRoom} (${formatAssignmentShift(draft.conflictAssignment)}).`;
     }
 
     try {
@@ -655,6 +650,9 @@ export function RosterInsitePage({
         position_label: targetRoom.roomName,
         personnel_id: draft.personnelId,
         shift_period: draft.shiftPeriod,
+        start_minute: draft.startMinute,
+        end_minute: draft.endMinute,
+        day_rate_snapshot: draft.dayRate,
         base_cost_snapshot: draft.baseCostSnapshot,
         allowance_cost: draft.allowanceCost,
         note: draft.note,
@@ -663,12 +661,12 @@ export function RosterInsitePage({
 
       return true;
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : 'Không thể lưu phân công phòng khám.',
-      );
-      return false;
+      if (!(err instanceof Error)) return 'Không thể lưu phân công phòng khám.';
+      if (/start_minute|end_minute|day_rate_snapshot/.test(err.message) &&
+        /column|schema cache/i.test(err.message)) {
+        return 'Cơ sở dữ liệu chưa được cập nhật để lưu ca theo giờ.';
+      }
+      return err.message;
     }
   };
 
@@ -718,7 +716,7 @@ export function RosterInsitePage({
       activePage="roster-insite"
       contentClassName="dym-clinic-content"
       breadcrumbs={view === 'day' ? [
-        { label: 'Điều phối Y khoa' },
+        { label: 'Điều phối' },
         { label: 'Lịch tại Phòng khám', onSelect: () => setView('week') },
         { label: formatDisplayDate(selectedDate) },
       ] : undefined}
@@ -1158,6 +1156,7 @@ export function RosterInsitePage({
 
                               <td className="align-middle">
                                 <RosterAssignmentCell
+                                  timedShifts
                                   readOnly={historyLocked}
                                   rowKey={roomRow.key}
                                   targetLabel={roomRow.roomName}

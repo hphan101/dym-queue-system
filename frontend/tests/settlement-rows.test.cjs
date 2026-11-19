@@ -72,6 +72,7 @@ test('filtered Excel matches table rows and totals; full-month Excel ignores tab
   const service = load('features/admin/roster/data/rosterService.ts', { '../personnel/doctorSpecialties': specialties });
   let entries;
   const excel = load('features/admin/roster/shared/exportRosterExcel.ts', {
+    '../data/shiftTime': load('features/admin/roster/data/shiftTime.ts'),
     '../settlement/settlementRows': rowsModule,
     '../data/rosterService': service,
     '../../../../lib/date': { getTodayInVietnam: () => '2026-11-17' },

@@ -1,3 +1,4 @@
+import { formatAssignmentShift } from '../data/shiftTime';
 import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -60,7 +61,6 @@ import {
   isRosterDateLocked,
   parseCurrencyInput,
   ROSTER_BRANCH_LABELS,
-  SHIFT_SHORT_LABELS,
   shiftIsoDate,
   summarizeAssignmentCosts,
   SCHEDULE_TYPE_LABELS,
@@ -907,7 +907,7 @@ export function RosterOnsitePage({
     if (draft.conflictAssignment) {
       const conflictPerson = personnelMap.get(draft.personnelId);
       setErrorMessage(
-        `${conflictPerson?.full_name || 'Nhân sự'} đã xếp tại ${getConflictLocationLabel(draft.conflictAssignment)} (${SHIFT_SHORT_LABELS[draft.conflictAssignment.shift_period]}).`,
+        `${conflictPerson?.full_name || 'Nhân sự'} đã xếp tại ${getConflictLocationLabel(draft.conflictAssignment)} (${formatAssignmentShift(draft.conflictAssignment)}).`,
       );
       return false;
     }
@@ -962,7 +962,7 @@ export function RosterOnsitePage({
       activePage="roster-onsite"
       contentClassName="dym-onsite-content"
       breadcrumbs={view === 'details' ? [
-        { label: 'Điều phối Y khoa' },
+        { label: 'Điều phối' },
         { label: 'Đoàn khám Onsite', onSelect: () => setView('week') },
         { label: selectedCampaign
           ? `${selectedCampaign.company_name || selectedCampaign.campaign_code} · ${formatDisplayDate(selectedCampaign.schedule_date)}`
@@ -1955,7 +1955,7 @@ export function RosterOnsitePage({
                                             Number(item.allowance_cost) > 0;
                                           return [
                                             `${person?.full_name || 'Nhân sự'} (${person?.personnel_code || '—'})`,
-                                            `Ca: ${SHIFT_SHORT_LABELS[item.shift_period]}`,
+                                            `Ca: ${formatAssignmentShift(item)}`,
                                             hasAllowance
                                               ? `Chi phí: Cố định ${formatVndCurrency(item.base_cost_snapshot)} + Phụ cấp ${formatVndCurrency(item.allowance_cost)} = ${formatVndCurrency(Number(item.base_cost_snapshot) + Number(item.allowance_cost))}`
                                               : `Chi phí: ${formatVndCurrency(item.base_cost_snapshot)}`,

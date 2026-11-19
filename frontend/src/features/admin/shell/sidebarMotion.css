@@ -52,6 +52,7 @@
   background: var(--sidebar-selected-bg);
   color: var(--sidebar-selected-text);
   font-weight: 500;
+  transition: none;
 }
 .dym-sidebar-navigation [data-sidebar="menu-button"]:focus-visible,
 .dym-sidebar-navigation [data-sidebar="menu-sub-button"]:focus-visible {
@@ -59,26 +60,7 @@
   outline-offset: 2px;
   box-shadow: none;
 }
-html[data-navigation-motion="pointer"] .dym-admin-content {
-  opacity: 1;
-  transform: none;
-  transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
-}
-@starting-style {
-  html[data-navigation-motion="pointer"] .dym-admin-content {
-    opacity: 0.65;
-    transform: translateY(4px);
-  }
-}
-html[data-navigation-motion="instant"] .dym-sidebar-navigation [data-sidebar="menu-button"],
-html[data-navigation-motion="instant"] .dym-sidebar-navigation [data-sidebar="menu-sub-button"] {
-  transition: none;
-}
 @media (prefers-reduced-motion: reduce) {
-  html[data-navigation-motion] .dym-admin-content,
   .dym-sidebar-navigation [data-sidebar="menu-button"],
   .dym-sidebar-navigation [data-sidebar="menu-sub-button"] { transition: none; }
-  @starting-style {
-    html[data-navigation-motion="pointer"] .dym-admin-content { opacity: 1; transform: none; }
-  }
 }

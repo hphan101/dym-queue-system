@@ -10,6 +10,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { Input } from '@/components/ui/input';
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
@@ -21,7 +22,6 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
-  doShiftsOverlap,
   formatCurrencyInput,
   formatNumberPlain,
   formatVndCurrency,
@@ -30,18 +30,23 @@ import {
   ROLE_FILTER_OPTIONS,
   ROLE_SHORT_LABELS,
   SHIFT_OPTIONS,
-  SHIFT_SHORT_LABELS,
   type MedicalPersonnel,
   type PersonnelRoleType,
   type RosterAssignment,
   type ShiftPeriod,
 } from '../data/rosterService';
+import { assignmentShiftsOverlap, calculateClinicShiftCost, CLINIC_SHIFT_DEFAULTS, formatAssignmentShift, formatShiftMinute } from '../data/shiftTime';
 import './assignmentPopover.css';
+
+const SHIFT_MINUTES = Array.from({ length: 73 }, (_, index) => 360 + index * 15);
 
 export interface RosterAssignmentDraft {
   editingAssignmentId: string | null;
   personnelId: string;
   shiftPeriod: ShiftPeriod;
+  startMinute?: number;
+  endMinute?: number;
+  dayRate?: number;
   baseCostSnapshot: number;
   allowanceCost: number;
   note: string;
@@ -50,6 +55,7 @@ export interface RosterAssignmentDraft {
 
 interface RosterAssignmentCellProps {
   showCosts?: boolean;
+  timedShifts?: boolean;
   readOnly?: boolean;
   rowKey: string;
   targetLabel: string;
@@ -70,12 +76,13 @@ interface RosterAssignmentCellProps {
     assign: RosterAssignment,
     person?: MedicalPersonnel,
   ) => string;
-  onSaveAssignment: (draft: RosterAssignmentDraft) => Promise<boolean>;
+  onSaveAssignment: (draft: RosterAssignmentDraft) => Promise<boolean | string>;
   onDeleteAssignment: (assignmentId: string) => Promise<void> | void;
 }
 
 export function RosterAssignmentCell({
   showCosts = true,
+  timedShifts = false,
   readOnly = false,
   rowKey,
   targetLabel,
@@ -112,6 +119,15 @@ export function RosterAssignmentCell({
   const [assignAllowance, setAssignAllowance] = useState<number>(0);
   const [assignNote, setAssignNote] = useState<string>('');
   const [isExtraExpanded, setIsExtraExpanded] = useState(false);
+  const [startMinute, setStartMinute] = useState(CLINIC_SHIFT_DEFAULTS.FULL[0]);
+  const [endMinute, setEndMinute] = useState(CLINIC_SHIFT_DEFAULTS.FULL[1]);
+  const [saveError, setSaveError] = useState('');
+  const editingAssignment = assignments.find((item) => item.id === editingAssignmentId);
+  const keepLegacyShift = timedShifts && editingAssignment && editingAssignment.start_minute == null
+    && editingAssignment.personnel_id === assignPersonId
+    && startMinute === CLINIC_SHIFT_DEFAULTS[editingAssignment.shift_period][0]
+    && endMinute === CLINIC_SHIFT_DEFAULTS[editingAssignment.shift_period][1]
+    && assignBaseCost === (personnelMap.get(assignPersonId)?.fixed_cost ?? 0);
 
   const getOtherSameDayAssignments = (personId: string): RosterAssignment[] => {
     const list = sameDayAssignmentsByPerson.get(personId);
@@ -128,7 +144,11 @@ export function RosterAssignmentCell({
     if (personAssigns.length === 0) return null;
     return (
       personAssigns.find((existing) =>
-        doShiftsOverlap(existing.shift_period, targetShift),
+        assignmentShiftsOverlap(existing, {
+          shift_period: targetShift,
+          start_minute: timedShifts ? startMinute : null,
+          end_minute: timedShifts ? endMinute : null,
+        }),
       ) ?? null
     );
   };
@@ -140,7 +160,11 @@ export function RosterAssignmentCell({
         sameDayAssignmentsByPerson.get(person.id) ?? []
       ).filter((item) => item.id !== editingAssignmentId);
       const hasConflict = personAssigns.some((existing) =>
-        doShiftsOverlap(existing.shift_period, assignShift),
+        assignmentShiftsOverlap(existing, {
+          shift_period: assignShift,
+          start_minute: timedShifts ? startMinute : null,
+          end_minute: timedShifts ? endMinute : null,
+        }),
       );
       if (hasConflict) {
         return false;
@@ -159,6 +183,9 @@ export function RosterAssignmentCell({
   }, [
     activePersonnel,
     assignShift,
+    startMinute,
+    endMinute,
+    timedShifts,
     editingAssignmentId,
     personRoleFilter,
     personSearchQuery,
@@ -166,11 +193,14 @@ export function RosterAssignmentCell({
   ]);
 
   const openAddPopover = () => {
+    setSaveError('');
     setEditingAssignmentId(null);
     setPersonSearchQuery('');
     setPersonRoleFilter('all');
     setAssignPersonId('');
     setAssignShift('FULL');
+    setStartMinute(CLINIC_SHIFT_DEFAULTS.FULL[0]);
+    setEndMinute(CLINIC_SHIFT_DEFAULTS.FULL[1]);
     setAssignBaseCost(0);
     setAssignAllowance(defaultAllowance);
     setAssignNote('');
@@ -179,12 +209,17 @@ export function RosterAssignmentCell({
   };
 
   const openEditPopover = (item: RosterAssignment) => {
+    setSaveError('');
     setEditingAssignmentId(item.id);
     setPersonSearchQuery('');
     setPersonRoleFilter('all');
     setAssignPersonId(item.personnel_id);
     setAssignShift(item.shift_period);
-    setAssignBaseCost(item.base_cost_snapshot);
+    setStartMinute(item.start_minute ?? CLINIC_SHIFT_DEFAULTS[item.shift_period][0]);
+    setEndMinute(item.end_minute ?? CLINIC_SHIFT_DEFAULTS[item.shift_period][1]);
+    setAssignBaseCost(timedShifts
+      ? item.day_rate_snapshot ?? personnelMap.get(item.personnel_id)?.fixed_cost ?? 0
+      : item.base_cost_snapshot);
     setAssignAllowance(item.allowance_cost);
     setAssignNote(item.note || '');
     setIsExtraExpanded(
@@ -221,6 +256,8 @@ export function RosterAssignmentCell({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (timedShifts && endMinute <= startMinute) return;
+    setSaveError('');
 
     let targetPersonId = assignPersonId;
     let targetBaseCost = assignBaseCost;
@@ -244,14 +281,20 @@ export function RosterAssignmentCell({
     const didClose = await onSaveAssignment({
       editingAssignmentId,
       personnelId: targetPersonId,
-      shiftPeriod: assignShift,
-      baseCostSnapshot: targetBaseCost,
+      shiftPeriod: timedShifts && !keepLegacyShift ? 'FULL' : assignShift,
+      startMinute: timedShifts && !keepLegacyShift ? startMinute : undefined,
+      endMinute: timedShifts && !keepLegacyShift ? endMinute : undefined,
+      dayRate: timedShifts && !keepLegacyShift ? targetBaseCost : undefined,
+      baseCostSnapshot: keepLegacyShift ? editingAssignment.base_cost_snapshot
+        : timedShifts ? calculateClinicShiftCost(targetBaseCost, startMinute, endMinute) : targetBaseCost,
       allowanceCost: assignAllowance,
       note: assignNote,
       conflictAssignment,
     });
 
-    if (didClose) {
+    if (typeof didClose === 'string') {
+      setSaveError(didClose);
+    } else if (didClose) {
       closePopover();
     }
   };
@@ -270,6 +313,8 @@ export function RosterAssignmentCell({
 
   const isSubmitDisabled =
     isMutating ||
+    (timedShifts && (endMinute <= startMinute
+      || Boolean(assignPersonId && getPersonConflictForShift(assignPersonId, assignShift)))) ||
     (!assignPersonId &&
       (!autoSelectFirstAvailableOnSubmit ||
         !filteredPersonnel.some(
@@ -287,7 +332,7 @@ export function RosterAssignmentCell({
             >
               {personnelMap.get(assignment.personnel_id)?.full_name ??
                 'Nhân sự'}{' '}
-              · {SHIFT_SHORT_LABELS[assignment.shift_period]}
+              · {formatAssignmentShift(assignment)}
               {showCosts && (
                 <span className="ml-2 text-xs text-muted-foreground">
                   {formatVndCurrency(
@@ -316,7 +361,7 @@ export function RosterAssignmentCell({
           const isEditingThisChip = isOpen && editingAssignmentId === assign.id;
           const hasAllowance = Number(assign.allowance_cost) > 0;
           const chipTooltip = !showCosts
-            ? `${person?.full_name ?? 'Nhân sự'} · ${SHIFT_SHORT_LABELS[assign.shift_period]}`
+            ? `${person?.full_name ?? 'Nhân sự'} · ${formatAssignmentShift(assign)}`
             : formatChipTooltip
               ? formatChipTooltip(assign, person)
               : `Cố định ${formatVndCurrency(assign.base_cost_snapshot)} + Phụ cấp ${formatVndCurrency(assign.allowance_cost)}${assign.note ? ` · Ghi chú: ${assign.note}` : ''}`;
@@ -356,7 +401,7 @@ export function RosterAssignmentCell({
                 )}
                 <span className="text-muted-foreground/60">·</span>
                 <span className="font-medium text-muted-foreground">
-                  {SHIFT_SHORT_LABELS[assign.shift_period]}
+                  {formatAssignmentShift(assign)}
                 </span>
                 {showCosts && hasAllowance && (
                   <span
@@ -437,6 +482,7 @@ export function RosterAssignmentCell({
               )}
             </div>
             <FieldGroup className="dym-assignment-body">
+
             {/* Searchable Personnel Combobox with Double-Booking Lock */}
             <Field className="dym-assignment-personnel">
               <FieldLabel htmlFor={`${titleId}-search`}>Nhân sự</FieldLabel>
@@ -526,7 +572,7 @@ export function RosterAssignmentCell({
                               className="h-5 px-1.5 text-[11px] font-medium text-muted-foreground"
                             >
                               Đã xếp {conflictRoomName} ·{' '}
-                              {SHIFT_SHORT_LABELS[conflictAssign.shift_period]}
+                              {formatAssignmentShift(conflictAssign)}
                             </Badge>
                           ) : (
                             <>
@@ -536,7 +582,7 @@ export function RosterAssignmentCell({
                                   className="h-5 px-1.5 text-[11px] font-normal text-muted-foreground"
                                 >
                                   {otherRoomName} ·{' '}
-                                  {SHIFT_SHORT_LABELS[otherAssign.shift_period]}
+                                  {formatAssignmentShift(otherAssign)}
                                 </Badge>
                               )}
                               {showCosts && (
@@ -557,8 +603,31 @@ export function RosterAssignmentCell({
               </div>
             </Field>
 
+            {timedShifts && (
+              <FieldSet>
+                <FieldLegend variant="label">Giờ trực</FieldLegend>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field>
+                    <FieldLabel htmlFor={`${titleId}-start`}>Bắt đầu</FieldLabel>
+                    <select id={`${titleId}-start`} className="h-9 min-w-0 rounded-md border border-input bg-card px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={startMinute} onChange={(e) => setStartMinute(Number(e.target.value))}>
+                      {SHIFT_MINUTES.slice(0, -1).map((minute) => <option key={minute} value={minute}>{formatShiftMinute(minute)}</option>)}
+                    </select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`${titleId}-end`}>Kết thúc</FieldLabel>
+                    <select id={`${titleId}-end`} className="h-9 min-w-0 rounded-md border border-input bg-card px-2 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={endMinute} onChange={(e) => setEndMinute(Number(e.target.value))}>
+                      {SHIFT_MINUTES.slice(1).map((minute) => <option key={minute} value={minute}>{formatShiftMinute(minute)}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                {endMinute <= startMinute && <p className="text-sm text-destructive" role="status">Giờ kết thúc phải sau giờ bắt đầu.</p>}
+                {endMinute > startMinute && assignPersonId && getPersonConflictForShift(assignPersonId, assignShift) && (
+                  <p className="text-sm text-destructive" role="status">Nhân sự đang chọn đã có ca trùng giờ.</p>
+                )}
+              </FieldSet>
+            )}
             {/* Separate rows for Ca trực and Cost cố định */}
-            <FieldSet className="dym-assignment-shifts">
+            {!timedShifts && <FieldSet className="dym-assignment-shifts">
               <FieldLegend variant="label">Ca trực</FieldLegend>
               <Tabs value={assignShift} onValueChange={(value) => handleSelectShift(value as ShiftPeriod)}>
               <TabsList aria-label="Chọn ca trực" className="dym-assignment-shift-tabs">
@@ -572,7 +641,7 @@ export function RosterAssignmentCell({
                       value={shift.value}
                       title={
                         shiftConflict
-                          ? `Nhân sự đang chọn đã xếp ca ${SHIFT_SHORT_LABELS[shiftConflict.shift_period]}`
+                          ? `Nhân sự đang chọn đã xếp ca ${formatAssignmentShift(shiftConflict)}`
                           : undefined
                       }
                     >
@@ -582,14 +651,14 @@ export function RosterAssignmentCell({
                 })}
               </TabsList>
               </Tabs>
-            </FieldSet>
+            </FieldSet>}
 
             {showCosts && (
               <Field orientation="horizontal" className="dym-assignment-base-cost">
                 <FieldLabel
                   htmlFor={`base-cost-${rowKey}`}
                 >
-                  Chi phí cố định (VNĐ)
+                  {timedShifts ? 'Mức 8 giờ (VNĐ)' : 'Chi phí cố định (VNĐ)'}
                 </FieldLabel>
                 <Input
                   id={`base-cost-${rowKey}`}
@@ -603,6 +672,17 @@ export function RosterAssignmentCell({
                   className="dym-roster-tabular text-right"
                 />
               </Field>
+            )}
+
+            {timedShifts && showCosts && endMinute > startMinute && (
+              <div className="flex items-center justify-between gap-2 text-sm tabular-nums">
+                <span className="text-muted-foreground">
+                  {keepLegacyShift ? 'Chi phí đã lưu' : `Chi phí ca · ${(endMinute - startMinute) / 15} khung`}
+                </span>
+                <output className="font-medium">{formatVndCurrency(keepLegacyShift
+                  ? editingAssignment.base_cost_snapshot
+                  : calculateClinicShiftCost(assignBaseCost, startMinute, endMinute))}</output>
+              </div>
             )}
 
             {/* Collapsible Allowance & Notes */}
@@ -666,6 +746,11 @@ export function RosterAssignmentCell({
               )}
             </div>
             </FieldGroup>
+            {saveError && (
+              <Alert variant="destructive" className="mx-3 mb-2">
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
             <div className="dym-assignment-footer">
               {editingAssignmentId ? (
                 <Button permissionAction="delete"
@@ -696,7 +781,7 @@ export function RosterAssignmentCell({
                   disabled={isSubmitDisabled || !can(module, editingAssignmentId ? 'update' : 'create')}
                   className="h-8 px-3.5 text-[13px] font-medium"
                 >
-                  {editingAssignmentId ? updateButtonLabel : 'Lưu'}
+                  {isMutating ? 'Đang lưu…' : editingAssignmentId ? updateButtonLabel : 'Lưu'}
                 </Button>
               </div>
             </div>

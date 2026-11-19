@@ -13,18 +13,16 @@ function load(file, imports = {}, globals = {}) {
   return exports;
 }
 
-test('sidebar navigation opts into motion only for plain pointer clicks and retains native modified links', () => {
-  const dataset = {}, calls = [];
+test('sidebar pointer and keyboard navigation dispatch immediately and retain native modified links', () => {
+  const calls = [];
   const location = { origin: 'https://clinic.invalid', href: 'https://clinic.invalid/?page=admin' };
   const window = { location, history: { pushState(_, __, url) { location.href = url.href; calls.push('push'); } },
-    dispatchEvent() { calls.push(dataset.navigationMotion); }, scrollTo() {} };
-  const { handleInternalLinkClick } = load('lib/navigation.ts', {}, { window, document: { documentElement: { dataset } } });
+    dispatchEvent(event) { calls.push(event.type); }, scrollTo() {} };
+  const { handleInternalLinkClick, APP_NAVIGATION_EVENT } = load('lib/navigation.ts', {}, { window });
   const event = { defaultPrevented: false, button: 0, detail: 1, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
   handleInternalLinkClick(event, '/?page=staff');
-  assert.equal(dataset.navigationMotion, 'pointer');
   handleInternalLinkClick({ ...event, detail: 0 }, '/?page=roster-onsite');
-  assert.equal(dataset.navigationMotion, 'instant');
-  assert.deepEqual(calls, ['push', 'pointer', 'push', 'instant']);
+  assert.deepEqual(calls, ['push', APP_NAVIGATION_EVENT, 'push', APP_NAVIGATION_EVENT]);
   handleInternalLinkClick({ ...event, ctrlKey: true }, '/?page=staff');
   assert.equal(calls.length, 4);
 });

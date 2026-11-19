@@ -1,3 +1,4 @@
+import { assignmentShiftsOverlap } from '../data/shiftTime';
 import { buildInsiteWeek, getInsiteWeekDates } from '../clinic/insiteWeek';
 import {
   getCountedProvisionalCost,
@@ -143,9 +144,7 @@ export function buildDashboardSummary(
       list.some(
         (other, otherIndex) =>
           index !== otherIndex &&
-          (item.shift_period === 'FULL' ||
-            other.shift_period === 'FULL' ||
-            item.shift_period === other.shift_period),
+          assignmentShiftsOverlap(item, other),
       ),
     );
     return overlapping.length

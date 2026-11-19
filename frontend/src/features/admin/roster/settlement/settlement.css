@@ -142,14 +142,7 @@
 .settlement-detail-totals dd { margin-top: 4px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .settlement-detail-sheet[data-state='open'] { animation-duration: 250ms; }
 .settlement-detail-sheet[data-state='closed'] { animation-duration: 180ms; }
-.settlement-page-enter { animation: settlement-page-appear 280ms var(--ease-out) both; }
-@keyframes settlement-page-appear {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-}
-html[data-navigation-motion='instant'] .settlement-page-enter { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .settlement-page-enter { animation: none; }
   .settlement-sparkline .recharts-surface { clip-path: none; transition: none; }
   .settlement-detail-sheet { animation: none; transition: none; }
 }

@@ -32,7 +32,11 @@ export function requiresCompanyName(reason: string): boolean {
   return /công ty|doanh nghiệp/i.test(reason);
 }
 
+export function isWorkPermitCheckup(reason: string): boolean {
+  return /work permit/i.test(reason);
+}
+
 export function getRegistrationCompanyName(reason: string, company: string): string {
-  return company.trim() || (requiresCompanyName(reason) ? '' : 'Lao động tự do');
+  return company.trim() || (requiresCompanyName(reason) || isWorkPermitCheckup(reason) ? '' : 'Lao động tự do');
 }
 

@@ -46,19 +46,19 @@
 .dym-registrations-page :is(.dym-contact-id, .dym-address-line) { font-size: 12px; line-height: 20px; }
 .dym-registrations-page .dym-contact-phone { white-space: nowrap; }
 .dym-registrations-page { color: var(--color-ink); }
-.dym-registrations-page .dym-table-precision td > button { color: var(--color-ink-2); }
+.dym-registrations-page .dym-table-precision td > button:not([data-slot="checkbox"]) { color: var(--color-ink-2); }
 .dym-registrations-page .dym-table-actions-group button {
   color: var(--color-ink-2);
   background: var(--color-paper-2);
   border-color: var(--color-rule-2);
 }
-.dym-registrations-page .dym-table-precision tr[data-selected="true"] { background: #edf0f8; }
-.dym-registrations-page .dym-table-precision tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 var(--reception-accent); }
-.dark .dym-registrations-page .dym-table-precision tr[data-selected="true"],
-[data-color-mode="dark"] .dym-registrations-page .dym-table-precision tr[data-selected="true"] { background: #28344d; }
+.dym-registrations-page .dym-table-precision tr[data-selected="true"] {
+  background: color-mix(in srgb, var(--color-paper) 94%, var(--color-ink));
+}
+.dym-registrations-page .col-ticket .dym-ticket-tag { font-weight: 600; }
+.dym-registrations-page .col-ticket .dym-time-cell { color: var(--color-ink-2); }
 .dym-registrations-page .dym-table-precision tr:focus-within { outline: 2px solid var(--reception-accent); outline-offset: -2px; }
 .dym-registrations-page .dym-bulk-toolbar { background: var(--color-paper); color: var(--color-ink-2); }
-.dym-registrations-page .dym-bulk-toolbar[data-selected="true"] { border-top: 1px solid var(--color-rule); }
 .dym-registrations-page :is(.dym-bulk-toolbar button, .dym-table-actions-group button) {
   min-height: 36px;
   font-family: inherit;

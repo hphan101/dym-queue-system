@@ -247,7 +247,7 @@ export function AdminSidebar({
         {/* shadcn/ui SidebarContent with task groups */}
         <SidebarContent ref={contentRef} className="gap-0 overflow-x-hidden overflow-y-auto">
           <SidebarGroup>
-            <SidebarGroupLabel>Tiếp đón & Hàng đợi</SidebarGroupLabel>
+            <SidebarGroupLabel>Tiếp nhận và Hàng đợi</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {can('reception') && <SidebarMenuItem>
@@ -294,7 +294,7 @@ export function AdminSidebar({
               <SidebarSeparator />
 
               <SidebarGroup>
-                <SidebarGroupLabel>Điều phối Y khoa</SidebarGroupLabel>
+                <SidebarGroupLabel>Điều phối</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {rosterItems.map((item) => {

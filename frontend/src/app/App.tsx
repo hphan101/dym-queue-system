@@ -25,15 +25,19 @@ function App() {
     pathname: window.location.pathname,
     search: window.location.search,
   }));
+  const route = resolveAppRoute(location.pathname, location.search);
 
   useEffect(() => {
     const syncLocation = () => {
-      startTransition(() => {
-        setLocation({
-          pathname: window.location.pathname,
-          search: window.location.search,
-        });
-      });
+      const nextLocation = {
+        pathname: window.location.pathname,
+        search: window.location.search,
+      };
+      if (route.kind === 'admin' && resolveAppRoute(nextLocation.pathname, nextLocation.search).kind === 'admin') {
+        setLocation(nextLocation);
+      } else {
+        startTransition(() => setLocation(nextLocation));
+      }
     };
 
     window.addEventListener('popstate', syncLocation);
@@ -43,9 +47,7 @@ function App() {
       window.removeEventListener('popstate', syncLocation);
       window.removeEventListener(APP_NAVIGATION_EVENT, syncLocation);
     };
-  }, []);
-
-  const route = resolveAppRoute(location.pathname, location.search);
+  }, [route.kind]);
 
   return (
     <QueryClientProvider client={queryClient}>

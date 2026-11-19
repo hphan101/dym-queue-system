@@ -1,8 +1,9 @@
+import { formatAssignmentShift } from '../data/shiftTime';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDisplayDate } from '../../shared/adminFormatters';
-import { formatVndCurrency, ROSTER_BRANCH_LABELS, SHIFT_SHORT_LABELS, SCHEDULE_TYPE_LABELS, type ClinicRoom } from '../data/rosterService';
+import { formatVndCurrency, ROSTER_BRANCH_LABELS, SCHEDULE_TYPE_LABELS, type ClinicRoom } from '../data/rosterService';
 import type { SettlementRow } from './settlementRows';
 
 export function PersonnelCostSheet({ row, roomMap, month, open, onOpenChange }: {
@@ -41,7 +42,7 @@ export function PersonnelCostSheet({ row, roomMap, month, open, onOpenChange }: 
                   {schedule.schedule_type !== 'insite' && <p>{schedule.company_name}{schedule.campaign_code ? ` · ${schedule.campaign_code}` : ''}</p>}
                   {assignment.note && <p>Ghi chú: {assignment.note}</p>}
                 </TableCell>
-                <TableCell className="whitespace-nowrap">{SHIFT_SHORT_LABELS[assignment.shift_period] || assignment.shift_period}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatAssignmentShift(assignment)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums">{formatVndCurrency(base)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums">{formatVndCurrency(allowance)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums font-medium">{formatVndCurrency(base + allowance)}</TableCell>

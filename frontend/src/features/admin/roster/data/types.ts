@@ -95,6 +95,9 @@ export interface RosterAssignment {
   position_label: string;
   personnel_id: string;
   shift_period: ShiftPeriod;
+  start_minute?: number | null;
+  end_minute?: number | null;
+  day_rate_snapshot?: number | null;
   base_cost_snapshot: number;
   allowance_cost: number;
   total_cost: number;
@@ -136,6 +139,9 @@ export interface RosterAssignmentInput {
   position_label: string;
   personnel_id: string;
   shift_period: ShiftPeriod;
+  start_minute?: number | null;
+  end_minute?: number | null;
+  day_rate_snapshot?: number | null;
   base_cost_snapshot: number;
   allowance_cost: number;
   note?: string;

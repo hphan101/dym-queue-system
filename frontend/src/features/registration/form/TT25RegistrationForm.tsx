@@ -35,6 +35,7 @@ import {
   CHECKUP_REASONS,
   requiresCompanyName,
   getRegistrationCompanyName,
+  isWorkPermitCheckup,
 } from '../tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
 import { BirthDateInput } from './BirthDateInput';
@@ -92,6 +93,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     initialCheckupReason || CHECKUP_REASONS[0] || '',
   );
   const companyRequired = requiresCompanyName(checkupReason);
+  const phoneRequired = !isWorkPermitCheckup(checkupReason);
   const companyName = getRegistrationCompanyName(checkupReason, workplace);
 
   useEffect(() => {
@@ -238,9 +240,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-    if (!cleanPhone) {
+    if (phoneRequired && !phoneNumber.trim()) {
       newErrors.phoneNumber = isEn ? 'Please enter your phone number' : 'Vui lòng nhập số điện thoại';
-    } else if (!/^0(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
+    } else if (phoneNumber.trim() && !/^0(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
       newErrors.phoneNumber = isEn
         ? 'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)'
         : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
@@ -773,10 +775,11 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               {isEn ? '11. Mobile Phone Number' : '11. Điện thoại di động'}{' '}
-              <span className="text-red-500">*</span>
+              {phoneRequired && <span className="text-red-500">*</span>}
             </label>
             <input
               type="tel"
+              aria-required={phoneRequired}
               inputMode="tel"
               autoComplete="tel"
               enterKeyHint="next"

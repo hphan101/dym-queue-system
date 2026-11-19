@@ -1421,6 +1421,9 @@ export async function saveRosterAssignment(
     position_label: input.position_label.trim(),
     personnel_id: input.personnel_id,
     shift_period: input.shift_period,
+    start_minute: input.start_minute,
+    end_minute: input.end_minute,
+    day_rate_snapshot: input.day_rate_snapshot,
     base_cost_snapshot: baseCost,
     allowance_cost: allowanceCost,
     note: (input.note ?? '').trim(),
@@ -1628,7 +1631,7 @@ export async function copyInsiteScheduleFromDate(
 
   const { data: existingTargetData, error: existingTargetErr } = await supabase
     .from('roster_assignments')
-    .select('room_id, daily_override_id, personnel_id, shift_period')
+    .select('room_id, daily_override_id, personnel_id, shift_period, start_minute, end_minute')
     .eq('schedule_id', targetSchedule.id);
 
   if (existingTargetErr) {
@@ -1641,7 +1644,7 @@ export async function copyInsiteScheduleFromDate(
   const existingKeys = new Set(
     (existingTargetData ?? []).map(
       (item) =>
-        `${item.room_id ?? ''}|${item.daily_override_id ?? ''}|${item.personnel_id}|${item.shift_period}`,
+        `${item.room_id ?? ''}|${item.daily_override_id ?? ''}|${item.personnel_id}|${item.shift_period}|${item.start_minute ?? ''}|${item.end_minute ?? ''}`,
     ),
   );
 
@@ -1666,7 +1669,7 @@ export async function copyInsiteScheduleFromDate(
       continue;
     }
 
-    const key = `${targetRoomId ?? ''}|${targetDailyOverrideId ?? ''}|${item.personnel_id}|${item.shift_period}`;
+    const key = `${targetRoomId ?? ''}|${targetDailyOverrideId ?? ''}|${item.personnel_id}|${item.shift_period}|${item.start_minute ?? ''}|${item.end_minute ?? ''}`;
     if (existingKeys.has(key)) {
       continue;
     }
@@ -1679,6 +1682,9 @@ export async function copyInsiteScheduleFromDate(
       position_label: item.position_label,
       personnel_id: item.personnel_id,
       shift_period: item.shift_period,
+      start_minute: item.start_minute,
+      end_minute: item.end_minute,
+      day_rate_snapshot: item.day_rate_snapshot,
       base_cost_snapshot: Math.max(
         0,
         Math.round(Number(item.base_cost_snapshot) || 0),

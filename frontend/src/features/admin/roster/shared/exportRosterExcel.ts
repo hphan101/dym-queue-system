@@ -1,3 +1,4 @@
+import { formatAssignmentShift } from '../data/shiftTime';
 import { getTodayInVietnam } from '../../../../lib/date';
 import { orderCampaignPositions } from '../onsite/campaignPositionOrder';
 import { buildSettlementRows, type SettlementFilters } from '../settlement/settlementRows';
@@ -14,7 +15,6 @@ import {
   getCountedProvisionalCost,
   ROSTER_BRANCH_LABELS,
   SCHEDULE_TYPE_LABELS,
-  SHIFT_SHORT_LABELS,
   type ClinicRoom,
   type MedicalPersonnel,
   type RosterAssignment,
@@ -370,7 +370,7 @@ export function exportScheduleCostExcel({
         },
         { val: person?.phone_number || '—', styleId: 3 },
         {
-          val: SHIFT_SHORT_LABELS[item.shift_period] || item.shift_period,
+          val: formatAssignmentShift(item),
           styleId: 3,
         },
         { val: baseCost, styleId: 4, isNum: true },
@@ -780,7 +780,7 @@ export function exportMonthlyPersonnelCostExcel({
         },
         { val: positionName, styleId: 2 },
         {
-          val: SHIFT_SHORT_LABELS[item.shift_period] || item.shift_period,
+          val: formatAssignmentShift(item),
           styleId: 3,
         },
         { val: base, styleId: 4, isNum: true },

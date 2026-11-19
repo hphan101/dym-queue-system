@@ -56,6 +56,7 @@ test('campaign Excel exports exactly the supplied filtered rows, numeric totals,
   let entries, filename;
   const xlsx = load('lib/xlsx.ts');
   const excel = load('features/admin/roster/shared/exportRosterExcel.ts', {
+    '../data/shiftTime': load('features/admin/roster/data/shiftTime.ts'),
     '../data/rosterService': service,
     '../../shared/adminFormatters': { formatDisplayDate: date => date },
     '../../../../lib/xlsx': { ...xlsx, createZipArchive: value => { entries = value; return new Uint8Array(); } },

@@ -5,16 +5,14 @@ import { AdminLayout } from '../shell/AdminLayout';
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import {
-  ArrowDownTrayIcon,
-  ArrowPathIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Building2, Check, ChevronsUpDown, Printer } from 'lucide-react';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,7 +33,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatePicker, MonthPicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateForPrint } from '@/lib/date';
 import { cn } from '@/lib/utils';
 
 import { type TT25RegistrationData } from '../../registration/tt25Types';
@@ -69,6 +69,7 @@ import {
 } from './usePrintStatus';
 import { normalizeSearch } from '../shared/adminFormatters';
 import { exportRegistrationsToExcel } from './exportRegistrationsExcel';
+import { fetchRegistrationExportRows, getRegistrationExportDates, type RegistrationExportPeriod } from './registrationExportRange';
 import { AdminHeader } from '../shell/AdminHeader';
 import {
   CustomerNoticeModal,
@@ -84,6 +85,11 @@ export type { RegistrationDetails };
 
 const NEW_REGISTRATION_NOTICE_MS = 8_000;
 const REALTIME_REFETCH_DEBOUNCE_MS = 700;
+const EXPORT_OPTIONS = [
+  { period: 'day', label: 'Ngày' },
+  { period: 'week', label: 'Tuần' },
+  { period: 'month', label: 'Tháng' },
+] as const;
 
 export function RegistrationsPage({
   authorizedIsAdmin,
@@ -117,6 +123,11 @@ export function RegistrationsPage({
   const [consentModalRow, setConsentModalRow] =
     useState<RegistrationDetails | null>(null);
   const [bulkPrintError, setBulkPrintError] = useState<string | null>(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportPeriod, setExportPeriod] = useState<'day' | RegistrationExportPeriod>('day');
+  const [exportDate, setExportDate] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>(
       navigator.onLine ? 'connected' : 'offline',
@@ -296,6 +307,7 @@ export function RegistrationsPage({
   useEffect(() => {
     if (!branchId) return;
 
+    let refreshOnSubscribe = false;
     const scheduleRegistrationsInvalidation = () => {
       if (!isActiveTabRef.current) {
         hasPendingRealtimeRefetch.current = true;
@@ -361,8 +373,11 @@ export function RegistrationsPage({
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setConnectionState('connected');
+          if (refreshOnSubscribe) scheduleRegistrationsInvalidation();
+          refreshOnSubscribe = true;
         } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
           setConnectionState('disconnected');
+          refreshOnSubscribe = true;
         }
       });
 
@@ -463,10 +478,10 @@ export function RegistrationsPage({
   }, [isCompanyMenuOpen]);
 
   // Filter rows by search, status tab, print status, and company
-  const filteredRows = useMemo(() => {
+  const filterRows = useCallback((sourceRows: RegistrationDetails[]) => {
     const normalizedQuery = normalizeSearch(query);
 
-    return rows.filter((row) => {
+    return sourceRows.filter((row) => {
       // Status tab match
       if (statusFilter === 'waiting') {
         if (
@@ -521,7 +536,40 @@ export function RegistrationsPage({
 
       return normalizeSearch(searchableText).includes(normalizedQuery);
     });
-  }, [companyFilter, getStatus, printFilter, query, rows, statusFilter]);
+  }, [companyFilter, getStatus, printFilter, query, statusFilter]);
+  const filteredRows = useMemo(() => filterRows(rows), [filterRows, rows]);
+
+  const exportAnchor = exportDate || date;
+  const exportDays = exportPeriod === 'day'
+    ? [exportAnchor]
+    : getRegistrationExportDates(exportAnchor, exportPeriod);
+  const exportStart = exportDays[0];
+  const exportEnd = exportDays[exportDays.length - 1];
+  const useVisibleDay = exportPeriod === 'day' && exportAnchor === date;
+
+  async function handleExport() {
+    setIsExportMenuOpen(false);
+    setExportMessage(null);
+    setIsExporting(true);
+    try {
+      const exportRows = useVisibleDay
+        ? filteredRows
+        : filterRows(await fetchRegistrationExportRows(branch, exportDays));
+      if (!exportRows.length) {
+        setExportMessage('Không có hồ sơ phù hợp trong khoảng thời gian đã chọn.');
+        return;
+      }
+      exportRegistrationsToExcel({
+        rows: exportRows,
+        branch,
+        date: exportStart === exportEnd ? exportStart : `${exportStart}_${exportEnd}`,
+      });
+    } catch {
+      setExportMessage('Không thể xuất Excel. Vui lòng thử lại.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -576,48 +624,78 @@ export function RegistrationsPage({
         }}
         actions={
           <div className="flex items-center gap-2">
-            <Button permissionAction="view" permissionModule="export"
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isLoading || filteredRows.length === 0}
-              onClick={() =>
-                exportRegistrationsToExcel({
-                  rows: filteredRows,
-                  branch,
-                  date,
-                })
-              }
-              title={
-                filteredRows.length === 0
-                  ? 'Không có dữ liệu để xuất Excel'
-                  : `Xuất ${filteredRows.length} hồ sơ ra file Excel (.xlsx)`
-              }
-              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-            >
-              <ArrowDownTrayIcon
-                className="size-3.5 shrink-0"
-                aria-hidden="true"
-              />
-              <span>Xuất Excel</span>
-            </Button>
+            <Popover open={isExportMenuOpen} onOpenChange={(open) => {
+              if (open) setExportDate(date);
+              setIsExportMenuOpen(open);
+            }}>
+              <PopoverTrigger asChild>
+                <Button
+                  permissionAction="view"
+                  permissionModule="export"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-busy={isExporting}
+                  disabled={!branchId || !date || isLoadingIdentity || Boolean(identityError) || isExporting}
+                  className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
+                >
+                  <ArrowDownTrayIcon data-icon="inline-start" aria-hidden="true" />
+                  <span>{isExporting ? 'Đang xuất…' : 'Xuất Excel'}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" aria-label="Khoảng thời gian xuất Excel" className="flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 p-4">
+                <div role="group" aria-label="Xuất theo" className="grid grid-cols-3 gap-1">
+                  {EXPORT_OPTIONS.map(({ period, label }) => (
+                    <Button
+                      key={period}
+                      type="button"
+                      variant={exportPeriod === period ? 'secondary' : 'ghost'}
+                      size="sm"
+                      aria-pressed={exportPeriod === period}
+                      onClick={() => setExportPeriod(period)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                {exportPeriod === 'month' ? (
+                  <MonthPicker
+                    value={exportAnchor.slice(0, 7)}
+                    onChange={(month) => setExportDate(`${month}-01`)}
+                    align="end"
+                    className="w-full justify-start shadow-none"
+                  />
+                ) : (
+                  <DatePicker
+                    value={exportAnchor}
+                    onChange={setExportDate}
+                    title={exportPeriod === 'week' ? 'Chọn một ngày trong tuần muốn xuất' : 'Chọn ngày muốn xuất'}
+                    align="end"
+                    className="w-full justify-start shadow-none"
+                  />
+                )}
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">
+                    {exportPeriod === 'week' ? 'Khoảng xuất · Thứ Hai đến Chủ nhật' : 'Khoảng xuất'}
+                  </span>
+                  <output className="font-medium tabular-nums">
+                    {formatDateForPrint(exportStart)}
+                    {exportStart !== exportEnd && ` – ${formatDateForPrint(exportEnd)}`}
+                  </output>
+                </div>
+                <Button
+                  permissionAction="view"
+                  permissionModule="export"
+                  type="button"
+                  size="sm"
+                  disabled={!exportStart || (useVisibleDay && isLoading)}
+                  onClick={() => void handleExport()}
+                >
+                  Tải file Excel
+                </Button>
+              </PopoverContent>
+            </Popover>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-busy={isLoading}
-              disabled={isLoading}
-              onClick={() => void refetchRegistrations()}
-              title="Làm mới danh sách dữ liệu (F5)"
-              className="h-9 gap-1.5 bg-card px-3 text-xs font-medium shadow-sm"
-            >
-              <ArrowPathIcon
-                className={`size-3.5 shrink-0 ${isLoading ? 'animate-spin' : ''}`}
-                aria-hidden="true"
-              />
-              <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-            </Button>
           </div>
         }
       />
@@ -629,11 +707,26 @@ export function RegistrationsPage({
 
       <main className="dym-admin-content dym-reception-page dym-registrations-page">
         <RealtimeConnectionAlert state={connectionState} />
+        {exportMessage && (
+          <Alert className="mb-4"><AlertDescription>{exportMessage}</AlertDescription></Alert>
+        )}
 
         {(error || identityError) && (
-          <Alert variant="destructive" className="mb-4"><AlertDescription>
-            {error || identityError}
-          </AlertDescription></Alert>
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{identityError || error}</AlertDescription>
+            {queryError && !identityError && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                disabled={isQueryFetching}
+                onClick={() => void refetchRegistrations()}
+              >
+                {isQueryFetching ? 'Đang tải…' : 'Thử lại'}
+              </Button>
+            )}
+          </Alert>
         )}
 
         {/* Precision Table Section */}
@@ -1082,47 +1175,39 @@ export function RegistrationsPage({
           ) : (
             <>
               <div
-                className="dym-bulk-toolbar flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm"
-                data-selected={checkedIds.size > 0}
-                role="toolbar"
+                className="dym-bulk-toolbar flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border px-4 py-2 text-sm"
+                role="group"
                 aria-label="In hàng loạt"
               >
-                <Printer
-                  className="size-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span className="font-medium">
-                  {checkedIds.size > 0
-                    ? `Đã chọn ${checkedIds.size} hồ sơ`
-                    : 'In hàng loạt'}
-                </span>
-                {checkedIds.size < filteredRows.length && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-7 px-1 text-xs"
-                    onClick={() =>
-                      toggleChecked(
-                        filteredRows.map((r) => r.id),
-                        true,
-                      )
-                    }
-                  >
-                    Chọn tất cả
-                  </Button>
-                )}
-                {checkedIds.size > 0 && (
-                  <>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-medium tabular-nums" aria-live="polite">
+                    {checkedIds.size > 0
+                      ? `Đã chọn ${checkedIds.size} hồ sơ`
+                      : 'In hàng loạt'}
+                  </span>
+                  {checkedIds.size < filteredRows.length && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-xs"
+                      onClick={() => toggleChecked(filteredRows.map((row) => row.id), true)}
+                    >
+                      Chọn tất cả
+                    </Button>
+                  )}
+                  {checkedIds.size > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setCheckedIds(new Set())}
                     >
-                      Bỏ chọn
+                      Bỏ chọn tất cả
                     </Button>
+                  )}
+                </div>
+                {checkedIds.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Tùy chọn in">
                     {bulkProgress ? (
                       <span
                         className="font-medium text-foreground"
@@ -1136,16 +1221,14 @@ export function RegistrationsPage({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 bg-card px-3 text-xs"
                           onClick={() => void handleBulkPrint('consent')}
                         >
-                          In Đồng thuận
+                          In đồng thuận
                         </Button>
                         <Button permissionAction="view" permissionModule="printing"
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 bg-card px-3 text-xs"
                           onClick={() => void handleBulkPrint('tt25')}
                         >
                           In TT25
@@ -1153,15 +1236,15 @@ export function RegistrationsPage({
                         <Button permissionAction="view" permissionModule="printing"
                           type="button"
                           size="sm"
-                          className="dym-bulk-print-primary h-9 px-3 text-sm"
+                          className="dym-bulk-print-primary"
                           onClick={() => void handleBulkPrint('both')}
                           title="Mỗi khách: phiếu Đồng thuận rồi phiếu TT25, theo thứ tự số phiếu"
                         >
-                          In trọn bộ ({checkedIds.size})
+                          In trọn bộ
                         </Button>
                       </>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
               {bulkPrintError && (

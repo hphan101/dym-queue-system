@@ -1,3 +1,4 @@
+import { formatAssignmentShift } from '../data/shiftTime';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from 'lucide-react';
@@ -13,7 +14,6 @@ import { buildInsiteWeek, getInsiteWeekDates } from './insiteWeek';
 import {
   fetchRosterBundleForRange,
   shiftIsoDate,
-  SHIFT_SHORT_LABELS,
   getProvisionalCost,
   formatVndCurrency,
 } from '../data/rosterService';
@@ -240,7 +240,7 @@ export function RosterInsiteWeek({
                                       {personName(item.personnel_id)}
                                     </span>
                                     <Badge variant="secondary">
-                                      {SHIFT_SHORT_LABELS[item.shift_period]}
+                                      {formatAssignmentShift(item)}
                                     </Badge>
                                   </span>
                                 ))
@@ -351,7 +351,7 @@ export function RosterInsiteWeek({
                             <p key={item.id}>
                               {personName(item.personnel_id)}{' '}
                               <span>
-                                · {SHIFT_SHORT_LABELS[item.shift_period]}
+                                · {formatAssignmentShift(item)}
                               </span>
                             </p>
                           ))}

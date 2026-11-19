@@ -1,9 +1,10 @@
+import { formatAssignmentShift } from '../data/shiftTime';
 import { Badge } from '@/components/ui/badge';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { formatDisplayDate } from '../../shared/adminFormatters';
-import { formatVndCurrency, ROSTER_BRANCH_LABELS, SCHEDULE_TYPE_LABELS, SHIFT_SHORT_LABELS, type MedicalPersonnel } from '../data/rosterService';
+import { formatVndCurrency, ROSTER_BRANCH_LABELS, SCHEDULE_TYPE_LABELS, type MedicalPersonnel } from '../data/rosterService';
 import type { CampaignSettlementRow } from './campaignSettlementRows';
 
 export function CampaignCostSheet({ row, personnelMap, open, onOpenChange }: {
@@ -44,7 +45,7 @@ export function CampaignCostSheet({ row, personnelMap, open, onOpenChange }: {
               return <TableRow key={assignment.id}>
                 <TableCell className="settlement-detail-place"><p>{assignment.position_label || 'Chưa đặt tên vị trí'}</p>{assignment.note && <p>Ghi chú: {assignment.note}</p>}</TableCell>
                 <TableCell className="settlement-detail-place"><p>{person?.full_name || 'Nhân sự không còn trong danh mục'}</p><p>{person?.personnel_code || assignment.personnel_id}</p></TableCell>
-                <TableCell className="whitespace-nowrap">{SHIFT_SHORT_LABELS[assignment.shift_period] || assignment.shift_period}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatAssignmentShift(assignment)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums">{formatVndCurrency(base)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums">{formatVndCurrency(allowance)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap tabular-nums font-medium">{formatVndCurrency(base + allowance)}</TableCell>

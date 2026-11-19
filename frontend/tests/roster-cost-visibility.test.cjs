@@ -31,6 +31,7 @@ function loadComponent(file, stateValues, context, category = 'onsite', onStateC
       useMemo: (callback) => callback(), useEffect() {}, useId: () => 'test',
     };
     if (name === './rosterService') return service;
+    if (name === './shiftTime') return compile('shiftTime.ts', () => ({}));
     if (name === './campaignTemplates') return { ...templates, fetchCampaignTemplates: async () => service.CAMPAIGN_POSITION_TEMPLATES };
     if (name === './onsiteCalendar') return compile('onsiteCalendar.ts', () => ({ supabase: {} }));
     if (name === './campaignGroups') return campaignGroups;
@@ -53,6 +54,22 @@ test('hidden assignment costs never appear in chips, tooltips, personnel choices
   assert.match(hidden, /Bác sĩ An/);
   assert.doesNotMatch(hidden, /1234567|1\.234\.567|7654321|7\.654\.321|Cost cố định|Phụ cấp \(VNĐ\)/);
   assert.match(render(true), /1\.234\.567|1234567/);
+});
+
+test('clinic personnel picker offers staff again at the end of a previous shift', () => {
+  const previous = { ...assignment, start_minute: 435, end_minute: 735 };
+  const props = {
+    rowKey: 'next-room', targetLabel: 'Phòng khác', timedShifts: true, assignments: [],
+    activePersonnel: [person], personnelMap: new Map([[person.id, person]]),
+    sameDayAssignmentsByPerson: new Map([[person.id, [previous]]]),
+    getConflictLocationLabel: () => 'Phòng Nội', isOpen: true, isMutating: false,
+    onOpenChange() {}, onSaveAssignment() {}, onDeleteAssignment() {},
+  };
+  const render = (start) => JSON.stringify(loadComponent('RosterAssignmentCell.tsx', {
+    9: start, 10: 780,
+  }).RosterAssignmentCell(props));
+  assert.doesNotMatch(render(720), /Bác sĩ An/);
+  assert.match(render(735), /Bác sĩ An/);
 });
 
 test('the campaign screenshot mode removes monetary summaries, allowance controls and cost columns', () => {

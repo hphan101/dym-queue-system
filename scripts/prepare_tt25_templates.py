@@ -251,7 +251,7 @@ for name, count, history_pages, family_page, questions_page in [
                 assert dots
                 y = dots[0]['matrix'][5]
                 clear(index, [min(c['x0'] for c in dots), min(c['top'] for c in dots), max(c['x1'] for c in dots), max(c['bottom'] for c in dots)])
-                field(index, 'medications' if index == 2 else 'pregnancyDetails', 45, y, 510, 9)
+                field(index, 'medications' if index == 2 else 'pregnancyDetails', 45, y, 510, 12)
             elif index == questions_page:
                 pair = [c for c in boxes if 40 < c['x0'] < 60]
                 assert len(pair) == 4, (name, len(pair))
@@ -261,7 +261,7 @@ for name, count, history_pages, family_page, questions_page in [
                     if args.site == 'hcm':
                         detail = next(c for c in detail_placeholders if c['top'] >= yes['top'] - 2)
                         x = detail['x0']
-                        field(index, key, x, detail['matrix'][5], 562 - x, 9)
+                        field(index, key, x, detail['matrix'][5], 562 - x, 11.04)
                         continue
                     anchors = page.search(r'liều lượng:' if name == 'vnm' else r'taking and their dosages:')
                     anchor = next(m for m in anchors if m['top'] >= yes['top'] - 2)
@@ -272,7 +272,7 @@ for name, count, history_pages, family_page, questions_page in [
                     if dots:
                         clear(index, [min(c['x0'] for c in dots), min(c['top'] for c in dots),
                                       max(c['x1'] for c in dots), max(c['bottom'] for c in dots)])
-                    field(index, key, x, y, 562 - x, 9)
+                    field(index, key, x, y, 562 - x, 11.04)
 
         assert all(len(col) == 11 for col in personal), (name, [len(c) for c in personal])
         checks['personalHistory'] = {str(i + 1): {'yes': personal[0][i], 'no': personal[1][i]} for i in range(11)}

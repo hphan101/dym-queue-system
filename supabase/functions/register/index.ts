@@ -158,7 +158,8 @@ function parsePayload(value: unknown): RegistrationPayload | null {
 
   const branch = stringField(value, "branch");
   const fullName = stringField(value, "fullName");
-  const phoneNumber = stringField(value, "phoneNumber");
+  const phoneNumber = stringField(value, "phoneNumber", true);
+  const cleanPhone = (phoneNumber ?? "").replace(/[^0-9]/g, "");
   const email = stringField(value, "email", true);
   const birthDate = stringField(value, "birthDate");
   const gender = stringField(value, "gender");
@@ -175,6 +176,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     branch === null ||
     fullName === null ||
     phoneNumber === null ||
+    (phoneNumber !== "" && !cleanPhone) ||
     email === null ||
     (email !== "" && (!isSafeText(email, 1, 120) || !EMAIL_PATTERN.test(email))) ||
     birthDate === null ||
@@ -231,14 +233,14 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   return {
     branch: branch.toLowerCase(),
     fullName,
-    phoneNumber: phoneNumber.replace(/[^0-9]/g, ""),
+    phoneNumber: cleanPhone,
     birthDate,
     gender,
     cccd: cccd.toUpperCase(),
     province,
     ward,
     addressDetail,
-    companyName: companyName || (/work permit|khám sức khỏe khác/i.test(String(tt25Extras.checkupReason ?? '')) ? 'Lao động tự do' : ''),
+    companyName: companyName || (/khám sức khỏe khác/i.test(String(tt25Extras.checkupReason ?? '')) ? 'Lao động tự do' : ''),
     honeypot,
     tt25Extras,
   };
@@ -302,7 +304,8 @@ function isValidPayload(payload: RegistrationPayload): boolean {
   return (
     BRANCHES.has(payload.branch) &&
     isSafeText(payload.fullName, 2, 100) &&
-    PHONE_PATTERN.test(payload.phoneNumber) &&
+    (PHONE_PATTERN.test(payload.phoneNumber) ||
+      (payload.phoneNumber === "" && /work permit/i.test(String(payload.tt25Extras.checkupReason ?? "")))) &&
     isValidDate(payload.birthDate) &&
     GENDERS.has(payload.gender) &&
     isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate) &&
