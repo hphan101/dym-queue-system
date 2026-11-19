@@ -42,6 +42,7 @@ export function buildPrintData(
     branch,
     fullName: targetRow.full_name,
     gender: (targetRow.gender as 'Nam' | 'Nữ') || 'Nam',
+    pregnancyStatus: targetRow.gender === 'Nữ' ? extras.pregnancyStatus ?? undefined : undefined,
     birthDate: parsedBirthDate,
     ethnicity: extras.ethnicity || 'Kinh',
     bloodGroup: extras.bloodGroup || 'Chưa rõ',
@@ -60,6 +61,8 @@ export function buildPrintData(
     targetPayment:
       extras.targetPayment ?? getDefaultTargetPaymentByReason(resolvedReason),
     consentAgreed: extras.consentAgreed ?? true,
+    advertisingConsentAgreed: extras.advertisingConsentAgreed,
+    consentFormVersion: extras.consentFormVersion,
     queueNumber: formatQueueNumber(targetRow.queue_number),
     checkupDate: targetRow.queue_date,
     language: detectedLanguage,

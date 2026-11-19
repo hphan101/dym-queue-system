@@ -1,16 +1,15 @@
 # TT25 original HCM forms
 
-The three source DOCX files supplied under `D:/DYM IT/HCM` are exported read-only
+The three source DOCX files supplied under `D:/DYM IT/Giấy KSK V3 19.11.2026` are exported read-only
 using Microsoft Word. Their page structure and fixed clinical content are kept:
 
 | HCM registration | PDF | Pages |
 | --- | --- | --- |
-| Vietnamese, company or other checkup | `tt25-hcm-vnm.pdf` | 9 |
-| English, company or other checkup | `tt25-hcm-bilingual.pdf` | 13 |
+| Vietnamese, company or other checkup | `tt25-hcm-vnm.pdf` | 8 |
+| English, company or other checkup | `tt25-hcm-bilingual.pdf` | 12 |
 | Work Permit, either language | `tt25-hcm-wp.pdf` | 12 |
 
-Hanoi continues using the previous PDF and generator in `tt25PdfService.ts`.
-`tt25HcmPdfService.ts` selects the template for individual and bulk printing.
+`tt25HcmPdfService.ts` selects the regional template for individual and bulk printing.
 The preview shows only the actual PDF; the old HTML recreation is not offered.
 
 Only administrative data, supplied medical-history answers, applicant signature
@@ -31,6 +30,6 @@ To regenerate after an approved source update:
 
 The generator removes placeholders and yellow highlighting, records field
 coordinates in `tt25TemplateFields.json`, and preserves the source DOCX files.
-At the user's request, administrative table borders use uniform continuous
-gray 0.35pt lines at their original positions. Answer marks use vector ticks.
+Answer marks use vector ticks. The Vietnamese and bilingual HCM forms use the
+recorded pregnancy status when the customer selected it.
 Viewing and downloading do not change print status; pressing Print does.

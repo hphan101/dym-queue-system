@@ -1,7 +1,7 @@
 # Consent print templates
 
-The source forms are `DYM.PRO.09.FOR.02.02 - VNM.docx` and
-`DYM.PRO.09.FOR.02.02 - Song ngữ.docx`. Export them as PDF using Microsoft Word
+The source forms are `DYM.PRO.09.FOR.02.03 - VNM V18.11.2026.docx` and
+`DYM.PRO.09.FOR.02.03 - VNM - ENG V18.11.2026.docx` from the 19.11.2026 revision folder. Export them as PDF using Microsoft Word
 to preserve their original layout. Vietnamese has two pages (consent, refusal);
 bilingual has four pages (two consent, two refusal).
 
@@ -10,10 +10,13 @@ Historical records without a saved language default to Vietnamese. Identity
 document type does not determine the form language.
 
 `consentPdfService.ts` fills the original PDF with `pdf-lib` and embedded Arial
-fonts. It replaces only the highlighted placeholders and signature date slots.
+fonts. It fills the highlighted placeholders and marks gender, pregnancy
+status for female customers when recorded, and the saved consent choices.
+Advertising choices only populate the current PDF when saved for the current
+consent wording.
 Text shrinks to fit its field when necessary; fixed content does not reflow.
-The registration queue number is added at the top right of the first consent
-and refusal pages, with a Vietnamese or bilingual label and a 28pt bold number.
+The registration queue number appears in bold to the right of the title on
+the first consent and refusal pages. The template code retains its original position.
 The same service supplies individual previews and bulk printing.
 
 To regenerate template assets after an approved source form change:
@@ -29,3 +32,7 @@ The generator produces the two PDF assets under `frontend/public/templates`
 and their field coordinates in `consentTemplateFields.json`. The source DOCX
 files are never modified. Viewing or downloading does not mark the form printed;
 the app's Print button does.
+
+The register function stores `pregnancyStatus` for female customers, `advertisingConsentAgreed`, and
+`consentFormVersion` in `registrations.tt25_data` alongside `consentAgreed`.
+The advertising field is a boolean, with a missing key for historical records.

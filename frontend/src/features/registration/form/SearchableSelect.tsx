@@ -103,7 +103,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] focus:outline-none focus:ring-2 transition-[border-color,box-shadow] duration-150 cursor-pointer ${
             error
               ? "border-red-500 focus:ring-red-200"
-              : "border-slate-200 focus:border-dym-blue-500 focus:ring-dym-blue-100"
+              : "border-slate-200 focus:border-primary focus:ring-ring/30"
           }`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-slate-400 pointer-events-none">
@@ -125,9 +125,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 key={opt.value}
                 type="button"
                 onClick={() => handleSelect(opt.value)}
-                className={`w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-dym-blue-50 hover:text-dym-blue-800 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-accent hover:text-primary transition-colors ${
                   value === opt.value
-                    ? "bg-dym-blue-50 text-dym-blue-800 font-semibold"
+                    ? "bg-accent text-primary font-semibold"
                     : ""
                 }`}
               >

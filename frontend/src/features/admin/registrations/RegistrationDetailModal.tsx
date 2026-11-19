@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import React, { useEffect, useState } from 'react';
 import {
@@ -25,6 +26,8 @@ import { CHECKUP_REASONS } from '../../registration/tt25Constants';
 import { validateVietnamCccd } from '../../registration/form/cccdValidator';
 import { BirthDateInput } from '../../registration/form/BirthDateInput';
 import {
+  PREGNANCY_STATUS_LABELS,
+  type PregnancyStatus,
   type TT25PaymentSource,
   type TT25TargetGroup,
   getDefaultTargetPaymentByReason,
@@ -74,6 +77,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const [occupations, setOccupations] = useState<string[]>([]);
 
   const effectiveRow = selectedRow;
+  const savedPregnancyStatus = effectiveRow?.tt25_data?.pregnancyStatus;
 
   const buildInitialForm = (row: RegistrationDetails): RegistrationEditableFields => {
     const ext = row.tt25_data ?? {};
@@ -290,15 +294,17 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
             <div className="flex items-center gap-2 shrink-0">
               {!isEditing && (
-                <button
+                <Button
                   type="button"
-                  disabled={!can('registrations', 'update')} onClick={handleStartEdit}
-                  className="dym-clinical-drawer-edit-btn"
+                  variant="outline"
+                  size="sm"
+                  disabled={!can('registrations', 'update')}
+                  onClick={handleStartEdit}
                   title="Chỉnh sửa thông tin khách hàng"
                 >
-                  <PencilSquareIcon className="w-4 h-4" />
+                  <PencilSquareIcon data-icon="inline-start" aria-hidden="true" />
                   <span>Chỉnh sửa</span>
-                </button>
+                </Button>
               )}
               <button
                 type="button"
@@ -315,25 +321,26 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
           <div className="dym-clinical-drawer-actions">
             {onPrintConsent && (
-              <button
+              <Button
                 type="button"
-                disabled={!can('printing')} onClick={() => onPrintConsent(effectiveRow)}
-                className="dym-drawer-action-btn is-consent"
+                variant="outline"
+                disabled={!can('printing')}
+                onClick={() => onPrintConsent(effectiveRow)}
                 title="In phiếu Đồng thuận khám sức khỏe"
               >
-                <DocumentCheckIcon className="w-4 h-4 shrink-0" />
+                <DocumentCheckIcon data-icon="inline-start" aria-hidden="true" />
                 <span>In Đồng thuận</span>
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
-              disabled={!can('printing')} onClick={() => onPrint(effectiveRow)}
-              className="dym-drawer-action-btn is-tt25"
+              disabled={!can('printing')}
+              onClick={() => onPrint(effectiveRow)}
               title="In phiếu khám sức khỏe theo mẫu Thông tư 25"
             >
-              <PrinterIcon className="w-4 h-4 shrink-0" />
+              <PrinterIcon data-icon="inline-start" aria-hidden="true" />
               <span>In phiếu TT25</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -383,6 +390,9 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                       setForm((prev) => ({
                         ...prev,
                         gender: e.target.value as 'Nam' | 'Nữ',
+                        tt25_data: e.target.value === 'Nam'
+                          ? { ...prev.tt25_data, pregnancyStatus: null }
+                          : prev.tt25_data,
                       }))
                     }
                   >
@@ -390,6 +400,29 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                     <option value="Nữ">Nữ</option>
                   </select>
                 </div>
+
+                {form.gender === 'Nữ' && (
+                  <div className="dym-detail-item">
+                    <label className="dym-detail-label" htmlFor="edit-pregnancy-status">Tình trạng mang thai</label>
+                    <select
+                      id="edit-pregnancy-status"
+                      className="dym-drawer-input"
+                      value={form.tt25_data?.pregnancyStatus ?? ''}
+                      onChange={(e) => {
+                        const status = e.target.value as PregnancyStatus | '';
+                        setForm((prev) => ({
+                          ...prev,
+                          tt25_data: { ...prev.tt25_data, pregnancyStatus: status || null },
+                        }));
+                      }}
+                    >
+                      <option value="">Chưa ghi nhận</option>
+                      {Object.entries(PREGNANCY_STATUS_LABELS).map(([status, labels]) => (
+                        <option key={status} value={status}>{labels.vi}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="dym-detail-item">
                   <label className="dym-detail-label" htmlFor="edit-birth-date">
@@ -443,10 +476,6 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             ) : (
               <div className="dym-detail-grid">
                 <div className="dym-detail-item">
-                  <span className="dym-detail-label">Tên khách hàng</span>
-                  <span className="dym-detail-value">{effectiveRow.full_name}</span>
-                </div>
-                <div className="dym-detail-item">
                   <span className="dym-detail-label">Giới tính</span>
                   <span className="dym-detail-value">{effectiveRow.gender}</span>
                 </div>
@@ -463,16 +492,30 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                 </div>
                 <div className="dym-detail-item">
                   <span className="dym-detail-label">Số điện thoại</span>
-                  <span className="dym-detail-value">
+                  <span className="dym-detail-value tabular-nums">
                     {formatPhone(effectiveRow.phone_number)}
                   </span>
                 </div>
-                <div className="dym-detail-item dym-detail-full-width">
+                <div className="dym-detail-item">
+                  <span className="dym-detail-label">Email</span>
+                  <span className="dym-detail-value [overflow-wrap:anywhere]">
+                    {effectiveRow.tt25_data?.email?.trim() || 'Chưa ghi nhận'}
+                  </span>
+                </div>
+                <div className="dym-detail-item">
                   <span className="dym-detail-label">CCCD / Hộ chiếu</span>
                   <span className="dym-detail-value tabular-nums">
                     {effectiveRow.identity_document || '—'}
                   </span>
                 </div>
+                {effectiveRow.gender === 'Nữ' && (
+                  <div className="dym-detail-item">
+                    <span className="dym-detail-label">Tình trạng mang thai</span>
+                    <span className="dym-detail-value">
+                      {(savedPregnancyStatus && PREGNANCY_STATUS_LABELS[savedPregnancyStatus]?.vi) || 'Chưa ghi nhận'}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

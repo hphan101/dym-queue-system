@@ -1,6 +1,9 @@
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import React, { useState, useEffect } from 'react';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import React, { useState, useEffect, useId } from 'react';
 import {
   Activity,
   Check,
@@ -18,9 +21,11 @@ import type {
   TT25TargetPaymentInfo,
   TT25TargetGroup,
   TT25PaymentSource,
+  PregnancyStatus,
 } from '../tt25Types';
 import {
   TT25_PERSONAL_DISEASES,
+  PREGNANCY_STATUS_LABELS,
   INITIAL_TT25_MEDICAL_HISTORY,
   getDefaultTargetPaymentByReason,
 } from '../tt25Types';
@@ -41,6 +46,8 @@ import {
   type Province,
   type Ward,
 } from './locationService';
+
+const EMAIL_PATTERN = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
 interface TT25RegistrationFormProps {
   branch: BranchCode;
@@ -63,6 +70,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   // Administrative state
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState<'Nam' | 'Nữ'>('Nam');
+  const [pregnancyStatus, setPregnancyStatus] = useState<PregnancyStatus>();
+  const pregnancyId = useId();
   const [birthDate, setBirthDate] = useState('');
   const [ethnicity, setEthnicity] = useState('Kinh');
   const [bloodGroup, setBloodGroup] = useState('Chưa rõ');
@@ -77,6 +86,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [workplaceWard, setWorkplaceWard] = useState('');
   const [workplaceWards, setWorkplaceWards] = useState<Ward[]>([]);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const emailId = useId();
   const [checkupReason, setCheckupReason] = useState(
     initialCheckupReason || CHECKUP_REASONS[0] || '',
   );
@@ -212,6 +223,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       }
     }
 
+    if (gender === 'Nữ' && !pregnancyStatus) {
+      newErrors.pregnancyStatus = isEn ? 'Please select your pregnancy status' : 'Vui lòng chọn tình trạng mang thai';
+    }
+
     const cccdError = validateVietnamCccd({
       cccd,
       gender,
@@ -229,6 +244,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       newErrors.phoneNumber = isEn
         ? 'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)'
         : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
+    }
+
+    if (email.trim() && !EMAIL_PATTERN.test(email.trim())) {
+      newErrors.email = isEn ? 'Please enter a valid email address' : 'Vui lòng nhập email đúng định dạng';
     }
 
     if (!province) newErrors.province = isEn ? 'Please select a Province / City' : 'Vui lòng chọn Tỉnh/Thành phố';
@@ -273,6 +292,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       gender,
       birthDate,
       ethnicity: ethnicity.trim() || 'Kinh',
+      pregnancyStatus: gender === 'Nữ' ? pregnancyStatus : undefined,
       bloodGroup: bloodGroup.trim() || 'Chưa rõ',
       cccd: cccd.trim().toUpperCase(),
       insuranceNumber: insuranceNumber.trim().toUpperCase(),
@@ -283,6 +303,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       workplace: companyName,
       workplaceWard: formattedWorkplaceLocation,
       phoneNumber: phoneNumber.replace(/[^0-9]/g, ''),
+      email: email.trim() || undefined,
       checkupReason: checkupReason || 'Khám sức khỏe tổng quát',
       medicalHistory,
       targetPayment: {
@@ -304,7 +325,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Connecting Track Line: aligned to center of 32px circle (top-4) */}
           <div className="absolute top-4 left-6 right-6 -translate-y-1/2 h-[2.5px] bg-slate-200 rounded-full overflow-hidden pointer-events-none">
             <div
-              className="h-full w-full bg-dym-blue-500 rounded-full origin-left transition-transform duration-300 ease-out-quint"
+              className="h-full w-full bg-primary rounded-full origin-left transition-transform duration-300 ease-out-quint"
               style={{
                 transform: `scaleX(${
                   currentStep === 1
@@ -336,6 +357,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   key={item.step}
                   type="button"
                   disabled={!isClickable}
+                  aria-current={isCurrent ? 'step' : undefined}
                   onClick={() => {
                     if (isClickable) {
                       setCurrentStep(item.step);
@@ -349,9 +371,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-[background-color,color,border-color,box-shadow,transform] duration-200 ${
                       isCompleted
-                        ? 'bg-dym-blue-600 text-white shadow-sm ring-2 ring-dym-blue-100 group-hover:bg-dym-blue-700'
+                        ? 'bg-primary text-primary-foreground group-hover:bg-primary/90'
                         : isCurrent
-                          ? 'bg-dym-blue-600 text-white shadow-md ring-4 ring-dym-blue-100 scale-105'
+                          ? 'bg-primary text-primary-foreground ring-4 ring-accent'
                           : 'bg-white border-2 border-slate-300 text-slate-600'
                     }`}
                   >
@@ -364,9 +386,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   <span
                     className={`text-xs mt-1.5 transition-colors ${
                       isCurrent
-                        ? 'font-bold text-dym-blue-700'
+                        ? 'font-bold text-primary'
                         : isCompleted
-                          ? 'font-medium text-slate-700 group-hover:text-dym-blue-600'
+                          ? 'font-medium text-slate-700 group-hover:text-primary'
                           : 'font-medium text-slate-600'
                     }`}
                   >
@@ -385,8 +407,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <h2 className="sr-only">
             {isEn ? '1. Administrative Information' : '1. Thông tin hành chính'}
           </h2>
-          <div className="bg-dym-blue-50/60 border border-dym-blue-100 rounded-md p-3 text-xs text-dym-blue-900 flex items-start gap-2">
-            <Info className="w-4 h-4 text-dym-blue-600 shrink-0 mt-0.5" />
+          <div className="bg-accent/60 border border-border rounded-md p-3 text-xs text-foreground flex items-start gap-2">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p>
               {isEn
                 ? 'Please fill in your details accurately according to your Citizen ID or Passport to issue the Ministry of Health standard medical examination form (Circular 25/2026/TT-BYT).'
@@ -409,7 +431,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 setFullName(e.target.value);
                 if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: '' }));
               }}
-              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-[border-color,box-shadow] duration-150 ${
+              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-[border-color,box-shadow] duration-150 ${
                 errors.fullName ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
               }`}
             />
@@ -429,6 +451,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     type="button"
                     onClick={() => {
                       setGender(g);
+                      if (g === 'Nam') {
+                        setPregnancyStatus(undefined);
+                        setErrors((prev) => ({ ...prev, pregnancyStatus: '' }));
+                      }
                       if (cccd.trim().length === 12) {
                         const err = validateVietnamCccd({
                           cccd,
@@ -441,7 +467,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }}
                     className={`py-2 px-3 rounded text-xs font-semibold border transition-colors ${
                       gender === g
-                        ? 'bg-dym-blue-600 text-white border-dym-blue-600 shadow-sm'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
@@ -484,6 +510,35 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               {errors.birthDate && <p className="text-xs text-red-500 mt-1">{errors.birthDate}</p>}
             </div>
           </div>
+
+          {gender === 'Nữ' && (
+            <fieldset
+              aria-describedby={errors.pregnancyStatus ? `${pregnancyId}-error` : undefined}
+              aria-invalid={Boolean(errors.pregnancyStatus)}
+            >
+              <legend className="mb-1 text-xs font-semibold text-slate-700">
+                {isEn ? 'Pregnancy status' : 'Tình trạng mang thai'} <span className="text-red-500">*</span>
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(Object.keys(PREGNANCY_STATUS_LABELS) as PregnancyStatus[]).map((status) => (
+                  <label key={status} className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-input bg-card px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent/60">
+                    <input
+                      type="radio"
+                      name={pregnancyId}
+                      className="size-4 shrink-0 accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      checked={pregnancyStatus === status}
+                      onChange={() => {
+                        setPregnancyStatus(status);
+                        setErrors((prev) => ({ ...prev, pregnancyStatus: '' }));
+                      }}
+                    />
+                    {PREGNANCY_STATUS_LABELS[status][lang]}
+                  </label>
+                ))}
+              </div>
+              {errors.pregnancyStatus && <FieldError id={`${pregnancyId}-error`} className="mt-1 text-xs">{errors.pregnancyStatus}</FieldError>}
+            </fieldset>
+          )}
 
           {/* Dân tộc & Nhóm máu */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -556,7 +611,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 }}
                 maxLength={12}
                 placeholder={isEn ? 'Citizen ID / Passport number' : '12 chữ số CCCD'}
-                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
+                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
                   errors.cccd ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
               />
@@ -573,7 +628,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 onChange={(e) => setInsuranceNumber(e.target.value.toUpperCase())}
                 maxLength={15}
                 placeholder={isEn ? 'e.g. DN4791234567890' : 'VD: DN4791234567890'}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors"
               />
             </div>
           </div>
@@ -624,7 +679,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   if (errors.addressDetail) setErrors((prev) => ({ ...prev, addressDetail: '' }));
                 }}
                 placeholder={isEn ? 'House number, street name...' : 'Số nhà, tên đường, thôn / ấp...'}
-                className={`w-full px-3 py-2 bg-white border rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
+                className={`w-full px-3 py-2 bg-white border rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
                   errors.addressDetail ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
               />
@@ -676,7 +731,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     ? 'Enter company or school name...'
                     : 'Nhập tên đầy đủ công ty hoặc trường học...'
                 }
-                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${errors.workplace ? 'border-red-400 bg-red-50/30' : 'border-slate-200'}`}
+                className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${errors.workplace ? 'border-red-400 bg-red-50/30' : 'border-slate-200'}`}
               />
               {errors.workplace && <p id="workplace-error" className="text-xs text-red-500 mt-1">{errors.workplace}</p>}
             </div>
@@ -724,7 +779,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              enterKeyHint="done"
+              enterKeyHint="next"
               value={phoneNumber}
               onChange={(e) => {
                 setPhoneNumber(e.target.value);
@@ -732,24 +787,54 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               }}
               maxLength={10}
               placeholder="0912345678"
-              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-[border-color,box-shadow] duration-150 ${
+              className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-[border-color,box-shadow] duration-150 ${
                 errors.phoneNumber ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
               }`}
             />
             {errors.phoneNumber && <p className="text-xs text-red-500 mt-1">{errors.phoneNumber}</p>}
           </div>
 
+          <Field className="gap-1" data-invalid={errors.email ? true : undefined}>
+            <FieldLabel htmlFor={emailId} className="text-xs font-semibold leading-4 text-slate-700">
+              {isEn ? '12. Email (optional)' : '12. Email (không bắt buộc)'}
+            </FieldLabel>
+            <Input
+              id={emailId}
+              name="email"
+              type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="done"
+              value={email}
+              maxLength={120}
+              placeholder="ten@example.com"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? `${emailId}-error` : undefined}
+              className="h-[38px] rounded border-slate-200 bg-white py-2 text-sm text-slate-900 shadow-none transition-[border-color,box-shadow] duration-150 placeholder:text-gray-400 hover:border-slate-200 focus-visible:border-slate-200 focus-visible:ring-ring/30 aria-invalid:border-red-400 aria-invalid:bg-red-50/30"
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+              }}
+              onInvalid={(event) => {
+                event.preventDefault();
+                validateStep1();
+              }}
+            />
+            {errors.email && <FieldError id={`${emailId}-error`} className="text-xs">{errors.email}</FieldError>}
+          </Field>
+
           {/* Next Button */}
           <div className="pt-2">
-            <button
+            <Button
               type="submit"
-              className="w-full py-3 bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] text-white font-bold text-sm rounded shadow-md transition-[transform,background-color,box-shadow] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer"
+              className="h-auto min-h-11 w-full whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
               <span>
                 {isEn ? 'Next: Medical History Declaration' : 'Tiếp tục: Khai báo tiền sử bệnh'}
               </span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
         </form>
       )}
@@ -1040,25 +1125,26 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
           {/* Stepper Navigation */}
           <div className="flex items-center gap-3 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setCurrentStep(1)}
-              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.97] text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-[transform,background-color,border-color] duration-150 ease-out-quint cursor-pointer"
+              className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft aria-hidden="true" />
               {isEn ? 'Back' : 'Quay lại'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="flex-1 py-3 bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] text-white font-bold text-sm rounded shadow-md transition-[transform,background-color,box-shadow] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer"
+              className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
               <span>
                 {isEn
                   ? 'Next: Target & Payment Info'
                   : 'Tiếp tục: Thông tin đối tượng - chi trả'}
               </span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
         </form>
       )}
@@ -1071,8 +1157,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               ? '3. Target Category & Payment Source'
               : '3. Đối tượng & Nguồn chi trả'}
           </h2>
-          <div className="bg-dym-blue-50/60 border border-dym-blue-100 rounded-md p-3 text-xs text-dym-blue-900 flex items-start gap-2">
-            <Info className="w-4 h-4 text-dym-blue-600 shrink-0 mt-0.5" />
+          <div className="bg-accent/60 border border-border rounded-md p-3 text-xs text-foreground flex items-start gap-2">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p>
               {isEn
                 ? 'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical facility.'
@@ -1129,14 +1215,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }
                     className={`w-full p-2.5 rounded border text-left text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${
                       isSelected
-                        ? 'border-dym-blue-500 bg-dym-blue-50/50 text-dym-blue-900 font-semibold shadow-xs'
+                        ? 'border-primary bg-accent/50 text-foreground font-semibold shadow-xs'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
                     }`}
                   >
                     <span
                       className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 transition-colors ${
                         isSelected
-                          ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                          ? 'bg-primary border-primary text-primary-foreground'
                           : 'border-slate-300 bg-white'
                       }`}
                     >
@@ -1167,7 +1253,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       ? 'Enter target category or code (1 - 17)...'
                       : 'Nhập cụ thể đối tượng khác...'
                   }
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
               </div>
             )}
@@ -1212,14 +1298,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }
                     className={`w-full p-2.5 rounded border text-left text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${
                       isSelected
-                        ? 'border-dym-blue-500 bg-dym-blue-50/50 text-dym-blue-900 font-semibold shadow-xs'
+                        ? 'border-primary bg-accent/50 text-foreground font-semibold shadow-xs'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
                     }`}
                   >
                     <span
                       className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 transition-colors ${
                         isSelected
-                          ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                          ? 'bg-primary border-primary text-primary-foreground'
                           : 'border-slate-300 bg-white'
                       }`}
                     >
@@ -1248,7 +1334,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   placeholder={
                     isEn ? 'Enter other payment source...' : 'Nhập cụ thể nguồn chi trả khác...'
                   }
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-dym-blue-200"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
               </div>
             )}
@@ -1277,14 +1363,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   key={loc.id}
                   className={`px-3 py-2 rounded border text-xs flex items-center gap-2 select-none ${
                     loc.active
-                      ? 'border-dym-blue-500 bg-dym-blue-50/60 text-dym-blue-900 font-bold'
+                      ? 'border-primary bg-accent/60 text-foreground font-bold'
                       : 'border-slate-200 bg-slate-50 text-slate-500'
                   }`}
                 >
                   <span
                     className={`w-4 h-4 rounded-xs border flex items-center justify-center shrink-0 ${
                       loc.active
-                        ? 'bg-dym-blue-600 border-dym-blue-600 text-white'
+                        ? 'bg-primary border-primary text-primary-foreground'
                         : 'border-slate-300 bg-white'
                     }`}
                   >
@@ -1298,21 +1384,22 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
           {/* Stepper Navigation */}
           <div className="flex items-center gap-3 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setCurrentStep(2)}
-              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.97] text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-[transform,background-color,border-color] duration-150 ease-out-quint cursor-pointer"
+              className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft aria-hidden="true" />
               {isEn ? 'Back' : 'Quay lại'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="flex-1 py-3 bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] text-white font-bold text-sm rounded shadow-md transition-[transform,background-color,box-shadow] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer"
+              className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
               <span>{isEn ? 'Review & Confirm' : 'Xem lại & Xác nhận'}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
         </form>
       )}
@@ -1349,6 +1436,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   {birthDate.split('-').reverse().join('/')}
                 </span>
               </div>
+              {gender === 'Nữ' && pregnancyStatus && (
+                <div>
+                  <span className="text-slate-500 block text-[11px]">{isEn ? 'Pregnancy status:' : 'Tình trạng mang thai:'}</span>
+                  <span className="font-medium text-slate-700">{PREGNANCY_STATUS_LABELS[pregnancyStatus][lang]}</span>
+                </div>
+              )}
               <div>
                 <span className="text-slate-500 block text-[11px]">
                   {isEn ? 'Citizen ID / Passport:' : 'Số CCCD / Hộ chiếu:'}
@@ -1361,6 +1454,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 </span>
                 <span className="font-medium text-slate-700">{phoneNumber}</span>
               </div>
+              {email.trim() && (
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Email:</span>
+                  <span className="break-all font-medium text-slate-700">{email.trim()}</span>
+                </div>
+              )}
               <div>
                 <span className="text-slate-500 block text-[11px]">
                   {isEn ? 'Ethnicity / Blood Type:' : 'Dân tộc / Nhóm máu:'}
@@ -1461,7 +1560,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <span className="text-slate-500 block text-[11px]">
                   {isEn ? 'Exam Location:' : 'Địa điểm khám:'}
                 </span>
-                <span className="font-semibold text-dym-blue-700">{isEn ? 'Medical facility' : 'CS KBCB'}</span>
+                <span className="font-semibold text-primary">{isEn ? 'Medical facility' : 'CS KBCB'}</span>
               </div>
             </div>
           </div>
@@ -1489,20 +1588,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
           {/* Stepper Buttons */}
           <div className="flex items-center gap-3 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setCurrentStep(3)}
-              className="py-3 px-4 rounded border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.97] text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-[transform,background-color,border-color] duration-150 ease-out-quint cursor-pointer"
+              className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft aria-hidden="true" />
               {isEn ? 'Back' : 'Quay lại'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={isLoading || !medicalHistory.commitmentAgreed}
-              className="flex-1 py-3 bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] disabled:bg-slate-300 disabled:active:scale-100 text-white font-bold text-sm rounded shadow-md transition-[transform,background-color,box-shadow] duration-150 ease-out-quint flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
-              <Activity className="w-4 h-4" />
+              <Activity aria-hidden="true" />
               <span>
                 {isLoading
                   ? isEn
@@ -1512,7 +1612,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     ? 'Confirm & Submit'
                     : 'Xác nhận & Gửi thông tin'}
               </span>
-            </button>
+            </Button>
           </div>
         </form>
       )}

@@ -13,6 +13,7 @@ import { ConsentScreen } from './ConsentScreen';
 import { SuccessView } from './SuccessView';
 import { TT25RegistrationForm } from '../form/TT25RegistrationForm';
 import type { RegistrationResponse, TT25RegistrationData } from '../types';
+import { CONSENT_FORM_VERSION } from '../tt25Types';
 import { WelcomeScreen } from './WelcomeScreen';
 import { clearRegistrationReceipt, readRegistrationReceipt, storeRegistrationReceipt } from './registrationReceipt';
 import { useRegistrationAccess } from '../access/useRegistrationAccess';
@@ -42,6 +43,7 @@ export function RegistrationFlowPage() {
   >(() => receipt ? 'success' : 'welcome');
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [consentAgreed, setConsentAgreed] = useState<boolean>(true);
+  const [advertisingConsentAgreed, setAdvertisingConsentAgreed] = useState<boolean>();
   const [isLoading, setIsLoading] = useState(false);
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,8 +99,9 @@ export function RegistrationFlowPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSelectConsent = (agreed: boolean) => {
+  const handleSelectConsent = (agreed: boolean, advertisingAgreed: boolean) => {
     setConsentAgreed(agreed);
+    setAdvertisingConsentAgreed(advertisingAgreed);
     setError(null);
     setStep('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -132,11 +135,16 @@ export function RegistrationFlowPage() {
       15_000,
     );
 
-    const payload = {
+    const registrationData = {
       ...formData,
-      companyName: formData.workplace || '',
       consentAgreed,
+      advertisingConsentAgreed,
+      consentFormVersion: CONSENT_FORM_VERSION,
       language: lang,
+    };
+    const payload = {
+      ...registrationData,
+      companyName: formData.workplace || '',
       registrationSession: access.state.session.token,
     };
 
@@ -159,9 +167,7 @@ export function RegistrationFlowPage() {
         const formattedQueueNumber = formatQueueNumber(result.queueNumber);
         setQueueNumber(formattedQueueNumber);
         setRegisteredData({
-          ...formData,
-          language: lang,
-          consentAgreed,
+          ...registrationData,
           queueNumber: formattedQueueNumber,
         });
         setStep('success');
@@ -201,6 +207,7 @@ export function RegistrationFlowPage() {
     setStep('welcome');
     setSelectedReason('');
     setConsentAgreed(true);
+    setAdvertisingConsentAgreed(undefined);
     setRegisteredData(null);
     setQueueNumber('');
     setReceipt(null);
@@ -235,26 +242,26 @@ export function RegistrationFlowPage() {
           ? 'registration-entry-card'
           : 'bg-white rounded-lg border border-slate-200/80 p-5 sm:p-8 shadow-sm'}>
           {assisted && accessReady && <a className="mb-4 inline-block text-sm font-medium underline underline-offset-4" href={`/?page=admin&branch=${branch}`}>Về tiếp nhận</a>}
-          {step !== 'success' && <RegistrationAccessNotice state={access.state} onRetry={access.retry} />}
+          {step !== 'success' && <RegistrationAccessNotice state={access.state} assisted={assisted} onRetry={access.retry} />}
           <div hidden={showAccessGate}>
           {branch && step === 'form' && (
             <div className="mb-6 text-center">
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-dym-blue-50 text-dym-blue-700 text-xs font-semibold mb-1.5">
+              <span className="mb-2 inline-block rounded bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                 {lang === 'vi'
                   ? 'Thông tư 25/2026/TT-BYT (Mẫu 03)'
                   : 'Circular 25/2026/TT-BYT (Form 03)'}
               </span>
-              <h1 className="text-xl font-extrabold text-slate-800">
+              <h1 className="text-xl font-semibold text-foreground">
                 {lang === 'vi'
                   ? 'Hồ Sơ Khám Sức Khỏe'
                   : translations[lang].title}
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {lang === 'vi'
                   ? 'Vui lòng hoàn tất 12 mục hành chính và tiền sử y tế để in phiếu khám'
                   : 'Please complete the 12 administrative items and medical history to print your checkup form'}
               </p>
-              <p className="mt-2 inline-flex rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              <p className="mt-2 inline-flex rounded border border-dym-blue-100 bg-dym-blue-50 px-3.5 py-1 text-xs font-semibold text-dym-blue-800">
                 {BRANCH_NAMES[branch]}
               </p>
             </div>

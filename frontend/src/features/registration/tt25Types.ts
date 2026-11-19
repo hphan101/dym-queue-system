@@ -70,11 +70,22 @@ export interface TT25TargetPaymentInfo {
   examLocation: TT25ExamLocation;
 }
 
+export const CONSENT_FORM_VERSION = 'DYM.PRO.09.FOR.02.03-2026-11-19';
+
+export const PREGNANCY_STATUS_LABELS = {
+  not_pregnant: { vi: 'Không mang thai', en: 'Not pregnant' },
+  suspected: { vi: 'Nghi ngờ mang thai', en: 'Suspected pregnancy' },
+  pregnant: { vi: 'Đang mang thai', en: 'Pregnant' },
+} as const;
+
+export type PregnancyStatus = keyof typeof PREGNANCY_STATUS_LABELS;
+
 export interface TT25RegistrationData {
   branch: BranchCode;
   // 12 muc hanh chinh
   fullName: string;
   gender: 'Nam' | 'Nữ';
+  pregnancyStatus?: PregnancyStatus;
   birthDate: string; // YYYY-MM-DD
   ethnicity: string; // Mặc định: "Kinh"
   bloodGroup: string; // "A" | "B" | "AB" | "O" | "Chưa rõ"
@@ -98,6 +109,8 @@ export interface TT25RegistrationData {
 
   // Dong thuan kham & thong tin in phieu
   consentAgreed?: boolean;
+  advertisingConsentAgreed?: boolean;
+  consentFormVersion?: string;
   queueNumber?: string;
   checkupDate?: string;
   language?: 'vi' | 'en';
@@ -189,6 +202,7 @@ export function createDefaultTT25Data(
     branch: fields.branch,
     fullName: fields.fullName ?? '',
     gender: fields.gender ?? 'Nam',
+    pregnancyStatus: fields.pregnancyStatus,
     birthDate: fields.birthDate ?? '',
     ethnicity: fields.ethnicity ?? 'Kinh',
     bloodGroup: fields.bloodGroup ?? 'Chưa rõ',
@@ -206,6 +220,8 @@ export function createDefaultTT25Data(
     medicalHistory: fields.medicalHistory ?? INITIAL_TT25_MEDICAL_HISTORY,
     targetPayment: fields.targetPayment ?? defaultTargetPayment,
     consentAgreed: fields.consentAgreed ?? true,
+    advertisingConsentAgreed: fields.advertisingConsentAgreed,
+    consentFormVersion: fields.consentFormVersion,
     queueNumber: fields.queueNumber,
     checkupDate: fields.checkupDate,
     language: fields.language,

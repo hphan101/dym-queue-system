@@ -14,9 +14,12 @@ const COOLDOWN_SECONDS = 600;
 const IP_RATE_LIMIT_REQUESTS = 600;
 const IP_RATE_LIMIT_WINDOW_SECONDS = 600;
 const PHONE_PATTERN = /^0(3|5|7|8|9)[0-9]{8}$/;
+const EMAIL_PATTERN = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 const IDENTITY_PATTERN = /^([0-9]{12}|[A-Z][A-Z0-9]{6,12})$/;
 const BRANCHES = new Set(["q1", "q7", "hn"]);
 const GENDERS = new Set(["Nam", "Nữ"]);
+const PREGNANCY_STATUSES = new Set(["not_pregnant", "suspected", "pregnant"]);
+const CONSENT_FORM_VERSION = "DYM.PRO.09.FOR.02.03-2026-11-19";
 const VALID_CCCD_PROVINCE_CODES = new Set([
   "001", "002", "004", "006", "008", "010", "011", "012", "014", "015",
   "017", "019", "020", "022", "024", "025", "026", "027", "030", "031",
@@ -156,8 +159,11 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   const branch = stringField(value, "branch");
   const fullName = stringField(value, "fullName");
   const phoneNumber = stringField(value, "phoneNumber");
+  const email = stringField(value, "email", true);
   const birthDate = stringField(value, "birthDate");
   const gender = stringField(value, "gender");
+  const pregnancyStatus = stringField(value, "pregnancyStatus", true);
+  const usesCurrentConsentForm = value.consentFormVersion === CONSENT_FORM_VERSION;
   const cccd = stringField(value, "cccd");
   const province = stringField(value, "province");
   const ward = stringField(value, "ward");
@@ -169,8 +175,12 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     branch === null ||
     fullName === null ||
     phoneNumber === null ||
+    email === null ||
+    (email !== "" && (!isSafeText(email, 1, 120) || !EMAIL_PATTERN.test(email))) ||
     birthDate === null ||
     gender === null ||
+    (gender === "Nữ" && (usesCurrentConsentForm || value.pregnancyStatus !== undefined)
+      && (pregnancyStatus === null || !PREGNANCY_STATUSES.has(pregnancyStatus))) ||
     cccd === null ||
     province === null ||
     ward === null ||
@@ -182,6 +192,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   }
 
   const tt25Extras: Record<string, unknown> = {};
+  if (gender === "Nữ" && pregnancyStatus) tt25Extras.pregnancyStatus = pregnancyStatus;
   const optionalTextFields: Array<[string, number]> = [
     ["ethnicity", 60],
     ["bloodGroup", 20],
@@ -191,7 +202,6 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     ["workplaceWard", 160],
     ["checkupReason", 160],
     ["language", 20],
-    ["email", 120],
   ];
 
   for (const [key, maxLen] of optionalTextFields) {
@@ -200,6 +210,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
       tt25Extras[key] = val;
     }
   }
+  if (email) tt25Extras.email = email;
 
   if (isRecord(value.medicalHistory)) {
     tt25Extras.medicalHistory = sanitizeMedicalHistory(value.medicalHistory);
@@ -209,6 +220,12 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   }
   if (typeof value.consentAgreed === "boolean") {
     tt25Extras.consentAgreed = value.consentAgreed;
+  }
+  if (typeof value.advertisingConsentAgreed === "boolean") {
+    tt25Extras.advertisingConsentAgreed = value.advertisingConsentAgreed;
+    tt25Extras.consentFormVersion = usesCurrentConsentForm
+      ? CONSENT_FORM_VERSION
+      : "DYM.PRO.09.FOR.02.03-2026-11-18";
   }
 
   return {

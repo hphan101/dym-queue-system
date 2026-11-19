@@ -8,8 +8,9 @@ const fontkit = require('@pdf-lib/fontkit');
 
 const frontend = path.resolve(__dirname, '..');
 const layout = require('../src/features/registration/printing/consentTemplateFields.json');
+const consentVersion = 'DYM.PRO.09.FOR.02.03-2026-11-19';
 
-function loadService() {
+function loadService(onMark) {
   const fetched = [];
   const code = ts.transpileModule(fs.readFileSync(path.join(frontend, 'src/features/registration/printing/consentPdfService.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
@@ -26,8 +27,15 @@ function loadService() {
   const dependencies = {
     'pdf-lib': require('pdf-lib'), '@pdf-lib/fontkit': fontkit,
     './consentTemplateFields.json': layout,
+    '../tt25Types': { CONSENT_FORM_VERSION: consentVersion },
     '../../../lib/date': { ...date, getTodayInVietnam: () => '2026-11-01' },
-    './pdfDrawing': drawing,
+    './pdfDrawing': {
+      ...drawing,
+      drawPdfCheck(page, x, y) {
+        onMark?.({ x, y });
+        drawing.drawPdfCheck(page, x, y);
+      },
+    },
     './pdfPrintSession': require('./helpers/pdf-print-session.cjs'),
   };
   const execute = new Function('exports', 'require', 'fetch', 'Blob', 'URL', code);
@@ -86,3 +94,27 @@ test('consent generation uses original PDFs, with correct page selection', async
 });
 
 module.exports = { loadService, customer };
+
+test('consent PDF marks gender, pregnancy status and the applicable consent choices', async () => {
+  const marks = [];
+  const print = loadService(mark => marks.push(mark));
+  const coordinates = ({ x, y }) => ({ x, y });
+  for (const language of ['vi', 'en']) {
+    const form = layout[print.getConsentFormLanguage({ language })];
+    const choices = form.consentMarks;
+    for (const [pregnancyStatus, examination] of [['not_pregnant', true], ['suspected', false], ['pregnant', true]]) {
+      const result = await print.generateConsentPdf({ ...customer, language, pregnancyStatus, consentFormVersion: consentVersion, consentAgreed: examination, advertisingConsentAgreed: !examination });
+      URL.revokeObjectURL(result.url);
+      assert.deepEqual(marks.splice(0), [
+        form.genderMarks['Nữ'], form.pregnancyMarks[pregnancyStatus],
+        choices.examination[examination ? 'agree' : 'decline'], choices.advertising[examination ? 'decline' : 'agree'],
+      ].map(coordinates));
+    }
+    const old = await print.generateConsentPdf({ ...customer, language, consentAgreed: true });
+    URL.revokeObjectURL(old.url);
+    assert.deepEqual(marks.splice(0), [coordinates(form.genderMarks['Nữ'])]);
+    const male = await print.generateConsentPdf({ ...customer, language, gender: 'Nam', pregnancyStatus: 'suspected', consentAgreed: true, advertisingConsentAgreed: true, consentFormVersion: 'DYM.PRO.09.FOR.02.03-2026-11-18' });
+    URL.revokeObjectURL(male.url);
+    assert.deepEqual(marks.splice(0), [coordinates(form.genderMarks.Nam), coordinates(choices.examination.agree)]);
+  }
+});

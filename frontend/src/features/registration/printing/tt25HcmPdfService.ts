@@ -36,7 +36,8 @@ const assets = new Map<string, Promise<ArrayBuffer>>();
 function loadAsset(path: string) {
   let request = assets.get(path);
   if (!request) {
-    request = fetch(`${path}?v=20261113-hanoi-templates`).then(async (response) => {
+    const version = path.startsWith('/templates/tt25-hcm-') ? '20261119-hcm-v3.3' : '20261113-hanoi-templates';
+    request = fetch(`${path}?v=${version}`).then(async (response) => {
       if (!response.ok) throw new Error('Không tải được mẫu TT25 gốc hoặc phông chữ.');
       const bytes = await response.arrayBuffer();
       if (!bytes.byteLength) throw new Error('File mẫu TT25 không có dữ liệu.');
@@ -92,6 +93,10 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
     drawPdfCheck(pages[point.page], point.x, point.y);
   };
   tick(layout.checks.gender[data.gender]);
+  if (data.gender === 'Nữ' && data.pregnancyStatus && 'pregnancyStatus' in layout.checks
+    && Object.hasOwn(layout.checks.pregnancyStatus, data.pregnancyStatus)) {
+    tick(layout.checks.pregnancyStatus[data.pregnancyStatus]);
+  }
   // Missing history is left blank, never asserted as a negative answer.
   if (history) {
     tick(layout.checks.familyHistory[history.familyHistory.hasDisease ? 'yes' : 'no']);

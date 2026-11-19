@@ -72,7 +72,7 @@ export const ConsentPrintModal: React.FC<ConsentPrintModalProps> = ({ isOpen, on
           <FileText className="size-5 shrink-0" aria-hidden="true" />
           <div className="flex min-w-0 flex-col gap-1">
             <h2 className="consent-preview-title">Phiếu đồng thuận khám sức khỏe</h2>
-            <p className="consent-preview-subtitle">{data.fullName} · {language === 'vi' ? 'Tiếng Việt' : 'Song ngữ Việt – Anh'} · Mẫu gốc DYM.PRO.09.FOR.02.02</p>
+            <p className="consent-preview-subtitle">{data.fullName} · {language === 'vi' ? 'Tiếng Việt' : 'Song ngữ Việt – Anh'} · Mẫu gốc DYM.PRO.09.FOR.02.03</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

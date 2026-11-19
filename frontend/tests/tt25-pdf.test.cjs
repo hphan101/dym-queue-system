@@ -76,10 +76,15 @@ test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
   try {
     for (const [language, reason, pages] of [['vi', customer.checkupReason, 8], ['en', customer.checkupReason, 12], ['vi', 'Work Permit', 24]]) {
       drawn.length = 0; segments.length = 0; lines = 0;
-      const result = await service.generateTT25OriginalPdf({ ...customer, language, checkupReason: reason });
+      const data = { ...customer, language, checkupReason: reason, pregnancyStatus: 'suspected' };
+      const result = await service.generateTT25OriginalPdf(data);
       try {
         assert.equal((await PDFDocument.load(await result.blob.arrayBuffer())).getPageCount(), pages);
-        assert.equal(lines, pages === 24 ? 104 : 52);
+        assert.equal(lines, reason === 'Work Permit' ? 104 : 54);
+        if (reason !== 'Work Permit') {
+          const point = layout[service.getTT25TemplateInfo(data).key].checks.pregnancyStatus.suspected;
+          assert.ok(segments.some(({ start }) => Math.abs(start.x - point.x + 2.5) < .01 && Math.abs(start.y - point.y - .1) < .01));
+        }
         assert.deepEqual(segments[0].end, segments[1].start, 'tick strokes must join instead of crossing');
         assert.ok(segments[0].start.y > segments[0].end.y && segments[1].end.y > segments[1].start.y);
         for (const text of ['NGUYỄN THỊ MINH ANH', '0901234567', 'khach@example.test', 'Dị ứng thời tiết', 'Sinh thường năm 2020']) assert.ok(drawn.some((item) => item.text === text), text);
@@ -89,9 +94,12 @@ test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
       } finally { URL.revokeObjectURL(result.url); }
     }
     lines = 0;
-    const blank = await service.generateTT25OriginalPdf({ ...customer, medicalHistory: undefined });
+    drawn.length = 0;
+    const blank = await service.generateTT25OriginalPdf({ ...customer, email: undefined, medicalHistory: undefined });
     URL.revokeObjectURL(blank.url);
     assert.equal(lines, 2, 'missing medical history must not be marked No');
+    const emailField = layout.vnm.fields.find((field) => field.field === 'email');
+    assert.equal(drawn.some(({ options }) => options.x === emailField.x && options.y === emailField.y), false);
     const hanoi = await service.generateTT25OriginalPdf({ ...customer, branch: 'hn' });
     try { assert.equal((await PDFDocument.load(await hanoi.blob.arrayBuffer())).getPageCount(), 8); }
     finally { URL.revokeObjectURL(hanoi.url); }
@@ -123,6 +131,7 @@ test('Hanoi templates fill all history answers and keep only WP duplex padding',
         assert.equal(lines, 52 * copies);
         assert.equal(texts.includes(customer.workplace), reason === 'Work Permit', 'Hanoi corporate TT25 omits company names in both languages');
         for (const text of ['NGUYỄN THỊ MINH ANH', '001195012345', 'Đái tháo đường', 'Dị ứng thời tiết', 'Vitamin D, mỗi ngày một viên', 'Sinh thường năm 2020']) assert.ok(texts.includes(text), `${info.key}: ${text}`);
+        assert.equal(texts.includes(customer.email), reason !== 'Work Permit', 'print email when the existing template has a field');
         for (let page = 0; page < pdf.getPageCount(); page++) {
           const empty = (pdf.getPage(page).node.Contents()?.asArray().length ?? 0) === 0;
           assert.equal(empty, blank && page % expected === expected - 1, `unexpected blank at ${info.key} page ${page}`);

@@ -1,4 +1,4 @@
-import type { TT25MedicalHistory, TT25TargetPaymentInfo } from '../../registration/tt25Types';
+import type { PregnancyStatus, TT25MedicalHistory, TT25TargetPaymentInfo } from '../../registration/tt25Types';
 
 export interface TT25StoredExtras {
   ethnicity?: string;
@@ -11,6 +11,9 @@ export interface TT25StoredExtras {
   medicalHistory?: TT25MedicalHistory;
   targetPayment?: TT25TargetPaymentInfo;
   consentAgreed?: boolean;
+  advertisingConsentAgreed?: boolean;
+  consentFormVersion?: string;
+  pregnancyStatus?: PregnancyStatus | null;
   printedConsent?: boolean;
   printedTT25?: boolean;
   language?: 'vi' | 'en';

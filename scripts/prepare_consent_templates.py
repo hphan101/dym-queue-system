@@ -1,144 +1,137 @@
-"""Prepare fill-in PDFs exported by Microsoft Word without rebuilding their layout.
+"""Build print assets from the 19.11.2026 consent/refusal revision exported by Word."""
 
-Requires pdfplumber and PyMuPDF. Original DOCX files are opened read-only in Word
-and exported to <input-dir>/vnm-source.pdf and bilingual-source.pdf first.
-"""
 import argparse
 import json
 import sys
 from pathlib import Path
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--input-dir', type=Path, required=True)
-parser.add_argument('--pymupdf-path')
-args = parser.parse_args()
-if args.pymupdf_path:
-    sys.path.insert(0, args.pymupdf_path)
-import pymupdf
 import pdfplumber
+from pdf_table_borders import restore_table_row_borders
 
-root = Path(__file__).resolve().parents[1]
-result = {}
-for language, label, page_count, consent_pages, refusal_pages in [
-    ('vi', 'vnm', 2, [0], [1]),
-    ('bilingual', 'bilingual', 4, [0, 1], [2, 3]),
-]:
-    source = args.input_dir / f'{label}-source.pdf'
-    document = pymupdf.open(source)
-    fields, masks, gender_marks, borders = [], [], {}, []
-    placeholder_count = 0
-    with pdfplumber.open(source) as pdf:
-        assert len(pdf.pages) == page_count, f'Unexpected page count: {label}'
+
+PLACEHOLDERS = {
+    'tên khách': 'fullName',
+    'giới tính': 'gender',
+    'ngày sinh': 'birthDate',
+    'mã định danh': 'identityDocument',
+    'danh': 'identityDocument',  # Continuation of the wrapped bilingual placeholder.
+    'sđt': 'phoneNumber',
+    'email': 'email',
+    'công ty': 'workplace',
+    'ngày khám': 'checkupDate',
+}
+
+CHECKBOX_LABELS = {
+    'Nam': 'male', 'Nữ': 'female',
+    'Không mang thai': 'not_pregnant',
+    'Nghi ngờ mang thai': 'suspected',
+    'Đang mang thai': 'pregnant',
+    'Đồng ý khám': 'exam_agree', 'Không đồng ý khám': 'exam_decline',
+    'Đồng ý nhận': 'ads_agree', 'Không đồng ý thông tin': 'ads_decline',
+}
+
+
+def prepare(label, folder, output, pymupdf, consent_pages, refusal_pages):
+    source = folder / f'{label}-source.pdf'
+    fields, marks = [], {}
+    with pdfplumber.open(source) as pdf, pymupdf.open(source) as document:
+        assert len(pdf.pages) == len(consent_pages) + len(refusal_pages), f'Unexpected page count: {label}'
         for index, page in enumerate(pdf.pages):
-            # Restore original table rules after blanking placeholders: Word's
-            # highlight rectangles can touch the thin dotted row separators.
-            if index == 0:
-                borders = [line for line in page.lines if abs(line['top'] - line['bottom']) < .01
-                           and line['x1'] - line['x0'] > 400 and line['top'] < 310]
-            # Word highlighting extends above the glyph bounds. Clear the entire
-            # highlighted placeholder so no yellow edge survives the replacement.
+            target = document[index]
+            squares = []
+            phone = None
+            email_label = None
+            workplace_label = None
             for rect in page.rects:
-                if tuple(rect.get('non_stroking_color') or ()) == (1, 1, 0):
-                    box = [rect['x0'], rect['top'], rect['x1'], rect['bottom']]
-                    document[index].add_redact_annot(pymupdf.Rect(box), fill=(1, 1, 1))
-                    masks.append({'page': index, 'box': box})
-            matches = page.search(r'\[[^\]]+\]')
-            for match in matches:
-                placeholder_count += 1
-                text = ' '.join(match['text'].lower().split())
-                field = ('fullName' if 'tên khách' in text else
-                         'birthDate' if 'ngày sinh' in text else
-                         'identityDocument' if 'cccd' in text or 'hộ chiếu' in text else
-                         'phoneNumber' if 'điện thoại' in text else
-                         'email' if 'email' in text else
-                         'workplace' if 'nơi làm việc' in text else
-                         'checkupDate' if 'ngày khám' in text else None)
-                assert field, f'Unmapped placeholder: {text}'
-                lines = []
-                for char in match['chars']:
-                    line = next((group for group in lines if abs(group[0]['top'] - char['top']) < 2), None)
-                    if line is None:
-                        lines.append([char])
-                    else:
-                        line.append(char)
-                for line in lines:
-                    box = [min(c['x0'] for c in line) - .15, min(c['top'] for c in line) - .4,
-                           max(c['x1'] for c in line) + .15, max(c['bottom'] for c in line) + .4]
-                    document[index].add_redact_annot(pymupdf.Rect(box), fill=(1, 1, 1))
-                    masks.append({'page': index, 'box': box})
-                # Wrapped placeholders are filled on their continuation line, never over a label.
-                line = lines[-1]
-                first = line[0]
-                end = max(c['x1'] for c in line)
-                next_text = [c['x0'] for c in page.chars if c['text'].strip()
-                             and abs(c['top'] - first['top']) < 2 and c['x0'] > end + 2]
-                right = min([544] + [x - 7 for x in next_text])
-                signature = 'viết hoa' in text
-                font_name = first['fontname']
-                font = 'boldItalic' if 'BoldItalic' in font_name else 'bold' if 'Bold' in font_name else 'italic' if 'Italic' in font_name else 'regular'
-                fields.append({'page': index, 'field': field,
-                               'x': round((min(c['x0'] for c in line) + end) / 2 if signature else first['x0'], 3),
-                               'y': round(first['matrix'][5], 3),
-                               'width': 225 if signature else round(right - first['x0'], 3),
-                               'size': 12 if label == 'vnm' and index == 0 and field == 'identityDocument' else round(first['size'], 3), 'font': font,
-                               'align': 'center' if signature else 'left'})
-
-            if index == 0:
-                boxes = [c for c in page.chars if 'Wingdings' in c['fontname'] and c['text'] == '\uf0a8' and c['top'] < 220]
-                assert len(boxes) == 2
-                gender_marks = {gender: {'x': round((c['x0'] + c['x1']) / 2, 3),
-                                         'y': round(page.height - (c['top'] + c['bottom']) / 2, 3)}
-                                for gender, c in zip(['Nam', 'Nữ'], boxes)}
-
-            if index == refusal_pages[-1]:
-                band = (703, 718) if label == 'vnm' else (323, 350)
-                dots = [c for c in page.chars if c['text'] in '.…' and band[0] < c['top'] < band[1] and c['x0'] > 400]
-                groups = []
-                for c in dots:
-                    if not groups or abs(c['top'] - groups[-1][0]['top']) > 2 or c['x0'] - groups[-1][-1]['x1'] > 4:
-                        groups.append([c])
-                    else:
-                        groups[-1].append(c)
-                assert len(groups) == 3, f'Expected date slots: {label}'
-                if label == 'vnm':
-                    # Fill the signature date as one string so original slashes
-                    # cannot leave uneven gaps between day, month and year.
-                    date_chars = [c for c in page.chars if c['text'] in '.…/'
-                                  and abs(c['matrix'][5] - groups[0][0]['matrix'][5]) < 1
-                                  and c['x0'] >= groups[0][0]['x0']]
-                    box = [min(c['x0'] for c in date_chars) - .1, min(c['top'] for c in date_chars) - .3,
-                           max(c['x1'] for c in date_chars) + .1, max(c['bottom'] for c in date_chars) + .3]
-                    document[index].add_redact_annot(pymupdf.Rect(box), fill=(1, 1, 1))
-                    masks.append({'page': index, 'box': box})
-                    fields.append({'page': index, 'field': 'checkupDate', 'x': round(groups[0][0]['x0'], 3),
-                                   'y': round(groups[0][0]['matrix'][5], 3), 'width': round(box[2] - box[0], 3),
-                                   'size': 11.04, 'font': 'italic', 'align': 'left'})
+                if tuple(rect.get('non_stroking_color') or ()) != (1, 1, 0):
                     continue
-                for name, group in zip(['checkupDay', 'checkupMonth', 'checkupYear'], groups):
-                    box = [group[0]['x0'] - .1, min(c['top'] for c in group) - .3,
-                           max(c['x1'] for c in group) + .1, max(c['bottom'] for c in group) + .3]
-                    document[index].add_redact_annot(pymupdf.Rect(box), fill=(1, 1, 1))
-                    masks.append({'page': index, 'box': box})
-                    fields.append({'page': index, 'field': name, 'x': round(group[0]['x0'], 3),
-                                   'y': round(group[0]['matrix'][5], 3), 'width': round(box[2] - box[0], 3),
-                                   'size': round(group[0]['size'], 3), 'font': 'italic', 'align': 'left'})
-    assert placeholder_count == 13, f'Unexpected placeholders: {label}'
-    for page in document:
-        page.apply_redactions(images=0, graphics=0)
-    for line in borders:
-        dash = line.get('dash')
-        dashes = f"[{' '.join(str(n) for n in dash[0])}] {dash[1]}" if dash and dash[0] else None
-        document[0].draw_line(pymupdf.Point(line['x0'], line['top']),
-                              pymupdf.Point(line['x1'], line['bottom']),
-                              color=(0, 0, 0), width=line['linewidth'], dashes=dashes)
-    filename = f'dong-thuan-{label}.pdf'
-    document.save(root / 'frontend/public/templates' / filename, garbage=4, deflate=True)
-    document.close()
-    result[language] = {'template': filename, 'pageCount': page_count,
-                        'consentPages': consent_pages, 'refusalPages': refusal_pages,
-                        'fields': fields, 'genderMarks': gender_marks}
-    (args.input_dir / f'{label}-masks.json').write_text(json.dumps(masks), encoding='utf-8')
+                left, top, right, bottom = (rect[k] for k in ('x0', 'top', 'x1', 'bottom'))
+                chars = [c for c in page.chars if left - .5 < (c['x0'] + c['x1']) / 2 < right + .5
+                         and top < (c['top'] + c['bottom']) / 2 < bottom]
+                text = ''.join(c['text'] for c in chars).strip().lower()
+                target.add_redact_annot(pymupdf.Rect(left, top, right, bottom), fill=(1, 1, 1))
+                if text == '\uf0a8':
+                    center = (left + 5, page.height - chars[0]['top'] - 5)
+                    squares.append(center)
+                    baseline = chars[0]['matrix'][5]
+                    following = ''.join(c['text'] for c in page.chars
+                                        if abs(c['matrix'][5] - baseline) < 1 and c['x0'] >= right - .1).lstrip()
+                    key = next(key for prefix, key in CHECKBOX_LABELS.items() if following.startswith(prefix))
+                    assert key not in marks, (label, key)
+                    marks[key] = {'page': index, 'x': round(center[0], 3), 'y': round(center[1], 3)}
+                    continue
+                if text == 'mã định':  # Draw the complete ID on the next line.
+                    continue
+                field = PLACEHOLDERS[text]
+                first = chars[0]
+                same_line = [c for c in page.chars if c['text'].strip()
+                             and abs(c['matrix'][5] - first['matrix'][5]) < 1 and c['x0'] >= right - .1]
+                limit = min([550] + [c['x0'] - 2 for c in same_line])
+                if field == 'phoneNumber':
+                    phone = (left, right)
+                    limit = left + 68
+                elif field == 'email' and phone:
+                    # Move the printed email label to make room for a full phone number.
+                    target.add_redact_annot(pymupdf.Rect(phone[1], top, right, bottom), fill=(1, 1, 1))
+                    email_label = (phone[0] + 72, page.height - first['matrix'][5])
+                    left, limit = phone[0] + 115, 550
+                elif field == 'workplace' and label == 'bilingual':
+                    english = page.search('/ Workplace, place of study (if any):', regex=False)[0]
+                    target.add_redact_annot(pymupdf.Rect(english['x0'] - .2, top, right, bottom), fill=(1, 1, 1))
+                    size = 8.5
+                    workplace_label = ((english['x0'], page.height - first['matrix'][5]), english['text'], size)
+                    left = english['x0'] + pymupdf.get_text_length(english['text'], fontname='heit', fontsize=size) + 4
+                centered = index == refusal_pages[-1] and field == 'fullName' and top > 300
+                fields.append({
+                    'page': index, 'field': field,
+                    'x': round((left + right) / 2 if centered else left, 3),
+                    'y': round(first['matrix'][5], 3),
+                    'width': 220 if centered else round(limit - left, 3),
+                    'size': round(first['size'], 3),
+                    'font': 'bold' if 'Bold' in first['fontname'] else 'regular',
+                    'align': 'center' if centered else 'left',
+                })
+            target.apply_redactions(images=0, graphics=0)
+            if index == consent_pages[0]:
+                restore_table_row_borders(page, target, page.find_tables()[0].bbox)
+            if email_label:
+                target.insert_text(email_label, '; Email:', fontsize=11)
+            if workplace_label:
+                point, label_text, size = workplace_label
+                target.insert_text(point, label_text, fontname='heit', fontsize=size, color=(0, .44, .75))
+            for x, y in squares:
+                cy = page.height - y
+                target.draw_rect(pymupdf.Rect(x - 4, cy - 4, x + 4, cy + 4), color=(0, 0, 0), width=.8)
+        assert len(fields) == (14 if label == 'bilingual' else 13) and len(marks) == len(CHECKBOX_LABELS), (label, len(fields), len(marks))
+        assert all(field['width'] > 0 for field in fields)
+        filename = f'dong-thuan-{label}.pdf'
+        document.save(output / filename, garbage=4, deflate=True)
+    return {'template': filename, 'pageCount': len(consent_pages) + len(refusal_pages),
+            'consentPages': consent_pages, 'refusalPages': refusal_pages, 'fields': fields,
+            'genderMarks': {'Nam': marks['male'], 'Nữ': marks['female']},
+            'pregnancyMarks': {key: marks[key] for key in ('not_pregnant', 'suspected', 'pregnant')},
+            'consentMarks': {'examination': {'agree': marks['exam_agree'], 'decline': marks['exam_decline']},
+                             'advertising': {'agree': marks['ads_agree'], 'decline': marks['ads_decline']}}}
 
-(root / 'frontend/src/features/registration/printing/consentTemplateFields.json').write_text(
-    json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-print('Prepared original consent PDFs and fill-in coordinates.')
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input-dir', type=Path, required=True)
+    parser.add_argument('--pymupdf-path')
+    args = parser.parse_args()
+    if args.pymupdf_path:
+        sys.path.insert(0, args.pymupdf_path)
+    import pymupdf
+
+    frontend = Path(__file__).resolve().parents[1] / 'frontend'
+    output = frontend / 'public/templates'
+    layouts = {
+        'vi': prepare('vnm', args.input_dir, output, pymupdf, [0], [1]),
+        'bilingual': prepare('bilingual', args.input_dir, output, pymupdf, [0, 1], [2, 3]),
+    }
+    (frontend / 'src/features/registration/printing/consentTemplateFields.json').write_text(
+        json.dumps(layouts, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
+if __name__ == '__main__':
+    main()

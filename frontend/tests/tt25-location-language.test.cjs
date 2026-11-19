@@ -22,7 +22,10 @@ function render(lang, step, targetPayment) {
   const passthrough = ({ children }) => React.createElement('div', null, children);
   const { TT25RegistrationForm } = load('form/TT25RegistrationForm.tsx', {
     '@/components/ui/alert': { Alert: passthrough, AlertDescription: passthrough },
+    '@/components/ui/button': { Button: 'button' },
     '@/components/ui/checkbox': { Checkbox: () => null },
+    '@/components/ui/field': { Field: passthrough, FieldError: passthrough, FieldLabel: 'label' },
+    '@/components/ui/input': { Input: 'input' },
     '../tt25Types': {
       ...load('tt25Types.ts'),
       ...(targetPayment ? { getDefaultTargetPaymentByReason: () => targetPayment } : {}),

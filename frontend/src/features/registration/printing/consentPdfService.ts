@@ -3,13 +3,13 @@ import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSessi
 import { formatDateForPrint, getTodayInVietnam } from '../../../lib/date';
 import { drawPdfCheck } from './pdfDrawing';
 import layouts from './consentTemplateFields.json';
-import type { TT25RegistrationData } from '../tt25Types';
+import { CONSENT_FORM_VERSION, type TT25RegistrationData } from '../tt25Types';
 
 export type ConsentFormLanguage = 'vi' | 'bilingual';
 export type ConsentPageOption = 'all' | 'consent' | 'refusal';
 
 const assets = new Map<string, Promise<ArrayBuffer>>();
-const ASSET_VERSION = '20261110-original-consent-pages';
+const ASSET_VERSION = '20261119-consent-v5';
 
 function loadAsset(path: string): Promise<ArrayBuffer> {
   let pending = assets.get(path);
@@ -54,25 +54,19 @@ export async function appendConsentPdf(data: TT25RegistrationData, session: PdfP
   const values: Record<string, string> = {
     fullName: (data.fullName || '').trim().toUpperCase(),
     birthDate: formatDateForPrint(data.birthDate), identityDocument: (data.cccd || '').trim(),
+    gender: data.gender === 'Nam' || data.gender === 'Nữ'
+      ? language === 'bilingual' ? (data.gender === 'Nam' ? 'Nam / Male' : 'Nữ / Female') : data.gender
+      : '',
     phoneNumber: (data.phoneNumber || '').trim(), email: (data.email || '').trim(),
     workplace: (data.workplace || '').trim(), checkupDate, checkupDay, checkupMonth, checkupYear,
   };
   const queueNumber = (data.queueNumber || '').trim();
   if (queueNumber) {
-    const label = 'Số thứ tự';
-    const english = language === 'bilingual' ? ' / Order' : '';
-    const labelSize = 11;
-    const labelWidth = fonts.bold.widthOfTextAtSize(label, labelSize);
-    const englishWidth = fonts.boldItalic.widthOfTextAtSize(english, labelSize);
-    const centerX = 478;
-    const labelX = centerX - (labelWidth + englishWidth) / 2;
-    const numberSize = Math.min(28, 140 / fonts.bold.widthOfTextAtSize(queueNumber, 1));
+    const numberSize = Math.min(24, 130 / fonts.bold.widthOfTextAtSize(queueNumber, 1));
+    const x = 517.5 - fonts.bold.widthOfTextAtSize(queueNumber, numberSize) / 2;
     for (const index of [layout.consentPages[0], layout.refusalPages[0]]) {
-      pages[index].drawText(label, { x: labelX, y: 802, size: labelSize, font: fonts.bold, color: rgb(.4, .4, .4) });
-      if (english) pages[index].drawText(english, { x: labelX + labelWidth, y: 802, size: labelSize, font: fonts.boldItalic, color: rgb(.35, .48, .6) });
       pages[index].drawText(queueNumber, {
-        x: centerX - fonts.bold.widthOfTextAtSize(queueNumber, numberSize) / 2,
-        y: 770, size: numberSize, font: fonts.bold, color: rgb(0, 0, 0),
+        x, y: pages[index].getHeight() - 73, size: numberSize, font: fonts.bold, color: rgb(0, 0, 0),
       });
     }
   }
@@ -87,9 +81,19 @@ export async function appendConsentPdf(data: TT25RegistrationData, session: PdfP
       y: field.y, size, font, color: rgb(0, 0, 0),
     });
   }
-  const mark = layout.genderMarks[data.gender];
-  if (mark) drawPdfCheck(pages[0], mark.x, mark.y);
-
+  const mark = (point: { page: number; x: number; y: number }) => drawPdfCheck(pages[point.page], point.x, point.y);
+  if (data.gender === 'Nam' || data.gender === 'Nữ') mark(layout.genderMarks[data.gender]);
+  if (data.gender === 'Nữ' && data.pregnancyStatus && Object.hasOwn(layout.pregnancyMarks, data.pregnancyStatus)) {
+    mark(layout.pregnancyMarks[data.pregnancyStatus]);
+  }
+  if (typeof data.advertisingConsentAgreed === 'boolean') {
+    if (typeof data.consentAgreed === 'boolean') {
+      mark(layout.consentMarks.examination[data.consentAgreed ? 'agree' : 'decline']);
+    }
+    if (data.consentFormVersion === CONSENT_FORM_VERSION) {
+      mark(layout.consentMarks.advertising[data.advertisingConsentAgreed ? 'agree' : 'decline']);
+    }
+  }
 }
 
 export async function generateConsentPdf(data: TT25RegistrationData, pageOption: ConsentPageOption = 'all'): Promise<{ blob: Blob; url: string }> {

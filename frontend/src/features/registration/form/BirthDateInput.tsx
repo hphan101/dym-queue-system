@@ -130,14 +130,14 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
         onChange={handleTextChange}
         placeholder="01/01/1990"
         maxLength={10}
-        className={className ?? `w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-dym-blue-200 transition-colors ${
+        className={className ?? `w-full min-w-0 pl-3 pr-10 py-2 bg-white border rounded text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
           error ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
         }`}
       />
 
       {/* Calendar Icon & Full-Area Date Picker Overlay */}
       <div className="group absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center cursor-pointer">
-        <div className="flex items-center justify-center text-slate-400 group-hover:text-dym-blue-600 transition-colors pointer-events-none">
+        <div className="flex items-center justify-center text-slate-400 group-hover:text-ring transition-colors pointer-events-none">
           <Calendar className="w-4 h-4" />
         </div>
 

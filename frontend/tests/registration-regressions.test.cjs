@@ -197,9 +197,10 @@ test('editing a profile cannot overwrite print status from another workstation',
   const { saveRegistrationEdit } = load('features/admin/registrations/registrationEdits.ts', {
     '../../../lib/supabaseClient': { supabase: { rpc: async (_, args) => { request = args; return { error: null }; } } },
   });
-  const extras = { occupation: 'Kế toán', printedConsent: false, printedTT25: false };
-  await saveRegistrationEdit('patient', { ...fields, tt25_data: extras });
+  const extras = { occupation: 'Kế toán', pregnancyStatus: 'suspected', printedConsent: false, printedTT25: false };
+  await saveRegistrationEdit('patient', { ...fields, gender: 'Nữ', tt25_data: extras });
   assert.equal(request.p_tt25_data.occupation, 'Kế toán');
+  assert.equal(request.p_tt25_data.pregnancyStatus, 'suspected');
   assert.equal('printedConsent' in request.p_tt25_data, false);
   assert.equal('printedTT25' in request.p_tt25_data, false);
   assert.equal(extras.printedTT25, false);
@@ -234,7 +235,8 @@ test('reception prints the latest server record and ignores obsolete browser ove
     },
     '../../../lib/supabaseClient': { supabase: { rpc: async () => ({
       data: [{ id: row.id, full_name: 'Latest server name', birth_date: '2000-01-01',
-        gender: 'Nam', phone_number: row.phone, company_name: '', queue_date: row.date,
+        gender: 'Nữ', phone_number: row.phone, company_name: '', queue_date: row.date,
+        tt25_data: { pregnancyStatus: 'suspected' },
         identity_document: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', address_detail: '123 đường A' }],
       error: null,
     }) } },
@@ -249,5 +251,6 @@ test('reception prints the latest server record and ignores obsolete browser ove
   await new Promise(setImmediate);
   assert.equal(harness.states[0].fullName, 'Latest server name');
   assert.equal(harness.states[0].cccd, 'B1234567');
+  assert.equal(harness.states[0].pregnancyStatus, 'suspected');
   assert.equal(marked, false);
 });

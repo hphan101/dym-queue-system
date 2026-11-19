@@ -1,0 +1,74 @@
+{
+  "vi": {
+    "title": [
+      "PHIẾU ĐỒNG THUẬN CỦA KHÁCH HÀNG"
+    ],
+    "instructions": [
+      "Vui lòng đọc nội dung và chọn Đồng ý hoặc Không đồng ý cho từng mục bên dưới."
+    ],
+    "confirmation": [
+      "Tôi đã đọc và hiểu toàn bộ nội dung của Phiếu đồng thuận này. Tôi xác nhận các lựa chọn của mình ở trên."
+    ],
+    "examination": {
+      "title": "ĐỒNG Ý KHÁM VÀ XỬ LÝ DỮ LIỆU CÁ NHÂN",
+      "paragraphs": [
+        "Tôi xác nhận và đồng ý cho phép Bác sĩ, Nhân viên y tế được DYM phân công và/hoặc các đơn vị liên kết/hợp tác với DYM đối với các hạng mục dịch vụ mà DYM không trực tiếp cung cấp (nếu có), tiến hành các hoạt động thăm khám, cận lâm sàng và đánh giá sức khỏe trong phạm vi gói dịch vụ đã đăng ký.",
+        "Tôi xác nhận và đồng ý cho phép DYM thu thập, sử dụng, tổng hợp và lưu trữ dữ liệu cá nhân của tôi, bao gồm thông tin y tế, nhằm phục vụ cho việc thăm khám, chẩn đoán, điều trị, tư vấn, theo dõi sức khỏe, quản lý hồ sơ y tế, liên hệ nhằm cung cấp các dịch vụ y tế cho tôi. Thời gian lưu trữ dữ liệu được thực hiện theo quy định về thời gian lưu trữ hồ sơ, tài liệu ngành y tế có hiệu lực tại từng thời điểm. Tôi đồng ý cho phép DYM chuyển dữ liệu khám sức khỏe của tôi lên Cổng thông tin dữ liệu khám sức khỏe của Sở Y tế/Bộ Y tế theo quy định về liên thông dữ liệu khám sức khỏe.",
+        "Tôi xác nhận và đồng ý cho phép DYM cung cấp báo cáo y tế của tôi cho tôi và/hoặc đơn vị sử dụng lao động đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có), trong phạm vi cần thiết và phù hợp với mục đích khám sức khỏe, nội dung dịch vụ đã đăng ký và thỏa thuận được ký kết giữa đơn vị sử dụng lao động và DYM, trên cơ sở tuân thủ quy định của Luật An toàn, Vệ sinh Lao động số 84/2015/QH13, Luật Khám bệnh, Chữa bệnh số 15/2023/QH15, Luật Bảo vệ Dữ liệu Cá nhân số 91/2025/QH15 và các quy định pháp luật liên quan có hiệu lực tại từng thời điểm. Việc cung cấp, chia sẻ hoặc tiết lộ dữ liệu cá nhân và thông tin y tế của tôi cho bất kỳ bên thứ ba nào khác chỉ được thực hiện khi có sự đồng ý hoặc chỉ định bằng văn bản của tôi, ngoại trừ việc cung cấp cho đơn vị sử dụng lao động đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có) và các trường hợp cơ quan nhà nước có thẩm quyền yêu cầu theo quy định pháp luật."
+      ],
+      "agree": "Đồng ý",
+      "decline": "Không đồng ý",
+      "warning": [
+        "Nếu Quý Anh/Chị không đồng ý khám và xử lý dữ liệu cá nhân, DYM có thể không cung cấp được dịch vụ y tế."
+      ]
+    },
+    "advertising": {
+      "title": "ĐỒNG Ý NHẬN THÔNG TIN ƯU ĐÃI VÀ TRUYỀN THÔNG",
+      "paragraphs": [
+        "Tôi xác nhận đồng ý cho phép DYM liên hệ và gửi đến tôi các chương trình ưu đãi, mã giảm giá, thông tin truyền thông liên quan tới các dịch vụ y tế của DYM, bằng hình thức gửi thư/tin nhắn qua email, Zalo OA và các mạng xã hội hợp pháp khác của DYM tại từng thời điểm, trên cơ sở tuân thủ các quy định của pháp luật hiện hành về bảo vệ dữ liệu cá nhân, quảng cáo và các quy định pháp luật khác có liên quan."
+      ],
+      "agree": "Đồng ý",
+      "decline": "Không đồng ý"
+    }
+  },
+  "en": {
+    "title": [
+      "PHIẾU ĐỒNG THUẬN CỦA KHÁCH HÀNG",
+      "CUSTOMER CONSENT FORM"
+    ],
+    "instructions": [
+      "Vui lòng đọc nội dung và chọn Đồng ý hoặc Không đồng ý cho từng mục bên dưới.",
+      "Please read the information and select I agree or I do not agree for each section below."
+    ],
+    "confirmation": [
+      "Tôi đã đọc và hiểu toàn bộ nội dung của Phiếu đồng thuận này. Tôi xác nhận các lựa chọn của mình ở trên.",
+      "I have read and fully understood this Consent Form. I confirm my choices above."
+    ],
+    "examination": {
+      "title": "ĐỒNG Ý KHÁM VÀ XỬ LÝ DỮ LIỆU CÁ NHÂN / CONSENT TO EXAMINATION AND PERSONAL DATA PROCESSING",
+      "paragraphs": [
+        "Tôi xác nhận và đồng ý cho phép Bác sĩ, Nhân viên y tế được DYM phân công và/hoặc các đơn vị liên kết/hợp tác với DYM đối với các hạng mục dịch vụ mà DYM không trực tiếp cung cấp (nếu có), tiến hành các hoạt động thăm khám, cận lâm sàng và đánh giá sức khỏe trong phạm vi gói dịch vụ đã đăng ký.",
+        "I confirm and consent to the physicians and medical staff assigned by DYM and/or DYM’s affiliated/partner units, for service items not directly provided by DYM (if any), carrying out examinations, paraclinical tests and health assessments within the scope of the registered service package.",
+        "Tôi xác nhận và đồng ý cho phép DYM thu thập, sử dụng, tổng hợp và lưu trữ dữ liệu cá nhân của tôi, bao gồm thông tin y tế, nhằm phục vụ cho việc thăm khám, chẩn đoán, điều trị, tư vấn, theo dõi sức khỏe, quản lý hồ sơ y tế, liên hệ nhằm cung cấp các dịch vụ y tế cho tôi. Thời gian lưu trữ dữ liệu được thực hiện theo quy định về thời gian lưu trữ hồ sơ, tài liệu ngành y tế có hiệu lực tại từng thời điểm. Tôi đồng ý cho phép DYM chuyển dữ liệu khám sức khỏe của tôi lên Cổng thông tin dữ liệu khám sức khỏe của Sở Y tế/Bộ Y tế theo quy định về liên thông dữ liệu khám sức khỏe.",
+        "I confirm and consent to DYM collecting, using, aggregating and storing my personal data, including medical information, for the purposes of examination, diagnosis, treatment, consultation, health monitoring, medical records management and contacting me to provide medical services to me. The data retention period shall comply with the regulations on the retention period of medical records and documents in effect from time to time. I consent to DYM transferring my health check data to the Health Check Data Portal of the Department of Health/Ministry of Health in accordance with the regulations on health check data interconnection.",
+        "Tôi xác nhận và đồng ý cho phép DYM cung cấp báo cáo y tế của tôi cho tôi và/hoặc đơn vị sử dụng lao động đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có), trong phạm vi cần thiết và phù hợp với mục đích khám sức khỏe, nội dung dịch vụ đã đăng ký và thỏa thuận được ký kết giữa đơn vị sử dụng lao động và DYM, trên cơ sở tuân thủ quy định của Luật An toàn, Vệ sinh Lao động số 84/2015/QH13, Luật Khám bệnh, Chữa bệnh số 15/2023/QH15, Luật Bảo vệ Dữ liệu Cá nhân số 91/2025/QH15 và các quy định pháp luật liên quan có hiệu lực tại từng thời điểm. Việc cung cấp, chia sẻ hoặc tiết lộ dữ liệu cá nhân và thông tin y tế của tôi cho bất kỳ bên thứ ba nào khác chỉ được thực hiện khi có sự đồng ý hoặc chỉ định bằng văn bản của tôi, ngoại trừ việc cung cấp cho đơn vị sử dụng lao động đã đăng ký dịch vụ khám sức khỏe cho tôi (nếu có) và các trường hợp cơ quan nhà nước có thẩm quyền yêu cầu theo quy định pháp luật.",
+        "I confirm and consent to DYM providing my medical report to me and/or the employing organization that registered the health examination service for me (if any), to the extent necessary and appropriate for the purpose of the health examination, the registered services and the agreement signed between the employing organization and DYM, in compliance with the Law on Occupational Safety and Health No. 84/2015/QH13, the Law on Medical Examination and Treatment No. 15/2023/QH15, the Law on Personal Data Protection No. 91/2025/QH15 and other relevant laws in effect from time to time. My personal data and medical information shall only be provided, shared or disclosed to any other third party with my written consent or instruction, except for the provision to the employing organization that registered the health examination service for me (if any) and cases where competent state authorities so request in accordance with the law."
+      ],
+      "agree": "Đồng ý / I agree",
+      "decline": "Không đồng ý / I do not agree",
+      "warning": [
+        "Nếu Quý Anh/Chị không đồng ý khám và xử lý dữ liệu cá nhân, DYM có thể không cung cấp được dịch vụ y tế.",
+        "If you do not consent to the examination and personal data processing, DYM may be unable to provide medical services."
+      ]
+    },
+    "advertising": {
+      "title": "ĐỒNG Ý NHẬN THÔNG TIN ƯU ĐÃI VÀ TRUYỀN THÔNG / CONSENT TO RECEIVE PROMOTIONAL INFORMATION AND COMMUNICATIONS",
+      "paragraphs": [
+        "Tôi xác nhận đồng ý cho phép DYM liên hệ và gửi đến tôi các chương trình ưu đãi, mã giảm giá, thông tin truyền thông liên quan tới các dịch vụ y tế của DYM, bằng hình thức gửi thư/tin nhắn qua email, Zalo OA và các mạng xã hội hợp pháp khác của DYM tại từng thời điểm, trên cơ sở tuân thủ các quy định của pháp luật hiện hành về bảo vệ dữ liệu cá nhân, quảng cáo và các quy định pháp luật khác có liên quan.",
+        "I confirm and consent to DYM contacting me and sending me promotional programs, discount codes and communications relating to DYM’s medical services via email, Zalo OA and other lawful social media channels of DYM from time to time, in compliance with the prevailing laws on personal data protection, advertising and other relevant laws."
+      ],
+      "agree": "Đồng ý / I agree",
+      "decline": "Không đồng ý / I do not agree"
+    }
+  }
+}
