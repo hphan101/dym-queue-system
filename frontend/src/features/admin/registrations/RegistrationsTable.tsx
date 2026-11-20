@@ -1,4 +1,4 @@
-import React from 'react';
+import { useRef, type FC } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { formatQueueNumber } from '../../../lib/queueNumber';
@@ -28,7 +28,7 @@ export interface RegistrationsTableProps {
   onNoteSaved: (id: string, note: string) => void;
 }
 
-export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
+export const RegistrationsTable: FC<RegistrationsTableProps> = ({
   rows,
   searchQuery,
   onSelectRow,
@@ -39,6 +39,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
   onNoteSaved,
 }) => {
   const { getStatus } = usePrintStatus();
+  const selectionAnchor = useRef<string | null>(null);
   const isSelectable = Boolean(checkedIds && onToggleChecked);
   const allChecked =
     isSelectable && rows.length > 0 && rows.every((r) => checkedIds!.has(r.id));
@@ -54,9 +55,10 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                 <Checkbox
                   checked={allChecked ? true : someChecked ? 'indeterminate' : false}
                   disabled={rows.length === 0}
-                  onCheckedChange={(checked) =>
-                    onToggleChecked!(rows.map((r) => r.id), checked === true)
-                  }
+                  onCheckedChange={(checked) => {
+                    selectionAnchor.current = null;
+                    onToggleChecked!(rows.map((r) => r.id), checked === true);
+                  }}
                   aria-label="Chọn tất cả hồ sơ trên trang này"
                 />
               </th>
@@ -72,7 +74,7 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const displayState = getRegistrationDisplayState(
               row.state,
               row.first_called_at,
@@ -87,7 +89,20 @@ export const RegistrationsTable: React.FC<RegistrationsTableProps> = ({
                   <td className="w-10">
                     <Checkbox
                       checked={checkedIds!.has(row.id)}
-                      onCheckedChange={(checked) => onToggleChecked!([row.id], checked === true)}
+                      onClick={(event) => {
+                        const anchor = selectionAnchor.current;
+                        if (!event.shiftKey || !anchor || !checkedIds!.has(anchor)) return;
+                        const anchorIndex = rows.findIndex((entry) => entry.id === anchor);
+                        if (anchorIndex < 0) return;
+
+                        event.preventDefault();
+                        const range = rows.slice(Math.min(anchorIndex, index), Math.max(anchorIndex, index) + 1);
+                        onToggleChecked!(range.map((entry) => entry.id), true);
+                      }}
+                      onCheckedChange={(checked) => {
+                        selectionAnchor.current = checked === true ? row.id : null;
+                        onToggleChecked!([row.id], checked === true);
+                      }}
                       aria-label={`Chọn hồ sơ ${row.full_name}`}
                     />
                   </td>

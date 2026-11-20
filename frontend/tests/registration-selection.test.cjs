@@ -8,11 +8,36 @@ const exportsForTable = {};
 const source = fs.readFileSync(path.resolve(__dirname, '../src/features/admin/registrations/RegistrationsTable.tsx'), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const generic = new Proxy({}, { get: () => () => ({ label: '', className: '' }) });
+const anchorRef = { current: null };
 new Function('exports', 'require', code)(exportsForTable, name => {
-  if (name === 'react' || name === 'react/jsx-runtime') return require(name);
+  if (name === 'react') return { useRef: () => anchorRef };
+  if (name === 'react/jsx-runtime') return require(name);
   if (name === '@/components/ui/checkbox') return { Checkbox: 'checkbox' };
   if (name === './usePrintStatus') return { usePrintStatus: () => ({ getStatus: () => ({ consent: false, tt25: false }) }) };
   return generic;
+});
+
+test('Shift click selects the visible range in either direction and falls back when the anchor is off-page', () => {
+  const calls = [];
+  const rows = ['a', 'b', 'c', 'd'].map(id => ({ id, full_name: id }));
+  const render = (checkedIds, pageRows = rows) => nodes(exportsForTable.RegistrationsTable({
+    rows: pageRows, checkedIds: new Set(checkedIds), onToggleChecked: (...args) => calls.push(args),
+  })).filter(node => node.type === 'checkbox');
+  let prevented = false;
+  const event = { shiftKey: true, preventDefault() { prevented = true; } };
+
+  render([])[1].props.onCheckedChange(true);
+  render(['a'])[4].props.onClick(event);
+  assert.equal(prevented, true);
+  assert.deepEqual(calls.pop(), [['a', 'b', 'c', 'd'], true]);
+
+  render([])[4].props.onCheckedChange(true);
+  render(['d'])[2].props.onClick(event);
+  assert.deepEqual(calls.pop(), [['b', 'c', 'd'], true]);
+
+  prevented = false;
+  render(['d'], rows.slice(0, 2))[2].props.onClick(event);
+  assert.equal(prevented, false);
 });
 
 const nodes = node => !node || typeof node !== 'object' ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];

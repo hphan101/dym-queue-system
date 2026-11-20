@@ -1,6 +1,7 @@
 import type { PregnancyStatus, TT25MedicalHistory, TT25TargetPaymentInfo } from '../../registration/tt25Types';
 
 export interface TT25StoredExtras {
+  identityDocumentType?: 'cccd' | 'passport';
   ethnicity?: string;
   bloodGroup?: string;
   insuranceNumber?: string;

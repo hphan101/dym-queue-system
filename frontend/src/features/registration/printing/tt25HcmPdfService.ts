@@ -59,7 +59,11 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   const fonts: Record<string, PDFFont> = {};
   await Promise.all(fontNames.map(async (name, index) => { fonts[name] = await getPrintFont(session, `arial:${name}`, bytes[index + 1]); }));
   const checkupDate = formatDateForPrint(data.checkupDate || getTodayInVietnam());
-  const targetPayment = data.targetPayment ?? getDefaultTargetPaymentByReason(data.checkupReason, Boolean(data.workplace));
+  const reason = data.checkupReason || '';
+  const savedWorkplace = (data.workplace || '').trim();
+  const workplace = /khám sức khỏe khác|cá nhân|tự nguyện/i.test(reason)
+    && savedWorkplace.toLowerCase() === 'lao động tự do' ? '' : savedWorkplace;
+  const targetPayment = data.targetPayment ?? getDefaultTargetPaymentByReason(reason, Boolean(workplace));
   const fullName = (data.fullName || '').trim().toUpperCase();
   const birthDate = formatDateForPrint(data.birthDate);
   const history = data.medicalHistory;
@@ -70,7 +74,7 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
     cccd: data.cccd || '', ethnicity: data.ethnicity || '', bloodGroup: data.bloodGroup || '',
     insuranceNumber: data.insuranceNumber || '', addressDetail: data.addressDetail || '',
     homeWard: [data.ward, data.province].filter(Boolean).join(', '), occupation: data.occupation || '',
-    workplace: requiresCompanyName(data.checkupReason || '') ? '' : data.workplace || '',
+    workplace: requiresCompanyName(reason) ? '' : workplace,
     workplaceWard: data.workplaceWard || '',
     phoneNumber: data.phoneNumber || '', email: data.email || '', checkupReason: data.checkupReason || '',
     checkupDate, targetGroup: targetPayment.targetGroup === 'other' ? targetPayment.targetOtherDetails : targetPayment.targetGroup,

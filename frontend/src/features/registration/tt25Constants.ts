@@ -36,7 +36,3 @@ export function isWorkPermitCheckup(reason: string): boolean {
   return /work permit/i.test(reason);
 }
 
-export function getRegistrationCompanyName(reason: string, company: string): string {
-  return company.trim() || (requiresCompanyName(reason) || isWorkPermitCheckup(reason) ? '' : 'Lao động tự do');
-}
-

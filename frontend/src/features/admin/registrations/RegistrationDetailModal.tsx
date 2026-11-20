@@ -217,6 +217,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     if (form.identity_document.trim()) {
       const cccdErr = validateVietnamCccd({
         cccd: form.identity_document,
+        identityDocumentType: form.tt25_data?.identityDocumentType,
         gender: form.gender === 'Nữ' ? 'Nữ' : 'Nam',
         birthDate: form.birth_date || effectiveRow.birth_date,
       });

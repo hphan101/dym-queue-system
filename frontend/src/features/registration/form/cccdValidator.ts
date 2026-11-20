@@ -73,6 +73,7 @@ export interface CccdValidationParams {
   gender: 'Nam' | 'Nữ';
   birthDate?: string; // YYYY-MM-DD
   isEn?: boolean;
+  identityDocumentType?: 'cccd' | 'passport';
 }
 
 /**
@@ -92,8 +93,13 @@ export function validateVietnamCccd({
   gender,
   birthDate,
   isEn = false,
+  identityDocumentType,
 }: CccdValidationParams): string | null {
   const clean = cccd.trim().toUpperCase();
+
+  if (identityDocumentType === 'passport') {
+    return clean ? null : (isEn ? 'Please enter your passport number' : 'Vui lòng nhập số hộ chiếu');
+  }
 
   if (!clean) {
     return isEn
@@ -102,7 +108,7 @@ export function validateVietnamCccd({
   }
 
   // Allow foreign passport format ONLY if it starts with an uppercase letter (e.g. B1234567)
-  if (/^[A-Z][A-Z0-9]{6,11}$/.test(clean)) {
+  if (!identityDocumentType && /^[A-Z][A-Z0-9]{6,11}$/.test(clean)) {
     return null;
   }
 

@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import React, { useState, useEffect, useId } from 'react';
 import {
@@ -34,7 +34,6 @@ import {
   BLOOD_GROUPS,
   CHECKUP_REASONS,
   requiresCompanyName,
-  getRegistrationCompanyName,
   isWorkPermitCheckup,
 } from '../tt25Constants';
 import { SearchableSelect } from './SearchableSelect';
@@ -76,31 +75,36 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [birthDate, setBirthDate] = useState('');
   const [ethnicity, setEthnicity] = useState('Kinh');
   const [bloodGroup, setBloodGroup] = useState('Chưa rõ');
-  const [cccd, setCccd] = useState('');
+  const [documentNumbers, setDocumentNumbers] = useState({ cccd: '', passport: '' });
   const [insuranceNumber, setInsuranceNumber] = useState('');
   const [province, setProvince] = useState('');
   const [ward, setWard] = useState('');
   const [addressDetail, setAddressDetail] = useState('');
   const [occupation, setOccupation] = useState('');
-  const [workplace, setWorkplace] = useState(() => getRegistrationCompanyName(initialCheckupReason || CHECKUP_REASONS[0], ''));
+  const [workplace, setWorkplace] = useState('');
   const [workplaceProvince, setWorkplaceProvince] = useState('');
   const [workplaceWard, setWorkplaceWard] = useState('');
   const [workplaceWards, setWorkplaceWards] = useState<Ward[]>([]);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const emailId = useId();
+  const identityId = useId();
+  const [identityDocumentType, setIdentityDocumentType] = useState<'cccd' | 'passport'>('cccd');
+  const isPassport = identityDocumentType === 'passport';
+  const cccd = documentNumbers[identityDocumentType];
+  const identityLabel = isPassport
+    ? (isEn ? 'Passport number' : 'Số hộ chiếu')
+    : (isEn ? 'Citizen ID (CCCD)' : 'Số CCCD');
   const [checkupReason, setCheckupReason] = useState(
     initialCheckupReason || CHECKUP_REASONS[0] || '',
   );
   const companyRequired = requiresCompanyName(checkupReason);
   const phoneRequired = !isWorkPermitCheckup(checkupReason);
-  const companyName = getRegistrationCompanyName(checkupReason, workplace);
+  const companyName = workplace.trim();
 
   useEffect(() => {
     if (initialCheckupReason) {
       setCheckupReason(initialCheckupReason);
-      setWorkplace((current) => !current.trim() || current === 'Lao động tự do'
-        ? getRegistrationCompanyName(initialCheckupReason, '') : current);
       setTargetPayment(getDefaultTargetPaymentByReason(initialCheckupReason));
     }
   }, [initialCheckupReason]);
@@ -230,6 +234,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     }
 
     const cccdError = validateVietnamCccd({
+      identityDocumentType,
       cccd,
       gender,
       birthDate,
@@ -297,6 +302,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       pregnancyStatus: gender === 'Nữ' ? pregnancyStatus : undefined,
       bloodGroup: bloodGroup.trim() || 'Chưa rõ',
       cccd: cccd.trim().toUpperCase(),
+      identityDocumentType,
       insuranceNumber: insuranceNumber.trim().toUpperCase(),
       province,
       ward,
@@ -459,6 +465,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       }
                       if (cccd.trim().length === 12) {
                         const err = validateVietnamCccd({
+                          identityDocumentType,
                           cccd,
                           gender: g,
                           birthDate,
@@ -491,6 +498,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     const nextCccdErr =
                       cccd.trim().length === 12
                         ? validateVietnamCccd({
+                            identityDocumentType,
                             cccd,
                             gender,
                             birthDate: val,
@@ -578,18 +586,43 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Số CCCD & Số BHYT */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '6. Citizen ID / Passport No.' : '6. Số CCCD / Hộ chiếu'}{' '}
-                <span className="text-red-500">*</span>
+              <FieldSet className="mb-2 gap-2">
+                <FieldLegend variant="label">{isEn ? '6. Identity document' : '6. Giấy tờ tùy thân'}</FieldLegend>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  {(['cccd', 'passport'] as const).map((type) => (
+                    <label key={type} className="inline-flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={identityId}
+                        value={type}
+                        checked={identityDocumentType === type}
+                        onChange={() => {
+                          setIdentityDocumentType(type);
+                          setErrors((prev) => ({ ...prev, cccd: '' }));
+                        }}
+                      />
+                      {type === 'cccd' ? 'CCCD' : isEn ? 'Passport' : 'Hộ chiếu'}
+                    </label>
+                  ))}
+                </div>
+              </FieldSet>
+              <label htmlFor={`${identityId}-number`} className="block text-xs font-semibold text-slate-700 mb-1">
+                {identityLabel}{' '}<span className="text-red-500">*</span>
               </label>
               <input
+                id={`${identityId}-number`}
                 type="text"
+                inputMode={isPassport ? 'text' : 'numeric'}
+                aria-required="true"
+                aria-invalid={Boolean(errors.cccd)}
+                aria-describedby={errors.cccd ? `${identityId}-error` : undefined}
                 value={cccd}
                 onChange={(e) => {
                   const nextVal = e.target.value.toUpperCase();
-                  setCccd(nextVal);
-                  if (nextVal.trim().length === 12) {
+                  setDocumentNumbers((prev) => ({ ...prev, [identityDocumentType]: nextVal }));
+                  if (!isPassport && nextVal.trim().length === 12) {
                     const err = validateVietnamCccd({
+                      identityDocumentType,
                       cccd: nextVal,
                       gender,
                       birthDate,
@@ -601,8 +634,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   }
                 }}
                 onBlur={() => {
-                  if (cccd.trim()) {
+                  if (!isPassport && cccd.trim()) {
                     const err = validateVietnamCccd({
+                      identityDocumentType,
                       cccd,
                       gender,
                       birthDate,
@@ -611,13 +645,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     setErrors((prev) => ({ ...prev, cccd: err || '' }));
                   }
                 }}
-                maxLength={12}
-                placeholder={isEn ? 'Citizen ID / Passport number' : '12 chữ số CCCD'}
+                maxLength={isPassport ? 100 : 12}
+                placeholder={isPassport ? identityLabel : (isEn ? '12 digits' : '12 chữ số CCCD')}
                 className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
                   errors.cccd ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
               />
-              {errors.cccd && <p className="text-xs text-red-500 mt-1">{errors.cccd}</p>}
+              {errors.cccd && <p id={`${identityId}-error`} className="text-xs text-red-500 mt-1">{errors.cccd}</p>}
             </div>
 
             <div>
@@ -1447,7 +1481,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               )}
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Citizen ID / Passport:' : 'Số CCCD / Hộ chiếu:'}
+                  {identityLabel}
                 </span>
                 <span className="font-medium text-slate-700">{cccd}</span>
               </div>

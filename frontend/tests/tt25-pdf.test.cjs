@@ -93,6 +93,12 @@ test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
         assert.equal(customer.workplace, 'Công ty TNHH Kiểm Tra Biểu Mẫu', 'source data must remain available to consent/refusal printing');
       } finally { URL.revokeObjectURL(result.url); }
     }
+    for (const workplace of ['Lao động tự do', 'Công ty ABC']) {
+      drawn.length = 0;
+      const result = await service.generateTT25OriginalPdf({ ...customer, checkupReason: 'Khám sức khỏe khác', workplace });
+      URL.revokeObjectURL(result.url);
+      assert.equal(drawn.some((item) => item.text === workplace), workplace === 'Công ty ABC');
+    }
     lines = 0;
     drawn.length = 0;
     const blank = await service.generateTT25OriginalPdf({ ...customer, email: undefined, medicalHistory: undefined });

@@ -90,6 +90,7 @@ export interface TT25RegistrationData {
   ethnicity: string; // Mặc định: "Kinh"
   bloodGroup: string; // "A" | "B" | "AB" | "O" | "Chưa rõ"
   cccd: string; // 12 số CCCD / hộ chiếu
+  identityDocumentType?: 'cccd' | 'passport';
   insuranceNumber: string; // 15 ký tự BHYT
   province: string;
   ward: string;
@@ -207,6 +208,7 @@ export function createDefaultTT25Data(
     ethnicity: fields.ethnicity ?? 'Kinh',
     bloodGroup: fields.bloodGroup ?? 'Chưa rõ',
     cccd: fields.cccd ?? '',
+    identityDocumentType: fields.identityDocumentType,
     insuranceNumber: fields.insuranceNumber ?? '',
     province: fields.province ?? '',
     ward: fields.ward ?? '',

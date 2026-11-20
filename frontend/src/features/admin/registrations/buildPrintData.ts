@@ -47,6 +47,7 @@ export function buildPrintData(
     ethnicity: extras.ethnicity || 'Kinh',
     bloodGroup: extras.bloodGroup || 'Chưa rõ',
     cccd: rawId,
+    identityDocumentType: extras.identityDocumentType,
     insuranceNumber: extras.insuranceNumber || '',
     province: targetRow.province || '',
     ward: targetRow.ward || '',

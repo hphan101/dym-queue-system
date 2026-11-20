@@ -166,6 +166,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   const pregnancyStatus = stringField(value, "pregnancyStatus", true);
   const usesCurrentConsentForm = value.consentFormVersion === CONSENT_FORM_VERSION;
   const cccd = stringField(value, "cccd");
+  const identityDocumentType = value.identityDocumentType;
   const province = stringField(value, "province");
   const ward = stringField(value, "ward");
   const addressDetail = stringField(value, "addressDetail");
@@ -184,6 +185,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     (gender === "Nữ" && (usesCurrentConsentForm || value.pregnancyStatus !== undefined)
       && (pregnancyStatus === null || !PREGNANCY_STATUSES.has(pregnancyStatus))) ||
     cccd === null ||
+    (identityDocumentType !== undefined && identityDocumentType !== "cccd" && identityDocumentType !== "passport") ||
     province === null ||
     ward === null ||
     addressDetail === null ||
@@ -194,6 +196,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   }
 
   const tt25Extras: Record<string, unknown> = {};
+  if (identityDocumentType) tt25Extras.identityDocumentType = identityDocumentType;
   if (gender === "Nữ" && pregnancyStatus) tt25Extras.pregnancyStatus = pregnancyStatus;
   const optionalTextFields: Array<[string, number]> = [
     ["ethnicity", 60],
@@ -240,7 +243,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
     province,
     ward,
     addressDetail,
-    companyName: companyName || (/khám sức khỏe khác/i.test(String(tt25Extras.checkupReason ?? '')) ? 'Lao động tự do' : ''),
+    companyName,
     honeypot,
     tt25Extras,
   };
@@ -308,7 +311,10 @@ function isValidPayload(payload: RegistrationPayload): boolean {
       (payload.phoneNumber === "" && /work permit/i.test(String(payload.tt25Extras.checkupReason ?? "")))) &&
     isValidDate(payload.birthDate) &&
     GENDERS.has(payload.gender) &&
-    isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate) &&
+    (payload.tt25Extras.identityDocumentType === "passport"
+      ? isSafeText(payload.cccd, 1, 100)
+      : (payload.tt25Extras.identityDocumentType !== "cccd" || /^\d{12}$/.test(payload.cccd)) &&
+        isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate)) &&
     isSafeText(payload.companyName, /công ty|doanh nghiệp/i.test(String(payload.tt25Extras.checkupReason ?? '')) ? 1 : 0, 150) &&
     isSafeText(payload.province, 1, 120) &&
     isSafeText(payload.ward, 1, 120) &&
