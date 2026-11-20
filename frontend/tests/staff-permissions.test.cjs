@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
+const { pg_trgm: pgTrgm } = require('@electric-sql/pglite/contrib/pg_trgm');
 const { PERMISSION_MODULES, PERMISSION_ACTIONS, getDefaultPermissions, parsePermissions, hasPermission } = require('./helpers/staff-permissions.cjs');
 
 test('new staff starts without a role or grants and cannot save until a role is chosen', async () => {
@@ -93,7 +94,7 @@ test('matrix toggles, column selection and presets keep dependent view permissio
 });
 
 test('database matrix enforces grants, denied mutations and branch scope through real migrations', async () => {
-  const db = new PGlite();
+  const db = new PGlite({ extensions: { pg_trgm: pgTrgm } });
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
       create schema auth; create schema storage;
@@ -108,14 +109,34 @@ test('database matrix enforces grants, denied mutations and branch scope through
       grant usage on schema auth,storage to authenticated,service_role;
       grant select,insert,update,delete on storage.objects to authenticated;
       create publication supabase_realtime;
+      create function public.rls_auto_enable() returns event_trigger
+        language plpgsql security definer as $$ begin null; end; $$;
+      create event trigger test_enable_rls on ddl_command_end execute function public.rls_auto_enable();
     `);
     const directory = path.resolve(__dirname, '../../supabase/migrations');
     for (const file of fs.readdirSync(directory).filter((file) => file.endsWith('.sql')).sort()) {
       if (file.includes('bootstrap_initial_admin')) continue;
       const sql = fs.readFileSync(path.join(directory, file), 'utf8')
-        .replace(/create extension if not exists (pgcrypto|pg_trgm);/gi, '')
-        .replace(/create index[^;]*gin_trgm_ops[^;]*;/gi, '');
+        .replace(/create extension if not exists pgcrypto;/gi, '');
       try { await db.exec(sql); } catch (error) { throw new Error(`${file}: ${error.message}`); }
+    }
+    const { rows: indexState } = await db.query(`
+      select e.extnamespace::regnamespace::text as schema, i.indisvalid as valid
+      from pg_extension e
+      join pg_depend d on d.refobjid = e.oid and d.deptype = 'e'
+        and d.refclassid = 'pg_extension'::regclass and d.classid = 'pg_opclass'::regclass
+      join pg_index i on i.indclass[0] = d.objid
+      where e.extname = 'pg_trgm' and i.indexrelid = 'public.registrations_name_search_idx'::regclass
+    `);
+    assert.deepEqual(indexState, [{ schema: 'extensions', valid: true }]);
+    for (const role of ['anon', 'authenticated']) {
+      for (const signature of [
+        'public.guard_roster_assignment_time_overlap()', 'public.rls_auto_enable()',
+        'public.require_permission(text,text)', 'public.can_edit_roster_date(date)',
+      ]) {
+        const { rows } = await db.query("select has_function_privilege($1::name, $2::text, 'EXECUTE') as allowed", [role, signature]);
+        assert.equal(rows[0].allowed, false, `${role} ${signature}`);
+      }
     }
     const user = '00000000-0000-4000-8000-000000000001';
     const permissions = getDefaultPermissions('none');
@@ -160,7 +181,22 @@ test('database matrix enforces grants, denied mutations and branch scope through
         case when v.state='completed' then now() end,case when v.state='cancelled' then now() end
       from (values ('q1','2024-02-29',1,'active'),('q1','2024-02-29',2,'completed'),('q1','2024-02-29',3,'cancelled'),('q7','2024-02-29',1,'active'),('q1','2024-03-01',1,'active'),('q1','2023-02-28',1,'active')) v(branch,day,ticket,state)
       join public.branches b on b.code=v.branch;`);
+    const { rows: targetRows } = await db.query(`
+      select b.code, r.id from public.registrations r join public.branches b on b.id=r.branch_id
+      where r.queue_date='2024-02-29' and r.queue_number=1
+    `);
+    const edit = (branch) => db.query(`select public.update_registration_details(
+      $1, 'Updated patient', '1990-01-01', 'Nam', '0901234567', '001090000001', '', 'Test', 'Test', 'Test address'
+    )`, [targetRows.find(row => row.code === branch).id]);
     await db.exec('set role authenticated');
+    await assert.rejects(edit('q1'), /PERMISSION_DENIED/);
+    await db.exec('reset role');
+    permissions.registrations.view = true;
+    permissions.registrations.update = true;
+    await db.query(`update public.profiles set permissions=$2::jsonb where user_id=$1`, [user, JSON.stringify(permissions)]);
+    await db.exec('set role authenticated');
+    await edit('q1');
+    await assert.rejects(edit('q7'), /ACCESS_DENIED/);
     let trend = (await db.query(`select * from public.get_reception_trend(2024)`)).rows;
     assert.deepEqual(trend.map((row) => [row.queue_date.toISOString().slice(0, 10), Number(row.total)]), [['2024-02-29', 2], ['2024-03-01', 1]]);
     assert.deepEqual(Object.keys(trend[0]), ['queue_date', 'total']);

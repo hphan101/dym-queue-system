@@ -4,7 +4,7 @@ import { PermissionButton as Button } from '@/features/admin/shared/PermissionBu
 import { formatQueueNumber } from '../../../lib/queueNumber';
 import { usePrintStatus } from './usePrintStatus';
 import type { RegistrationDetails } from './types';
-import { getTT25PrintCopies } from '../../registration/tt25Types';
+import { getTT25PrintCopies, PREGNANCY_STATUS_LABELS } from '../../registration/tt25Types';
 import { getRegistrationCheckupReason } from './buildPrintData';
 import {
   calculateAge,
@@ -82,9 +82,10 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
             const age = calculateAge(row.birth_date);
             const printStatus = getStatus(row.id, row.tt25_data);
             const tt25Copies = getTT25PrintCopies({ checkupReason: getRegistrationCheckupReason(row) });
+            const isPregnant = row.gender === 'Nữ' && row.tt25_data?.pregnancyStatus === 'pregnant';
 
             return (
-              <tr key={row.id} data-selected={checkedIds?.has(row.id) ?? false}>
+              <tr key={row.id} data-selected={checkedIds?.has(row.id) ?? false} data-pregnant={isPregnant || undefined}>
                 {isSelectable && (
                   <td className="w-10">
                     <Checkbox
@@ -139,7 +140,7 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
                             : 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'
                         }`}
                       >
-                        {row.gender}
+                        {isPregnant ? `${row.gender} · ${PREGNANCY_STATUS_LABELS.pregnant.vi}` : row.gender}
                       </span>
                     </div>
                     <div className="dym-patient-meta">

@@ -17,7 +17,7 @@ import {
 import '../shell/admin.css';
 import '../shared/reception.css';
 
-import { useStaffIdentity } from '../shared/useStaffIdentity';
+import type { StaffIdentity } from '../shared/useStaffIdentity';
 import { useDashboardQueueQuery } from './useDashboardQueueQuery';
 import { useAdminScope } from '../shared/useAdminScope';
 import { useQueryClient } from '@tanstack/react-query';
@@ -53,16 +53,18 @@ const REALTIME_REFETCH_DEBOUNCE_MS = 700;
 
 export function AdminPage({
   authorizedIsAdmin,
+  staffIdentity,
   isActiveTab = true,
 }: {
   authorizedIsAdmin: boolean;
+  staffIdentity: StaffIdentity;
   isActiveTab?: boolean;
 }) {
   const { can } = useStaffPermissions();
   const queryClient = useQueryClient();
 
   const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
-    useStaffIdentity();
+    staffIdentity;
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [rows, setRows] = useState<RegistrationRow[]>([]);

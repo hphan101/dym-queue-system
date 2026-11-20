@@ -60,7 +60,7 @@ import '../shell/admin.css';
 import '../shared/reception.css';
 import './registrations.css';
 
-import { useStaffIdentity } from '../shared/useStaffIdentity';
+import type { StaffIdentity } from '../shared/useStaffIdentity';
 import { useRegistrationDetailsQuery } from './useRegistrationDetailsQuery';
 import { useAdminScope } from '../shared/useAdminScope';
 import {
@@ -93,15 +93,17 @@ const EXPORT_OPTIONS = [
 
 export function RegistrationsPage({
   authorizedIsAdmin,
+  staffIdentity,
   isActiveTab = true,
 }: {
   authorizedIsAdmin: boolean;
+  staffIdentity: StaffIdentity;
   isActiveTab?: boolean;
 }) {
   const queryClient = useQueryClient();
 
   const { staffName, staffRole, branchIds, isLoadingIdentity, identityError } =
-    useStaffIdentity();
+    staffIdentity;
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [query, setQuery] = useState('');

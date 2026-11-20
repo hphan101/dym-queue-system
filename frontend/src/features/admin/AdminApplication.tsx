@@ -15,6 +15,8 @@ import {
   RosterSettlementPage,
 } from './roster';
 import { DESTINATION_PERMISSIONS, StaffPermissionsContext } from './shared/useStaffPermissions';
+import { fetchStaffBranches, type StaffIdentity } from './shared/useStaffIdentity';
+import { getInitialStaffName, rememberStaffName } from './shared/adminIdentity';
 import { AdminLoader } from './shell/AdminLoader';
 import './shell/adminLoader.css';
 import { dymAdminTheme } from './shell/theme';
@@ -41,13 +43,20 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
   initialDestination.current = destination;
   const { themeMode } = useAdminTheme();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [staffRole, setStaffRole] = useState<StaffRole>('receptionist');
+  const [staffIdentity, setStaffIdentity] = useState<StaffIdentity>(() => ({
+    staffName: getInitialStaffName(),
+    staffRole: 'receptionist',
+    branchIds: {},
+    isLoadingIdentity: true,
+    identityError: null,
+  }));
   const [permissions, setPermissions] = useState<StaffPermissions>(getDefaultPermissions('none'));
-  const isAdmin = staffRole === 'admin';
+  const isAdmin = staffIdentity.staffRole === 'admin';
   const canAccessRoster = ['overview', 'clinic', 'onsite', 'settlement', 'personnel'].some((key) => permissions[key as keyof StaffPermissions]?.view);
 
   useEffect(() => {
     let isMounted = true;
+    let verification = 0;
     try {
       window.sessionStorage.removeItem('dym_registration_overrides_v1');
       window.localStorage.removeItem('dym_registration_overrides_v1');
@@ -57,25 +66,30 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) window.location.replace('/?page=login');
+      if (!session) {
+        verification += 1;
+        window.location.replace('/?page=login');
+      }
     });
 
     const verifyAccess = async () => {
+      const attempt = ++verification;
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
+      if (!isMounted || attempt !== verification) return;
       if (!user) {
         window.location.replace('/?page=login');
         return;
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const [{ data: profile, error }, branches] = await Promise.all([
+        supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
+        fetchStaffBranches(user.id).catch(() => null),
+      ]);
 
+      if (!isMounted || attempt !== verification) return;
       if (error || !profile?.is_active) {
         await supabase.auth.signOut();
         window.location.replace('/?page=login');
@@ -93,11 +107,17 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
         if (fallback) { window.location.replace('/?page=' + (fallback === 'dashboard' ? 'admin' : fallback)); return; }
       }
 
-      if (isMounted) {
-        setStaffRole(resolvedRole);
-        setPermissions(resolvedPermissions);
-        setIsAuthorized(true);
-      }
+      const staffName = profile.display_name || getInitialStaffName();
+      if (profile.display_name) rememberStaffName(staffName);
+      setStaffIdentity({
+        staffName,
+        staffRole: resolvedRole,
+        branchIds: (resolvedRole === 'admin' && profile.permissions == null ? branches?.all : branches?.assigned) ?? {},
+        isLoadingIdentity: false,
+        identityError: branches ? null : 'Không thể tải danh sách chi nhánh.',
+      });
+      setPermissions(resolvedPermissions);
+      setIsAuthorized(true);
     };
 
     void verifyAccess();
@@ -146,6 +166,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
       {permissions.reception.view && <div className={destination === 'dashboard' ? 'contents' : 'hidden'}>
         <AdminPage
           authorizedIsAdmin={isAdmin}
+          staffIdentity={staffIdentity}
           isActiveTab={destination === 'dashboard'}
         />
       </div>}
@@ -154,6 +175,7 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
         <div className={destination === 'registrations' ? 'contents' : 'hidden'}>
           <RegistrationsPage
             authorizedIsAdmin={isAdmin}
+            staffIdentity={staffIdentity}
             isActiveTab={destination === 'registrations'}
           />
         </div>

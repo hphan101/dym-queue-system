@@ -4,10 +4,41 @@ import type { BranchCode } from '../../../types/domain';
 import { getInitialStaffName, rememberStaffName } from './adminIdentity';
 import type { StaffRole } from '../accounts/types';
 
+type BranchIds = Partial<Record<BranchCode, string>>;
+
+export interface StaffIdentity {
+  staffName: string;
+  staffRole: StaffRole;
+  branchIds: BranchIds;
+  isLoadingIdentity: boolean;
+  identityError: string | null;
+}
+
+export async function fetchStaffBranches(userId: string) {
+  const [{ data: branches, error: branchError }, { data: access, error: accessError }] =
+    await Promise.all([
+      supabase.from('branches').select('id, code').eq('is_active', true),
+      supabase.from('staff_branch_access').select('branch_id').eq('user_id', userId),
+    ]);
+  if (branchError || accessError || !branches) throw new Error('Không thể tải danh sách chi nhánh.');
+
+  const assignedIds = new Set((access ?? []).map((entry) => String(entry.branch_id)));
+  const all: BranchIds = {};
+  const assigned: BranchIds = {};
+  for (const branch of branches) {
+    const code = String(branch.code);
+    if (code !== 'q1' && code !== 'q7' && code !== 'hn') continue;
+    const id = String(branch.id);
+    all[code] = id;
+    if (assignedIds.has(id)) assigned[code] = id;
+  }
+  return { all, assigned };
+}
+
 export function useStaffIdentity() {
   const [staffName, setStaffName] = useState<string>(getInitialStaffName);
   const [staffRole, setStaffRole] = useState<StaffRole>('receptionist');
-  const [branchIds, setBranchIds] = useState<Partial<Record<BranchCode, string>>>({});
+  const [branchIds, setBranchIds] = useState<BranchIds>({});
   const [isLoadingIdentity, setIsLoadingIdentity] = useState(true);
   const [identityError, setIdentityError] = useState<string | null>(null);
 
@@ -21,45 +52,16 @@ export function useStaffIdentity() {
         } = await supabase.auth.getUser();
         if (!user || !isMounted) return;
 
-        const [
-          { data: profile },
-          { data: branchRecords, error: branchError },
-          { data: accessRecords, error: accessError },
-        ] = await Promise.all([
+        const [{ data: profile }, branches] = await Promise.all([
           supabase
             .from('profiles')
             .select('*')
             .eq('user_id', user.id)
             .maybeSingle(),
-          supabase.from('branches').select('id, code').eq('is_active', true),
-          supabase
-            .from('staff_branch_access')
-            .select('branch_id')
-            .eq('user_id', user.id),
+          fetchStaffBranches(user.id),
         ]);
 
         if (!isMounted) return;
-
-        if (branchError || accessError || !branchRecords) {
-          setIdentityError('Không thể tải danh sách chi nhánh.');
-          setIsLoadingIdentity(false);
-          return;
-        }
-
-        const nextBranchIds: Partial<Record<BranchCode, string>> = {};
-        const allowedBranchIds = new Set(
-          (accessRecords ?? []).map((access) => String(access.branch_id)),
-        );
-
-        for (const record of branchRecords) {
-          const code = String(record.code);
-          if (
-            (code === 'q1' || code === 'q7' || code === 'hn') &&
-            ((profile?.role === 'admin' && profile.permissions == null) || allowedBranchIds.has(String(record.id)))
-          ) {
-            nextBranchIds[code] = String(record.id);
-          }
-        }
 
         if (
           profile?.role === 'admin' ||
@@ -75,10 +77,10 @@ export function useStaffIdentity() {
           setStaffName(nextStaffName);
         }
 
-        setBranchIds(nextBranchIds);
+        setBranchIds(profile?.role === 'admin' && profile.permissions == null ? branches.all : branches.assigned);
       } catch {
         if (isMounted) {
-          setIdentityError('Lỗi xác thực người dùng.');
+          setIdentityError('Không thể xác thực người dùng hoặc tải danh sách chi nhánh.');
         }
       } finally {
         if (isMounted) {

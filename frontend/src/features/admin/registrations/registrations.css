@@ -55,6 +55,17 @@
 .dym-registrations-page .dym-table-precision tr[data-selected="true"] {
   background: color-mix(in srgb, var(--color-paper) 94%, var(--color-ink));
 }
+.dym-registrations-page .dym-table-precision tbody tr[data-pregnant="true"] {
+  background-color: color-mix(in srgb, var(--color-paper-2) 88%, hsl(var(--destructive)));
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-registrations-page .dym-table-precision tbody tr[data-pregnant="true"]:hover {
+    background-color: color-mix(in srgb, var(--color-paper-2) 84%, hsl(var(--destructive)));
+  }
+}
+.dym-registrations-page .dym-table-precision tbody tr[data-pregnant="true"][data-selected="true"] {
+  background-color: color-mix(in srgb, var(--color-paper-2) 80%, hsl(var(--destructive)));
+}
 .dym-registrations-page .col-ticket .dym-ticket-tag { font-weight: 600; }
 .dym-registrations-page .col-ticket .dym-time-cell { color: var(--color-ink-2); }
 .dym-registrations-page .dym-table-precision tr:focus-within { outline: 2px solid var(--reception-accent); outline-offset: -2px; }

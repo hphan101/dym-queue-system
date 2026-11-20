@@ -23,7 +23,7 @@ export function CustomerNoticeModal({
     <div className="fixed right-4 top-4 z-20 w-[calc(100vw-2rem)] max-w-sm text-foreground">
       <Alert role="status" aria-live="polite" aria-atomic="true" className="pr-12 shadow-md">
         <UserRoundPlus className="size-4" aria-hidden="true" />
-        <AlertTitle>Khách mới đăng ký</AlertTitle>
+        <AlertTitle className="font-semibold text-white">Khách mới đăng ký</AlertTitle>
         <AlertDescription className="break-words">
           Số {notification.queueNumber} · {notification.fullName}
         </AlertDescription>

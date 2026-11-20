@@ -14,6 +14,10 @@ new Function('exports', 'require', code)(exportsForTable, name => {
   if (name === 'react/jsx-runtime') return require(name);
   if (name === '@/components/ui/checkbox') return { Checkbox: 'checkbox' };
   if (name === './usePrintStatus') return { usePrintStatus: () => ({ getStatus: () => ({ consent: false, tt25: false }) }) };
+  if (name === '../../registration/tt25Types') return {
+    getTT25PrintCopies: () => 1,
+    PREGNANCY_STATUS_LABELS: { pregnant: { vi: 'Đang mang thai' } },
+  };
   return generic;
 });
 
@@ -41,6 +45,23 @@ test('Shift click selects the visible range in either direction and falls back w
 });
 
 const nodes = node => !node || typeof node !== 'object' ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+test('only a female registration marked pregnant shows a pregnancy highlight, including when selected', () => {
+  const rows = [
+    { id: 'pregnant', gender: 'Nữ', tt25_data: { pregnancyStatus: 'pregnant' } },
+    { id: 'suspected', gender: 'Nữ', tt25_data: { pregnancyStatus: 'suspected' } },
+    { id: 'not-pregnant', gender: 'Nữ', tt25_data: { pregnancyStatus: 'not_pregnant' } },
+    { id: 'unknown', gender: 'Nữ' },
+    { id: 'male', gender: 'Nam', tt25_data: { pregnancyStatus: 'pregnant' } },
+  ];
+  const tableRows = nodes(exportsForTable.RegistrationsTable({
+    rows, checkedIds: new Set(['pregnant']), onToggleChecked: () => {},
+  })).filter(node => node.type === 'tr').slice(1);
+
+  assert.deepEqual(tableRows.map(row => row.props['data-pregnant']), [true, undefined, undefined, undefined, undefined]);
+  assert.equal(tableRows[0].props['data-selected'], true);
+  assert.ok(nodes(tableRows[0]).some(node => node.props?.children === 'Nữ · Đang mang thai'));
+});
+
 test('registration checkboxes retain partial, all and empty page selection', () => {
   const calls = [];
   const rows = [{ id: 'a', full_name: 'Nguyễn An' }, { id: 'b', full_name: 'Trần Bình' }];
