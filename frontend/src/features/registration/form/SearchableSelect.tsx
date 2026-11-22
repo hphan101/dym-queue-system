@@ -93,6 +93,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       <div className="relative">
         <input
           type="text"
+          aria-invalid={error}
           disabled={disabled}
           placeholder={placeholder}
           value={

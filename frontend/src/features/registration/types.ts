@@ -6,6 +6,7 @@ export interface RegistrationResponse {
   queueNumber?: string;
   queueDate?: string;
   error?: string;
+  field?: string;
 }
 
 export * from './tt25Types';

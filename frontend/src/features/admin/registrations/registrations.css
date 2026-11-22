@@ -41,6 +41,35 @@
 .dym-registrations-page .dym-table-precision { min-width: 1440px; }
 .dym-registrations-page .dym-table-precision th { white-space: nowrap; }
 .dym-registrations-page .dym-table-precision td { padding: 16px; }
+@media (min-width: 64rem) and (min-height: 36rem) {
+  .dym-scroll-registry .dym-admin-workspace {
+    scroll-padding-top: calc(var(--registry-column-offset, 0px) + 2.75rem);
+  }
+  .dym-scroll-registry .dym-admin-header-bar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+  }
+  .dym-registrations-page .dym-registration-toolbar {
+    position: sticky;
+    top: var(--registry-header-height, 0px);
+    z-index: 3;
+    border-radius: 12px 12px 0 0;
+    background: var(--color-paper-2);
+  }
+  .dym-registrations-page .dym-bulk-toolbar {
+    position: sticky;
+    top: var(--registry-bulk-offset, 0px);
+    z-index: 3;
+  }
+  .dym-registrations-page .dym-table-scroller { overflow: visible; }
+  .dym-registrations-page .dym-table-precision td { padding-block: 8px; }
+  .dym-registrations-page .dym-table-precision thead {
+    position: sticky;
+    top: var(--registry-column-offset, 0px);
+    z-index: 2;
+  }
+}
 .dym-registrations-page .dym-patient-block { min-width: 240px; gap: 4px; }
 .dym-registrations-page :is(.dym-contact-phone, .dym-company-name) { font-size: 14px; font-weight: 500; line-height: 20px; }
 .dym-registrations-page :is(.dym-contact-id, .dym-address-line) { font-size: 12px; line-height: 20px; }

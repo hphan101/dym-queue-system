@@ -5,6 +5,7 @@ import type { BranchCode } from '../../../types/domain';
 import type { RegistrationRow } from './QueueTable';
 import type { TT25StoredExtras } from '../registrations/types';
 import { formatBirthDate } from '../shared/adminFormatters';
+import { fetchRegistrationPages } from '../shared/fetchRegistrationPages';
 import { syncPrintStatusesFromServer } from '../registrations/usePrintStatus';
 
 interface RegistrationRecord {
@@ -64,11 +65,8 @@ export function useDashboardQueueQuery({
         throw new Error('BRANCH_UNAVAILABLE');
       }
 
-      const [registrationsResult, displayResult] = await Promise.all([
-        supabase.rpc('get_dashboard_registrations', {
-          p_branch_code: branch,
-          p_queue_date: date,
-        }),
+      const [rawRecords, displayResult] = await Promise.all([
+        fetchRegistrationPages<RegistrationRecord>('get_dashboard_registrations', branch, date),
         supabase
           .from('branch_display_state')
           .select('registration_id, queue_date, queue_number, called_at')
@@ -76,17 +74,11 @@ export function useDashboardQueueQuery({
           .maybeSingle(),
       ]);
 
-      if (registrationsResult.error) {
-        console.error('Lỗi khi tải registrations:', registrationsResult.error);
-        throw new Error(registrationsResult.error.message);
-      }
       if (displayResult.error) {
         console.error('Lỗi khi tải display state:', displayResult.error);
         throw new Error(displayResult.error.message);
       }
 
-      const rawRecords =
-        (registrationsResult.data as RegistrationRecord[] | null) ?? [];
       syncPrintStatusesFromServer(rawRecords);
 
       const fetchedRows = rawRecords.map(

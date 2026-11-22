@@ -93,6 +93,21 @@
   border-color: var(--color-rule-2);
 }
 .dym-reception-page .dym-pagination-bar { background: var(--color-paper-2); border-radius: 0 0 12px 12px; }
+
+@media (min-width: 64rem) and (min-height: 36rem) {
+  .dym-reception-dashboard .dym-registry-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 2 * var(--space-4));
+  }
+  .dym-reception-dashboard .dym-registry-panel > :not(.dym-table-scroller) { flex-shrink: 0; }
+  .dym-reception-dashboard .dym-table-scroller { min-height: 8rem; overflow: auto; }
+  .dym-reception-dashboard .dym-table-precision thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+}
 .dym-reception-page [role="tab"] { font-size: 14px; font-weight: 500; }
 :is(.dark, [data-color-mode="dark"]) .dym-reception-page [role="tablist"] {
   background: var(--color-paper-3);

@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
+import { fetchRegistrationPages } from '../shared/fetchRegistrationPages';
 import type { RegistrationDetails } from './types';
 import { syncPrintStatusesFromServer } from './usePrintStatus';
 
 export type { RegistrationDetails } from './types';
+
+export function fetchRegistrationDay(branch: BranchCode, date: string) {
+  return fetchRegistrationPages<RegistrationDetails>('get_registration_details', branch, date);
+}
 
 export function useRegistrationDetailsQuery({
   branch,
@@ -23,20 +27,7 @@ export function useRegistrationDetailsQuery({
         throw new Error('BRANCH_UNAVAILABLE');
       }
 
-      const { data, error: queryError } = await supabase.rpc(
-        'get_registration_details',
-        {
-          p_branch_code: branch,
-          p_queue_date: date,
-        },
-      );
-
-      if (queryError) {
-        console.error('Không thể tải chi tiết đăng ký:', queryError);
-        throw new Error(queryError.message);
-      }
-
-      const rows = (data ?? []) as RegistrationDetails[];
+      const rows = await fetchRegistrationDay(branch, date);
       syncPrintStatusesFromServer(rows);
       return rows;
     },

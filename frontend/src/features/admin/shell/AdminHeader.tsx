@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
   VolumeX,
   Volume2,
@@ -26,6 +26,7 @@ import { AdminBreadcrumb } from './AdminBreadcrumb';
 import type { AdminBreadcrumbItem } from './adminBreadcrumbs';
 
 export interface AdminHeaderProps {
+  ref?: Ref<HTMLElement>;
   breadcrumbs?: AdminBreadcrumbItem[];
   title?: string;
   branch?: BranchCode;
@@ -40,6 +41,7 @@ export interface AdminHeaderProps {
 }
 
 export function AdminHeader({
+  ref,
   breadcrumbs,
   title = 'Tiếp nhận',
   branch,
@@ -56,7 +58,7 @@ export function AdminHeader({
   const isToday = !date || date === today;
 
   return (
-    <header className="dym-admin-header-bar">
+    <header ref={ref} className="dym-admin-header-bar">
       {/* Page Title */}
       <div className="dym-header-branding">
         <AdminBreadcrumb items={breadcrumbs} />

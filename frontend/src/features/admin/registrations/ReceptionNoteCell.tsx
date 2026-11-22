@@ -4,17 +4,15 @@ import { useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { saveReceptionNote } from './receptionNotes';
-import { HighlightText } from '../shared/HighlightText';
 
 interface ReceptionNoteCellProps {
   id: string;
   name: string;
   value: string;
-  query?: string;
   onSaved: (note: string) => void;
 }
 
-export function ReceptionNoteCell({ id, name, value, query, onSaved }: ReceptionNoteCellProps) {
+export function ReceptionNoteCell({ id, name, value, onSaved }: ReceptionNoteCellProps) {
   const { can } = useStaffPermissions();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -42,7 +40,7 @@ export function ReceptionNoteCell({ id, name, value, query, onSaved }: Reception
     setDraft(value); setExpected(value); setError(null); setEditing(true);
   }}>
     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${value ? '' : 'text-muted-foreground'}`}>
-      {value ? <HighlightText text={value} query={query} /> : 'Thêm ghi chú'}
+      {value || 'Thêm ghi chú'}
     </span>
     <Pencil className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
   </button>;

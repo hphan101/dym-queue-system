@@ -153,7 +153,7 @@ function sanitizeTargetPayment(
   };
 }
 
-function parsePayload(value: unknown): RegistrationPayload | null {
+function parsePayload(value: unknown, invalidFields: string[] = []): RegistrationPayload | null {
   if (!isRecord(value)) return null;
 
   const branch = stringField(value, "branch");
@@ -173,17 +173,23 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   const companyName = stringField(value, "companyName", true);
   const honeypot = stringField(value, "honeypot", true);
 
+  if (email === null || (email !== "" && (!isSafeText(email, 1, 120) || !EMAIL_PATTERN.test(email)))) {
+    invalidFields.push("email");
+    return null;
+  }
+  if (gender === "Nữ" && (usesCurrentConsentForm || value.pregnancyStatus !== undefined)
+    && (pregnancyStatus === null || !PREGNANCY_STATUSES.has(pregnancyStatus))) {
+    invalidFields.push("pregnancyStatus");
+    return null;
+  }
+
   if (
     branch === null ||
     fullName === null ||
     phoneNumber === null ||
     (phoneNumber !== "" && !cleanPhone) ||
-    email === null ||
-    (email !== "" && (!isSafeText(email, 1, 120) || !EMAIL_PATTERN.test(email))) ||
     birthDate === null ||
     gender === null ||
-    (gender === "Nữ" && (usesCurrentConsentForm || value.pregnancyStatus !== undefined)
-      && (pregnancyStatus === null || !PREGNANCY_STATUSES.has(pregnancyStatus))) ||
     cccd === null ||
     (identityDocumentType !== undefined && identityDocumentType !== "cccd" && identityDocumentType !== "passport") ||
     province === null ||
@@ -303,24 +309,24 @@ function isValidIdentityDocument(
   return true;
 }
 
-function isValidPayload(payload: RegistrationPayload): boolean {
-  return (
-    BRANCHES.has(payload.branch) &&
-    isSafeText(payload.fullName, 2, 100) &&
-    (PHONE_PATTERN.test(payload.phoneNumber) ||
-      (payload.phoneNumber === "" && /work permit/i.test(String(payload.tt25Extras.checkupReason ?? "")))) &&
-    isValidDate(payload.birthDate) &&
-    GENDERS.has(payload.gender) &&
-    (payload.tt25Extras.identityDocumentType === "passport"
-      ? isSafeText(payload.cccd, 1, 100)
-      : (payload.tt25Extras.identityDocumentType !== "cccd" || /^\d{12}$/.test(payload.cccd)) &&
-        isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate)) &&
-    isSafeText(payload.companyName, /công ty|doanh nghiệp/i.test(String(payload.tt25Extras.checkupReason ?? '')) ? 1 : 0, 150) &&
-    isSafeText(payload.province, 1, 120) &&
-    isSafeText(payload.ward, 1, 120) &&
-    isSafeText(payload.addressDetail, 3, 250) &&
-    isSafeText(payload.honeypot, 0, 200)
-  );
+function getInvalidPayloadField(payload: RegistrationPayload): string | undefined {
+  const checkupReason = String(payload.tt25Extras.checkupReason ?? "");
+  if (!BRANCHES.has(payload.branch)) return "branch";
+  if (!isSafeText(payload.fullName, 2, 100)) return "fullName";
+  if (!isValidDate(payload.birthDate)) return "birthDate";
+  if (!GENDERS.has(payload.gender)) return "gender";
+  const validDocument = payload.tt25Extras.identityDocumentType === "passport"
+    ? isSafeText(payload.cccd, 1, 100)
+    : (payload.tt25Extras.identityDocumentType !== "cccd" || /^\d{12}$/.test(payload.cccd)) &&
+      isValidIdentityDocument(payload.cccd, payload.gender, payload.birthDate);
+  if (!validDocument) return "cccd";
+  if (!PHONE_PATTERN.test(payload.phoneNumber)
+    && (payload.phoneNumber !== "" || !/work permit/i.test(checkupReason))) return "phoneNumber";
+  if (!isSafeText(payload.companyName, /công ty|doanh nghiệp/i.test(checkupReason) ? 1 : 0, 150)) return "companyName";
+  if (!isSafeText(payload.province, 1, 120)) return "province";
+  if (!isSafeText(payload.ward, 1, 120)) return "ward";
+  if (!isSafeText(payload.addressDetail, 3, 250)) return "addressDetail";
+  if (!isSafeText(payload.honeypot, 0, 200)) return "honeypot";
 }
 
 async function createHmac(
@@ -430,19 +436,22 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   let payload: RegistrationPayload | null = null;
   let sessionToken = "";
+  const invalidFields: string[] = [];
   try {
     const decoded: unknown = JSON.parse(rawBody);
-    payload = parsePayload(decoded);
+    payload = parsePayload(decoded, invalidFields);
     if (isRecord(decoded) && typeof decoded.registrationSession === "string") sessionToken = decoded.registrationSession;
   } catch {
     // Handled by the common invalid payload response below.
   }
 
-  if (!payload || !isValidPayload(payload)) {
+  const invalidField = payload ? getInvalidPayloadField(payload) : invalidFields[0];
+  if (!payload || invalidField) {
     return jsonResponse(
       {
         success: false,
         code: "INVALID_DATA",
+        field: invalidField,
         error: "Dữ liệu đăng ký không hợp lệ. Vui lòng kiểm tra lại thông tin.",
       },
       400,
@@ -562,6 +571,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
           code: errorText.includes("REGISTRATION_SESSION_EXPIRED") ? "REGISTRATION_SESSION_EXPIRED" : "REGISTRATION_SESSION_INVALID",
           error: "Phiên đăng ký đã hết hạn hoặc không hợp lệ. Vui lòng quét lại mã QR tại phòng khám.",
         }, 403, origin);
+      }
+      if (error.message === "IDENTITY_DOCUMENT_COOLDOWN") {
+        const retryAfter = Math.max(1, Math.min(3600, Number(error.details) || 3600));
+        const minutes = Math.ceil(retryAfter / 60);
+        const passport = error.hint === "passport";
+        return jsonResponse({
+          success: false,
+          code: "IDENTITY_DOCUMENT_COOLDOWN",
+          error: payload.tt25Extras.language === "en"
+            ? `This ${passport ? "passport" : "Citizen ID"} was recently registered at this branch. Please try again in ${minutes} min.`
+            : `${passport ? "Hộ chiếu" : "CCCD"} này vừa được đăng ký tại chi nhánh này. Vui lòng thử lại sau ${minutes} phút.`,
+        }, 429, origin, { "Retry-After": String(retryAfter) });
       }
       if (errorText.includes("RATE_LIMITED")) {
         return jsonResponse(

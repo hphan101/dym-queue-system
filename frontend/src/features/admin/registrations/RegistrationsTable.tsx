@@ -59,15 +59,15 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
                     selectionAnchor.current = null;
                     onToggleChecked!(rows.map((r) => r.id), checked === true);
                   }}
-                  aria-label="Chọn tất cả hồ sơ trên trang này"
+                  aria-label="Chọn tất cả hồ sơ trong danh sách"
                 />
               </th>
             )}
             <th scope="col">Số phiếu & giờ</th>
             <th scope="col">Tên khách hàng</th>
+            <th scope="col">Ghi chú</th>
             <th scope="col">SĐT & CCCD</th>
             <th scope="col">Đơn vị & địa chỉ</th>
-            <th scope="col">Ghi chú</th>
             <th scope="col">Trạng thái</th>
             <th scope="col">Trạng thái in</th>
             <th scope="col" className="text-right">Hồ sơ</th>
@@ -88,21 +88,25 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
               <tr key={row.id} data-selected={checkedIds?.has(row.id) ?? false} data-pregnant={isPregnant || undefined}>
                 {isSelectable && (
                   <td className="w-10">
-                    <Checkbox
+                    <input
+                      type="checkbox"
+                      className="size-4 align-middle accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                       checked={checkedIds!.has(row.id)}
-                      onClick={(event) => {
+                      onChange={(event) => {
                         const anchor = selectionAnchor.current;
-                        if (!event.shiftKey || !anchor || !checkedIds!.has(anchor)) return;
-                        const anchorIndex = rows.findIndex((entry) => entry.id === anchor);
-                        if (anchorIndex < 0) return;
+                        const { nativeEvent } = event;
+                        if ('shiftKey' in nativeEvent && nativeEvent.shiftKey && anchor && checkedIds!.has(anchor)) {
+                          const anchorIndex = rows.findIndex((entry) => entry.id === anchor);
+                          if (anchorIndex >= 0) {
+                            const range = rows.slice(Math.min(anchorIndex, index), Math.max(anchorIndex, index) + 1);
+                            onToggleChecked!(range.map((entry) => entry.id), true);
+                            return;
+                          }
+                        }
 
-                        event.preventDefault();
-                        const range = rows.slice(Math.min(anchorIndex, index), Math.max(anchorIndex, index) + 1);
-                        onToggleChecked!(range.map((entry) => entry.id), true);
-                      }}
-                      onCheckedChange={(checked) => {
-                        selectionAnchor.current = checked === true ? row.id : null;
-                        onToggleChecked!([row.id], checked === true);
+                        const checked = event.currentTarget.checked;
+                        selectionAnchor.current = checked ? row.id : null;
+                        onToggleChecked!([row.id], checked);
                       }}
                       aria-label={`Chọn hồ sơ ${row.full_name}`}
                     />
@@ -146,17 +150,14 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
                     <div className="dym-patient-meta">
                       {age !== null && <span>{age} tuổi</span>}
                       {row.birth_date && (
-                        <span>
-                          (
-                          <HighlightText
-                            text={formatBirthDate(row.birth_date)}
-                            query={searchQuery}
-                          />
-                          )
-                        </span>
+                        <span>({formatBirthDate(row.birth_date)})</span>
                       )}
                     </div>
                   </div>
+                </td>
+
+                <td className="w-44 min-w-44 max-w-44">
+                  <ReceptionNoteCell id={row.id} name={row.full_name} value={row.reception_note ?? ''} onSaved={(note) => onNoteSaved(row.id, note)} />
                 </td>
 
                 {/* Contact & ID */}
@@ -191,10 +192,7 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
                           className="dym-company-name truncate"
                           title={row.company_name}
                         >
-                          <HighlightText
-                            text={row.company_name}
-                            query={searchQuery}
-                          />
+                          {row.company_name}
                         </span>
                       )}
                     <span
@@ -205,22 +203,12 @@ export const RegistrationsTable: FC<RegistrationsTableProps> = ({
                         row.province,
                       )}
                     >
-                      <HighlightText
-                        text={formatFullAddress(
-                          row.address_detail,
-                          row.ward,
-                          row.province,
-                        )}
-                        query={searchQuery}
-                      />
+                      {formatFullAddress(row.address_detail, row.ward, row.province)}
                     </span>
                   </div>
                 </td>
 
                 {/* Status */}
-                <td className="w-44 min-w-44 max-w-44">
-                  <ReceptionNoteCell id={row.id} name={row.full_name} value={row.reception_note ?? ''} query={searchQuery} onSaved={(note) => onNoteSaved(row.id, note)} />
-                </td>
                 <td>
                   <span className={`dym-status-badge ${displayState.cls}`}>
                     <span className="dym-status-indicator-dot" />

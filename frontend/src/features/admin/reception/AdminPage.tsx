@@ -1,7 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
 import { AdminLayout } from '../shell/AdminLayout';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BRANCH_NAMES } from '../../../config/branches';
 import { getTodayInVietnam } from '../../../lib/date';
@@ -31,6 +31,7 @@ import {
 } from '../shared/CustomerNoticeModal';
 import { QueueMetrics, type QueueStatus } from './QueueMetrics';
 import { QueueTable, type RegistrationRow } from './QueueTable';
+import { useRegistrationDetailsQuery } from '../registrations/useRegistrationDetailsQuery';
 import { RealtimeConnectionAlert } from '../shared/RealtimeConnectionAlert';
 
 type PendingQueueAction = 'next' | 'recall' | null;
@@ -69,8 +70,7 @@ export function AdminPage({
 
   const [rows, setRows] = useState<RegistrationRow[]>([]);
   const [query, setQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] = useState<QueueStatus | 'all'>('all');
   const [currentQueue, setCurrentQueue] = useState('—');
   const [currentPatient, setCurrentPatient] = useState('Chưa gọi số');
@@ -99,6 +99,11 @@ export function AdminPage({
 
   const branchId = branchIds[branch];
   const isMutating = pendingQueueAction !== null || pendingUndoId !== null;
+  const normalizedQuery = normalizeSearch(deferredQuery);
+  const canSearchIdentity = can('registrations', 'view');
+  const searchIdentity = Boolean(normalizedQuery && canSearchIdentity && isActiveTab);
+  const { data: registrationDetails, isLoading: isIdentitySearchLoading, isError: hasIdentitySearchError } =
+    useRegistrationDetailsQuery({ branch, branchId: searchIdentity ? branchId : undefined, date });
 
   const {
     data: dashboardData,
@@ -153,6 +158,7 @@ export function AdminPage({
       void queryClient.invalidateQueries({
         queryKey: ['dashboardQueue', branch, date],
       });
+      void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
     }
   }, [branch, date, isActiveTab, queryClient]);
 
@@ -234,6 +240,7 @@ export function AdminPage({
         void queryClient.invalidateQueries({
           queryKey: ['dashboardQueue', branch, date],
         });
+        void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
       }, REALTIME_REFETCH_DEBOUNCE_MS);
     };
 
@@ -318,7 +325,9 @@ export function AdminPage({
   ]);
 
   const rowsForDay = useMemo(
-    () => rows.filter((row) => row.branch === branch && row.date === date),
+    () => rows
+      .filter((row) => row.branch === branch && row.date === date)
+      .sort((a, b) => Number(b.queueNumber) - Number(a.queueNumber)),
     [branch, date, rows],
   );
 
@@ -335,48 +344,16 @@ export function AdminPage({
   );
 
   const filteredRows = useMemo(() => {
-    const normalizedQuery = normalizeSearch(query);
     if (!normalizedQuery) return rowsForDay;
 
+    const matchingDocuments = new Set(searchIdentity ? registrationDetails
+      ?.filter((row) => normalizeSearch(row.identity_document ?? '').includes(normalizedQuery))
+      .map((row) => row.id) : []);
     return rowsForDay.filter((row) =>
-      normalizeSearch(
-        [
-          row.queueNumber,
-          row.fullName,
-          row.birthDate,
-          row.gender,
-          row.phone,
-          row.companyName,
-        ].join(' '),
-      ).includes(normalizedQuery),
+      matchingDocuments.has(row.id) ||
+      normalizeSearch([row.queueNumber, row.fullName, row.phone].join(' ')).includes(normalizedQuery),
     );
-  }, [query, rowsForDay]);
-
-  const rowsForStatus = useMemo(() => statusFilter === 'all' ? filteredRows : filteredRows.filter((row) => row.status === statusFilter), [filteredRows, statusFilter]);
-  const totalPages = Math.max(
-    1,
-    Math.ceil(rowsForStatus.length / pageSize),
-  );
-  const visiblePage = Math.min(currentPage, totalPages);
-  const pageStartIndex = (visiblePage - 1) * pageSize;
-  const paginatedRows = useMemo(
-    () =>
-      rowsForStatus.slice(pageStartIndex, pageStartIndex + pageSize),
-    [rowsForStatus, pageStartIndex, pageSize],
-  );
-  const firstVisibleRow = rowsForStatus.length === 0 ? 0 : pageStartIndex + 1;
-  const lastVisibleRow = Math.min(
-    pageStartIndex + pageSize,
-    rowsForStatus.length,
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [branch, date, query, statusFilter]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+  }, [normalizedQuery, registrationDetails, rowsForDay, searchIdentity]);
 
   const callNext = async () => {
     if (isMutating || !can('reception', 'update')) return;
@@ -444,7 +421,7 @@ export function AdminPage({
     setPendingQueueAction(null);
   };
 
-  const returnToWaiting = async (row: RegistrationRow) => {
+  const returnToWaiting = useCallback(async (row: RegistrationRow) => {
     if (isMutating || row.status !== 'called') return;
 
     setPendingUndoId(row.id);
@@ -494,7 +471,7 @@ export function AdminPage({
     }
 
     setPendingUndoId(null);
-  };
+  }, [branch, date, isMutating, queryClient]);
 
   const callNextRef = useRef(callNext);
   const recallCurrentRef = useRef(recallCurrent);
@@ -567,6 +544,7 @@ export function AdminPage({
   return (
     <AdminLayout
       activePage="dashboard"
+      className="dym-reception-dashboard"
       branch={branch}
       date={date}
       staffName={staffName}
@@ -617,26 +595,21 @@ export function AdminPage({
         />
 
         <QueueTable
-          pageSize={pageSize}
-          onPageSizeChange={setPageSize}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           filteredRows={filteredRows}
-          paginatedRows={paginatedRows}
           query={query}
+          resultQuery={deferredQuery}
           onQueryChange={setQuery}
-          isDataLoading={isDataLoading}
+          canSearchIdentity={canSearchIdentity}
+          hasIdentitySearchError={searchIdentity && hasIdentitySearchError}
+          isDataLoading={isDataLoading || (searchIdentity && isIdentitySearchLoading && filteredRows.length === 0)}
           isMutating={isMutating}
           pendingUndoId={pendingUndoId}
           branchName={BRANCH_NAMES[branch]}
           date={date}
           today={getTodayInVietnam()}
-          visiblePage={visiblePage}
-          totalPages={totalPages}
-          firstVisibleRow={firstVisibleRow}
-          lastVisibleRow={lastVisibleRow}
-          onPageChange={setCurrentPage}
-          onReturnToWaiting={(row) => void returnToWaiting(row)}
+          onReturnToWaiting={returnToWaiting}
         />
       </main>
     </AdminLayout>

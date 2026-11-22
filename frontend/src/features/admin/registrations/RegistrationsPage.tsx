@@ -1,13 +1,14 @@
 import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { NumberedPagination } from '@/components/numbered-pagination';
 import { AdminLayout } from '../shell/AdminLayout';
 import {
   lazy,
   Suspense,
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -107,6 +108,7 @@ export function RegistrationsPage({
   const { branch, setBranch, date, setDate } = useAdminScope();
 
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] =
     useState<RegistrationStatusTab>('all');
   const [printFilter, setPrintFilter] = useState<
@@ -115,8 +117,6 @@ export function RegistrationsPage({
   const [companyFilter, setCompanyFilter] = useState('all');
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false);
   const [companySearchQuery, setCompanySearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [selectedRow, setSelectedRow] = useState<RegistrationDetails | null>(
     null,
   );
@@ -141,6 +141,9 @@ export function RegistrationsPage({
   const realtimeRefetchTimer = useRef<number | null>(null);
   const hasPendingRealtimeRefetch = useRef(false);
   const companySearchInputRef = useRef<HTMLInputElement | null>(null);
+  const pageHeaderRef = useRef<HTMLElement>(null);
+  const registryToolbarRef = useRef<HTMLDivElement>(null);
+  const bulkToolbarRef = useRef<HTMLDivElement>(null);
   const isActiveTabRef = useRef(isActiveTab);
   isActiveTabRef.current = isActiveTab;
   const searchInputId = useId();
@@ -195,13 +198,13 @@ export function RegistrationsPage({
     setCheckedIds(new Set());
   }, [branch, date]);
 
-  const toggleChecked = (ids: string[], checked: boolean) => {
+  const toggleChecked = useCallback((ids: string[], checked: boolean) => {
     setCheckedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
       return next;
     });
-  };
+  }, []);
 
   const handleBulkPrint = async (mode: BulkPrintMode) => {
     const targets = rows
@@ -480,8 +483,8 @@ export function RegistrationsPage({
   }, [isCompanyMenuOpen]);
 
   // Filter rows by search, status tab, print status, and company
-  const filterRows = useCallback((sourceRows: RegistrationDetails[]) => {
-    const normalizedQuery = normalizeSearch(query);
+  const filterRows = useCallback((sourceRows: RegistrationDetails[], searchQuery: string) => {
+    const normalizedQuery = normalizeSearch(searchQuery);
 
     return sourceRows.filter((row) => {
       // Status tab match
@@ -525,21 +528,67 @@ export function RegistrationsPage({
       const searchableText = [
         formatQueueNumber(row.queue_number),
         row.full_name,
-        row.birth_date,
-        row.gender,
         row.phone_number,
         row.identity_document,
-        row.company_name,
-        row.reception_note,
-        row.province,
-        row.ward,
-        row.address_detail,
       ].join(' ');
 
       return normalizeSearch(searchableText).includes(normalizedQuery);
     });
-  }, [companyFilter, getStatus, printFilter, query, statusFilter]);
-  const filteredRows = useMemo(() => filterRows(rows), [filterRows, rows]);
+  }, [companyFilter, getStatus, printFilter, statusFilter]);
+  const newestFirstRows = useMemo(
+    () => [...rows].sort((a, b) =>
+      Date.parse(b.registered_at) - Date.parse(a.registered_at) || b.queue_number - a.queue_number,
+    ),
+    [rows],
+  );
+  const filteredRows = useMemo(
+    () => filterRows(newestFirstRows, deferredQuery),
+    [deferredQuery, filterRows, newestFirstRows],
+  );
+  const showBulkToolbar = !isLoading && filteredRows.length > 0;
+
+  useLayoutEffect(() => {
+    const header = pageHeaderRef.current;
+    const toolbar = registryToolbarRef.current;
+    const bulkToolbar = bulkToolbarRef.current;
+    const workspace = toolbar?.closest<HTMLElement>('.dym-admin-workspace');
+    if (!header || !toolbar || !workspace) return;
+
+    const updateStickyOffsets = () => {
+      const headerHeight = header.getBoundingClientRect().height;
+      const bulkOffset = headerHeight + toolbar.getBoundingClientRect().height;
+      const bulkHeight = bulkToolbar?.getBoundingClientRect().height ?? 0;
+      workspace.style.setProperty('--registry-header-height', `${headerHeight}px`);
+      workspace.style.setProperty('--registry-bulk-offset', `${bulkOffset}px`);
+      workspace.style.setProperty('--registry-column-offset', `${bulkOffset + bulkHeight}px`);
+    };
+    const observer = new ResizeObserver(updateStickyOffsets);
+    observer.observe(header);
+    observer.observe(toolbar);
+    if (bulkToolbar) observer.observe(bulkToolbar);
+    updateStickyOffsets();
+    return () => observer.disconnect();
+  }, [showBulkToolbar]);
+
+  const registrationsTable = useMemo(
+    () => (
+      <RegistrationsTable
+        rows={filteredRows}
+        onNoteSaved={(id, note) => {
+          queryClient.setQueryData<RegistrationDetails[]>(['registrationDetails', branch, date],
+            (current) => current?.map((row) => row.id === id ? { ...row, reception_note: note } : row));
+          void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
+        }}
+        searchQuery={deferredQuery}
+        checkedIds={checkedIds}
+        onToggleChecked={toggleChecked}
+        onSelectRow={setSelectedRow}
+        onPrintRow={setPrintModalRow}
+        onPrintConsentRow={setConsentModalRow}
+      />
+    ),
+    [branch, checkedIds, date, deferredQuery, filteredRows, queryClient, toggleChecked],
+  );
 
   const exportAnchor = exportDate || date;
   const exportDays = exportPeriod === 'day'
@@ -555,8 +604,8 @@ export function RegistrationsPage({
     setIsExporting(true);
     try {
       const exportRows = useVisibleDay
-        ? filteredRows
-        : filterRows(await fetchRegistrationExportRows(branch, exportDays));
+        ? filterRows(rows, query)
+        : filterRows(await fetchRegistrationExportRows(branch, exportDays), query);
       if (!exportRows.length) {
         setExportMessage('Không có hồ sơ phù hợp trong khoảng thời gian đã chọn.');
         return;
@@ -573,23 +622,6 @@ export function RegistrationsPage({
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const visiblePage = Math.min(currentPage, totalPages);
-  const pageStartIndex = (visiblePage - 1) * pageSize;
-  const paginatedRows = useMemo(
-    () => filteredRows.slice(pageStartIndex, pageStartIndex + pageSize),
-    [filteredRows, pageStartIndex, pageSize],
-  );
-  const firstVisibleRow = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
-  const lastVisibleRow = Math.min(
-    pageStartIndex + pageSize,
-    filteredRows.length,
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [branch, date, query, statusFilter, printFilter, companyFilter]);
-
   useEffect(() => {
     setCompanyFilter('all');
     setCompanySearchQuery('');
@@ -601,6 +633,7 @@ export function RegistrationsPage({
   return (
     <AdminLayout
       activePage="registrations"
+      className="dym-scroll-registry"
       branch={branch}
       date={date}
       staffName={staffName}
@@ -609,6 +642,7 @@ export function RegistrationsPage({
     >
       {/* Unified Clinical Precision Header */}
       <AdminHeader
+        ref={pageHeaderRef}
         title="Danh sách tiếp nhận"
         branch={branch}
         branchOptions={availableBranches.map((code) => ({
@@ -737,7 +771,7 @@ export function RegistrationsPage({
           aria-labelledby="registry-table-title"
         >
           {/* Toolbar with Title Header + shadcn/ui Filter & Search Controls */}
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
+          <div ref={registryToolbarRef} className="dym-registration-toolbar flex flex-col gap-3 border-b border-border px-5 py-4">
             <div className="dym-registry-title-block">
               <h2 id="registry-table-title" className="dym-registry-title">
                 Danh sách khách hàng
@@ -1061,7 +1095,7 @@ export function RegistrationsPage({
                 {/* Search Field (shadcn Input + Clear Button / Kbd) */}
                 <SearchField
                 id={searchInputId}
-                placeholder="Tìm tên, SĐT, CCCD, công ty…"
+                placeholder="Tìm số phiếu, tên, SĐT, CCCD/hộ chiếu…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label="Tìm kiếm hồ sơ khách hàng"
@@ -1085,9 +1119,9 @@ export function RegistrationsPage({
                   <tr>
                     <th scope="col">Số Phiếu & Giờ</th>
                     <th scope="col">Tên Khách Hàng</th>
+                    <th scope="col">Ghi chú</th>
                     <th scope="col">Liên Hệ & Định Danh</th>
                     <th scope="col">Đơn Vị & Địa Chỉ</th>
-                    <th scope="col">Ghi chú</th>
                     <th scope="col">Trạng Thái</th>
                     <th scope="col">Trạng Thái In</th>
                     <th scope="col" className="text-right">
@@ -1113,6 +1147,7 @@ export function RegistrationsPage({
                           <Skeleton className="h-3 w-28" />
                         </div>
                       </td>
+                      <td><Skeleton className="h-8 w-52 rounded" /></td>
                       <td>
                         <div className="flex flex-col gap-1.5">
                           <Skeleton className="h-4 w-24" />
@@ -1125,7 +1160,6 @@ export function RegistrationsPage({
                           <Skeleton className="h-3 w-52" />
                         </div>
                       </td>
-                      <td><Skeleton className="h-8 w-52 rounded" /></td>
                       <td>
                         <Skeleton className="h-6 w-20 rounded-full" />
                       </td>
@@ -1177,6 +1211,7 @@ export function RegistrationsPage({
           ) : (
             <>
               <div
+                ref={bulkToolbarRef}
                 className="dym-bulk-toolbar flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border px-4 py-2 text-sm"
                 role="group"
                 aria-label="In hàng loạt"
@@ -1254,36 +1289,15 @@ export function RegistrationsPage({
                   {bulkPrintError}
                 </AlertDescription></Alert>
               )}
-              <RegistrationsTable
-                rows={paginatedRows}
-                onNoteSaved={(id, note) => {
-                  queryClient.setQueryData<RegistrationDetails[]>(['registrationDetails', branch, date],
-                    (current) => current?.map((row) => row.id === id ? { ...row, reception_note: note } : row));
-                  void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
-                }}
-                searchQuery={query}
-                checkedIds={checkedIds}
-                onToggleChecked={toggleChecked}
-                onSelectRow={(row) => setSelectedRow(row)}
-                onPrintRow={(row) => {
-                  setPrintModalRow(row);
-                }}
-                onPrintConsentRow={(row) => {
-                  setConsentModalRow(row);
-                }}
-              />
+              {registrationsTable}
             </>
           )}
 
-          {/* Pagination Bar */}
-          {!isLoading && filteredRows.length > 0 && (
+          {showBulkToolbar && (
             <div className="dym-pagination-bar">
               <span className="dym-pagination-summary">
-                Hiển thị <strong>{firstVisibleRow}</strong>–
-                <strong>{lastVisibleRow}</strong> trong{' '}
-                <strong>{filteredRows.length}</strong> đăng ký
+                <strong>{filteredRows.length}</strong> hồ sơ
               </span>
-              <NumberedPagination currentPage={visiblePage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={pageSize} onPageSizeChange={setPageSize} label="Phân trang danh sách tiếp nhận" />
             </div>
           )}
         </section>

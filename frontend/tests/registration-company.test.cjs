@@ -16,16 +16,16 @@ function load(file, mocks = {}, expose = '') {
 
 const constants = load('frontend/src/features/registration/tt25Constants.ts');
 const http = load('supabase/functions/_shared/http.ts');
-const api = load('supabase/functions/register/index.ts', { '../_shared/http.ts': http }, '\nexports.parsePayload = parsePayload; exports.isValidPayload = isValidPayload;');
+const api = load('supabase/functions/register/index.ts', { '../_shared/http.ts': http }, '\nexports.parsePayload = parsePayload; exports.getInvalidPayloadField = getInvalidPayloadField;');
 const validCustomer = { branch: 'q1', fullName: 'Nguyễn Văn A', phoneNumber: '0901234567', birthDate: '2000-01-01', gender: 'Nam', cccd: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', addressDetail: '123 đường A' };
 
 test('company checkups require a nonblank company in both the form policy and registration API', () => {
   for (const reason of [constants.CHECKUP_REASONS[0], 'Khám sức khỏe định kì theo công ty']) {
     assert.equal(constants.requiresCompanyName(reason), true);
-    assert.equal(api.isValidPayload(api.parsePayload({ ...validCustomer, checkupReason: reason, companyName: '  ' })), false);
+    assert.equal(api.getInvalidPayloadField(api.parsePayload({ ...validCustomer, checkupReason: reason, companyName: '  ' })), 'companyName');
     const payload = api.parsePayload({ ...validCustomer, checkupReason: reason, companyName: ' DYM MEDICAL ' });
     assert.equal(payload.companyName, 'DYM MEDICAL');
-    assert.equal(api.isValidPayload(payload), true);
+    assert.equal(api.getInvalidPayloadField(payload), undefined);
   }
 });
 
@@ -35,7 +35,7 @@ test('Work Permit and personal checkups leave company blank unless one is entere
     for (const company of ['', '  ', ' Công ty ABC ']) {
       const payload = api.parsePayload({ ...validCustomer, checkupReason: reason, companyName: company });
       assert.equal(payload.companyName, company.trim());
-      assert.equal(api.isValidPayload(payload), true);
+      assert.equal(api.getInvalidPayloadField(payload), undefined);
     }
     assert.equal(api.parsePayload({ ...validCustomer, checkupReason: reason }).companyName, '');
   }
@@ -50,7 +50,7 @@ test('only Work Permit accepts a blank phone number, and supplied numbers are va
       ['123', false], ['abc', false], ['0901234567', true],
     ]) {
       const payload = api.parsePayload({ ...validCustomer, companyName: 'DYM MEDICAL', checkupReason, phoneNumber });
-      assert.equal(Boolean(payload && api.isValidPayload(payload)), valid, JSON.stringify({ checkupReason, phoneNumber }));
+      assert.equal(Boolean(payload && !api.getInvalidPayloadField(payload)), valid, JSON.stringify({ checkupReason, phoneNumber }));
     }
   }
 });
@@ -69,32 +69,37 @@ test('explicit passports bypass CCCD format, while CCCD and legacy submissions r
   ]) {
     const data = { ...validCustomer, checkupReason, identityDocumentType, cccd };
     const payload = api.parsePayload(data);
-    assert.equal(Boolean(payload && api.isValidPayload(payload)), valid);
+    assert.equal(Boolean(payload && !api.getInvalidPayloadField(payload)), valid);
     assert.equal(validator.validateVietnamCccd(data) === null, valid);
   }
 });
 
+async function installRegistrationSchema(db) {
+  const migration = (name) => fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8');
+  await db.exec(`
+    create schema auth;
+    create table auth.users (id uuid primary key);
+    create function auth.uid() returns uuid language sql as $$ select '00000000-0000-4000-8000-000000000001'::uuid $$;
+    create function public.can_access_branch(uuid) returns boolean language sql as $$ select true $$;
+    insert into auth.users values (auth.uid());
+    create role anon; create role authenticated; create role service_role;
+  `);
+  const schema = migration('20260728091142_initial_queue_schema.sql');
+  await db.exec(schema.slice(schema.indexOf('create type'), schema.indexOf('create index')));
+  await db.exec(`
+    alter table public.registrations add column tt25_data jsonb default '{}'::jsonb;
+    insert into public.branches (code, name, short_name) values ('q1', 'Quận 1', 'Q1'), ('q7', 'Quận 7', 'Q7');
+  `);
+  await db.exec(migration('20261101090000_add_registration_qr_sessions.sql'));
+  await db.exec(migration('20261119150000_allow_blank_work_permit_phone.sql'));
+  await db.exec(migration('20261120100000_allow_explicit_passport_format.sql'));
+  return migration;
+}
+
 test('database issues and updates a Work Permit registration with a blank phone and an explicit passport', async () => {
   const db = new PGlite();
-  const migration = (name) => fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8');
   try {
-    await db.exec(`
-      create schema auth;
-      create table auth.users (id uuid primary key);
-      create function auth.uid() returns uuid language sql as $$ select '00000000-0000-4000-8000-000000000001'::uuid $$;
-      create function public.can_access_branch(uuid) returns boolean language sql as $$ select true $$;
-      insert into auth.users values (auth.uid());
-      create role anon; create role authenticated; create role service_role;
-    `);
-    const schema = migration('20260728091142_initial_queue_schema.sql');
-    await db.exec(schema.slice(schema.indexOf('create type'), schema.indexOf('create index')));
-    await db.exec(`
-      alter table public.registrations add column tt25_data jsonb default '{}'::jsonb;
-      insert into public.branches (code, name, short_name) values ('q1', 'Quận 1', 'Q1');
-    `);
-    await db.exec(migration('20261101090000_add_registration_qr_sessions.sql'));
-    await db.exec(migration('20261119150000_allow_blank_work_permit_phone.sql'));
-    await db.exec(migration('20261120100000_allow_explicit_passport_format.sql'));
+    await installRegistrationSchema(db);
     const hash = 'a'.repeat(64);
     await db.query(`
       insert into public.registration_access_sessions(token_hash, branch_id, expires_at)
@@ -118,6 +123,44 @@ test('database issues and updates a Work Permit registration with a blank phone 
     `, [id]);
     assert.deepEqual((await db.query('select full_name, phone_number, identity_document from public.registrations where id = $1', [id])).rows,
       [{ full_name: 'Nguyễn Văn B', phone_number: '', identity_document: '123-45 / XY' }]);
+  } finally {
+    await db.close();
+  }
+});
+
+test('CCCD and passport numbers each have a one-hour cooldown per branch', async () => {
+  const db = new PGlite();
+  try {
+    const migration = await installRegistrationSchema(db);
+    const cccd = '001200123456';
+    const passport = 'B1234567';
+    const issue = (branch, document, phone, fingerprint, identityDocumentType) => db.query(`
+      select * from public.issue_registration(
+        $1, 'Khách thử', '2000-01-01', 'Nam', $2, $3, '', 'Hà Nội', 'Cầu Giấy',
+        '123 Đường A', $4, 600, $5
+      )
+    `, [branch, phone, document, fingerprint.repeat(64), identityDocumentType ? { identityDocumentType } : {}]);
+
+    const firstCccd = (await issue('q1', cccd, '0901234567', 'a')).rows[0];
+    const firstPassport = (await issue('q1', passport, '0901234567', 'p')).rows[0];
+    await db.exec("update public.registrations set registered_at = clock_timestamp() - interval '30 minutes'");
+    await db.exec(migration('20261121110000_limit_repeat_identity_document_by_branch.sql'));
+
+    const cooldownError = (type) => (error) =>
+      error.message === 'IDENTITY_DOCUMENT_COOLDOWN' && error.hint === type
+      && Number(error.detail) > 1700 && Number(error.detail) <= 1800;
+    await assert.rejects(issue('q1', cccd, '0911234567', 'b', 'cccd'), cooldownError('cccd'));
+    await assert.rejects(issue('q1', ' b1234567 ', '0911234567', 's', 'passport'), cooldownError('passport'));
+    assert.equal((await issue('q7', cccd, '0911234567', 'c', 'cccd')).rows.length, 1);
+    assert.equal((await issue('q7', passport, '0911234567', 't', 'passport')).rows.length, 1);
+    assert.equal((await issue('q1', '001200123457', '0911234567', 'd', 'cccd')).rows.length, 1);
+
+    await db.query("update public.registrations set registered_at = clock_timestamp() - interval '61 minutes' where id in ($1, $2)", [firstCccd.registration_id, firstPassport.registration_id]);
+    assert.equal((await issue('q1', cccd, '0911234567', 'b', 'cccd')).rows.length, 1);
+    assert.equal((await issue('q1', passport, '0911234567', 's', 'passport')).rows.length, 1);
+    assert.equal((await issue('q1', cccd, '0911234567', 'e', 'passport')).rows.length, 1);
+    await assert.rejects(issue('q1', cccd, '0911234567', 'f', 'passport'), (error) =>
+      error.message === 'IDENTITY_DOCUMENT_COOLDOWN' && error.hint === 'passport');
   } finally {
     await db.close();
   }

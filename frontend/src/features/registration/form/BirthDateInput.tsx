@@ -124,6 +124,7 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
     <div className="relative flex items-center w-full min-w-0">
       <input
         id={id}
+        aria-invalid={Boolean(error)}
         type="text"
         inputMode="numeric"
         value={displayValue}

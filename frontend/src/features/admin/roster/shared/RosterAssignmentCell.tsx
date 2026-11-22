@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { SearchField } from '@/components/search-field';
 import { PermissionModuleContext } from '../../shared/useStaffPermissions';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -17,6 +17,7 @@ import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/componen
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
@@ -105,6 +106,7 @@ export function RosterAssignmentCell({
 }: RosterAssignmentCellProps) {
   const { can } = useStaffPermissions();
   const titleId = useId();
+  const popoverAnchor = useRef<HTMLButtonElement | null>(null);
   const module = useContext(PermissionModuleContext) ?? 'clinic';
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(
     null,
@@ -230,7 +232,6 @@ export function RosterAssignmentCell({
   };
 
   const closePopover = () => {
-    setEditingAssignmentId(null);
     onOpenChange(false);
   };
 
@@ -378,7 +379,17 @@ export function RosterAssignmentCell({
             >
               <button
                 type="button"
-                disabled={!can(module, 'update') && !can(module, 'delete')} onClick={() => openEditPopover(assign)}
+                disabled={!can(module, 'update') && !can(module, 'delete')}
+                aria-haspopup="dialog"
+                aria-expanded={isEditingThisChip}
+                onClick={(event) => {
+                  if (isEditingThisChip) {
+                    closePopover();
+                    return;
+                  }
+                  popoverAnchor.current = event.currentTarget;
+                  openEditPopover(assign);
+                }}
                 className="dym-assignment-edit inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
                 title={chipTooltip}
               >
@@ -440,11 +451,20 @@ export function RosterAssignmentCell({
           }
         }}
       >
+        <PopoverAnchor virtualRef={popoverAnchor} />
         <PopoverTrigger asChild>
           <Button permissionAction="create"
             type="button"
             variant="outline"
             size="sm"
+            aria-expanded={isOpen && !editingAssignmentId}
+            onClick={(event) => {
+              popoverAnchor.current = event.currentTarget;
+              if (isOpen && editingAssignmentId) {
+                event.preventDefault();
+                openAddPopover();
+              }
+            }}
             className={cn(
               'h-8 gap-1 px-3 text-[13px] font-medium',
               !hasStaff
@@ -461,6 +481,20 @@ export function RosterAssignmentCell({
           sideOffset={8}
           collisionPadding={16}
           aria-labelledby={titleId}
+          onInteractOutside={(event) => {
+            const target = event.target;
+            const cell = popoverAnchor.current?.closest('.dym-assignment-cell');
+            if (target instanceof Element && cell?.contains(target.closest('.dym-assignment-edit'))) {
+              event.preventDefault();
+            }
+          }}
+          onCloseAutoFocus={(event) => {
+            const anchor = popoverAnchor.current;
+            if (anchor?.isConnected && document.activeElement === document.body) {
+              event.preventDefault();
+              anchor.focus({ preventScroll: true });
+            }
+          }}
           className="dym-assignment-popover"
         >
           <form
@@ -470,7 +504,7 @@ export function RosterAssignmentCell({
             <div className="dym-assignment-header">
               <div>
                 <h3 id={titleId}>{editingAssignmentId ? 'Sửa ca trực' : 'Thêm nhân sự'}</h3>
-                <p>{targetLabel}</p>
+                <p>{targetLabel}{editingAssignment && ` · ${formatAssignmentShift(editingAssignment)}`}</p>
               </div>
               {selectedPerson && (
                 <Badge

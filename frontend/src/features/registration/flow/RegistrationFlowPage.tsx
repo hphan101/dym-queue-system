@@ -186,6 +186,9 @@ export function RegistrationFlowPage() {
         } catch { /* Registration is already saved on the server. */ }
       } else {
         if (result?.code === 'REGISTRATION_SESSION_INVALID' || result?.code === 'REGISTRATION_SESSION_EXPIRED') access.invalidate();
+        if (result?.code === 'INVALID_DATA') {
+          return result;
+        }
         throw new Error(result?.error || translations[lang].saveError);
       }
     } catch (err: unknown) {
@@ -197,6 +200,7 @@ export function RegistrationFlowPage() {
             ? err.message
             : translations[lang].networkError,
       );
+      window.scrollTo({ top: 0, behavior: 'auto' });
     } finally {
       window.clearTimeout(requestTimeout);
       finishLoading();

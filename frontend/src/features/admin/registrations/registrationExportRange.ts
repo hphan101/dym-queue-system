@@ -1,6 +1,6 @@
-import { supabase } from '../../../lib/supabaseClient';
 import type { BranchCode } from '../../../types/domain';
 import type { RegistrationDetails } from './types';
+import { fetchRegistrationDay } from './useRegistrationDetailsQuery';
 
 export type RegistrationExportPeriod = 'week' | 'month';
 
@@ -26,27 +26,12 @@ export function getRegistrationExportDates(date: string, period: RegistrationExp
   return days;
 }
 
-const PAGE_SIZE = 1000;
 const CONCURRENT_DAYS = 4;
-
-async function fetchExportDay(branch: BranchCode, date: string): Promise<RegistrationDetails[]> {
-  const rows: RegistrationDetails[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .rpc('get_registration_details', { p_branch_code: branch, p_queue_date: date })
-      .order('queue_number')
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (error) throw error;
-    const page = (data ?? []) as RegistrationDetails[];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) return rows;
-  }
-}
 
 export async function fetchRegistrationExportRows(branch: BranchCode, dates: string[]): Promise<RegistrationDetails[]> {
   const rows: RegistrationDetails[] = [];
   for (let index = 0; index < dates.length; index += CONCURRENT_DAYS) {
-    const batch = await Promise.all(dates.slice(index, index + CONCURRENT_DAYS).map((date) => fetchExportDay(branch, date)));
+    const batch = await Promise.all(dates.slice(index, index + CONCURRENT_DAYS).map((date) => fetchRegistrationDay(branch, date)));
     for (const day of batch) rows.push(...day);
   }
   return rows;

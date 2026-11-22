@@ -206,6 +206,29 @@ test('editing a profile cannot overwrite print status from another workstation',
   assert.equal(extras.printedTT25, false);
 });
 
+test('reception fetches rows beyond the API response limit', async () => {
+  const rows = Array.from({ length: 1001 }, (_, index) => ({ queue_number: index + 1 }));
+  const ranges = [];
+  const { fetchRegistrationPages } = load('features/admin/shared/fetchRegistrationPages.ts', {
+    '../../../lib/supabaseClient': { supabase: {
+      rpc: (name) => {
+        assert.equal(name, 'get_dashboard_registrations');
+        return { order: (column) => {
+          assert.equal(column, 'queue_number');
+          return { range: async (first, last) => {
+            ranges.push([first, last]);
+            return { data: rows.slice(first, last + 1), error: null };
+          } };
+        } };
+      },
+    } },
+  });
+
+  const result = await fetchRegistrationPages('get_dashboard_registrations', 'q1', '2026-11-21');
+  assert.deepEqual(Array.from(result), rows);
+  assert.deepEqual(ranges, [[0, 999], [1000, 1999]]);
+});
+
 test('reception prints the latest server record and ignores obsolete browser overrides', async () => {
   const harness = reactHarness();
   const oldStorage = storage();
@@ -233,19 +256,24 @@ test('reception prints the latest server record and ignores obsolete browser ove
       createDefaultTT25Data: (data) => data,
       getDefaultTargetPaymentByReason: () => ({}),
     },
-    '../../../lib/supabaseClient': { supabase: { rpc: async () => ({
-      data: [{ id: row.id, full_name: 'Latest server name', birth_date: '2000-01-01',
-        gender: 'Nữ', phone_number: row.phone, company_name: '', queue_date: row.date,
-        tt25_data: { pregnancyStatus: 'suspected' },
-        identity_document: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', address_detail: '123 đường A' }],
-      error: null,
+    '../../../lib/supabaseClient': { supabase: { rpc: () => ({
+      eq: (column, value) => {
+        assert.equal(column, 'id');
+        assert.equal(value, row.id);
+        return { maybeSingle: async () => ({
+          data: { id: row.id, full_name: 'Latest server name', birth_date: '2000-01-01',
+            gender: 'Nữ', phone_number: row.phone, company_name: '', queue_date: row.date,
+            tt25_data: { pregnancyStatus: 'suspected' },
+            identity_document: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', address_detail: '123 đường A' },
+          error: null,
+        }) };
+      },
     }) } },
   }, { window: { sessionStorage: oldStorage, localStorage: oldStorage } });
   const tree = QueueTable({
-    statusFilter: 'all', pageSize: 20,
-    filteredRows: [row], paginatedRows: [row], query: '', branchName: 'Q1',
-    date: row.date, today: row.date, visiblePage: 1, totalPages: 1,
-    firstVisibleRow: 1, lastVisibleRow: 1,
+    statusFilter: 'all',
+    filteredRows: [row], query: '', resultQuery: '', branchName: 'Q1',
+    date: row.date, today: row.date,
   });
   elements(tree).find((n) => n.props?.title === 'In phiếu khám sức khỏe TT25').props.onClick();
   await new Promise(setImmediate);

@@ -1,8 +1,7 @@
 import { SearchField } from '@/components/search-field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
-import { NumberedPagination } from '@/components/numbered-pagination';
-import { lazy, Suspense, useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useId, useMemo, useState } from 'react';
 import {
   ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
@@ -43,53 +42,44 @@ export interface RegistrationRow {
 }
 
 interface QueueTableProps {
-  pageSize: number;
-  onPageSizeChange: (size: number) => void;
   statusFilter: TableStatusFilter;
   onStatusFilterChange: (status: TableStatusFilter) => void;
   filteredRows: RegistrationRow[];
-  paginatedRows: RegistrationRow[];
   query: string;
+  resultQuery: string;
   onQueryChange: (query: string) => void;
+  canSearchIdentity: boolean;
+  hasIdentitySearchError: boolean;
   isDataLoading: boolean;
   isMutating: boolean;
   pendingUndoId: string | null;
   branchName: string;
   date: string;
   today: string;
-  visiblePage: number;
-  totalPages: number;
-  firstVisibleRow: number;
-  lastVisibleRow: number;
-  onPageChange: (page: number) => void;
   onReturnToWaiting: (row: RegistrationRow) => void;
 }
 
 type TableStatusFilter = 'all' | 'waiting' | 'called';
 
 export function QueueTable({
-  pageSize,
-  onPageSizeChange,
   statusFilter,
   onStatusFilterChange,
   filteredRows,
-  paginatedRows,
   query,
+  resultQuery,
   onQueryChange,
+  canSearchIdentity,
+  hasIdentitySearchError,
   isDataLoading,
   isMutating,
   pendingUndoId,
   branchName,
   date,
   today,
-  visiblePage,
-  totalPages,
-  firstVisibleRow,
-  lastVisibleRow,
-  onPageChange,
   onReturnToWaiting,
 }: QueueTableProps) {
   const { can } = useStaffPermissions();
+  const canPrint = can('printing');
   const searchInputId = useId();
   const [printModalData, setPrintModalData] = useState<TT25RegistrationData | null>(null);
   const [consentModalData, setConsentModalData] = useState<TT25RegistrationData | null>(null);
@@ -98,32 +88,27 @@ export function QueueTable({
   const [printError, setPrintError] = useState<string | null>(null);
   const { getStatus, markPrinted } = usePrintStatus();
 
-  const fetchRowPrintData = async (row: RegistrationRow): Promise<TT25RegistrationData> => {
-    if (!can('printing')) throw new Error('Tài khoản chưa được cấp quyền in hồ sơ.');
+  const fetchRowPrintData = useCallback(async (row: RegistrationRow): Promise<TT25RegistrationData> => {
+    if (!canPrint) throw new Error('Tài khoản chưa được cấp quyền in hồ sơ.');
     try {
-      const { data: detailsList, error } = await supabase.rpc(
+      const { data, error } = await supabase.rpc(
         'get_registration_details',
         {
           p_branch_code: row.branch,
           p_queue_date: row.date,
         },
-      );
+      ).eq('id', row.id).maybeSingle();
 
       if (error) throw error;
-
-      const match = (detailsList as RegistrationDetails[] | null)?.find(
-        (r) => r.id === row.id,
-      );
-
-      if (!match) throw new Error('REGISTRATION_NOT_FOUND');
-      return buildPrintData(match, row.branch);
+      if (!data) throw new Error('REGISTRATION_NOT_FOUND');
+      return buildPrintData(data as RegistrationDetails, row.branch);
     } catch (err) {
       console.error('Error getting print details:', err);
       throw new Error('Không thể tải hồ sơ mới nhất để in. Vui lòng thử lại.');
     }
-  };
+  }, [canPrint]);
 
-  const handlePrintClick = async (row: RegistrationRow) => {
+  const handlePrintClick = useCallback(async (row: RegistrationRow) => {
     setLoadingPrintId(`tt25:${row.id}`);
     setPrintError(null);
     try {
@@ -135,9 +120,9 @@ export function QueueTable({
     } finally {
       setLoadingPrintId(null);
     }
-  };
+  }, [fetchRowPrintData]);
 
-  const handlePrintConsentClick = async (row: RegistrationRow) => {
+  const handlePrintConsentClick = useCallback(async (row: RegistrationRow) => {
     setLoadingPrintId(`consent:${row.id}`);
     setPrintError(null);
     try {
@@ -149,7 +134,7 @@ export function QueueTable({
     } finally {
       setLoadingPrintId(null);
     }
-  };
+  }, [fetchRowPrintData]);
 
   // Compute status counts for quick tabs
   const tabCounts = useMemo(() => {
@@ -164,12 +149,151 @@ export function QueueTable({
     );
   }, [filteredRows]);
 
-  // Apply tab filter on rows
-  const displayedRows = paginatedRows;
+  const displayedRows = useMemo(
+    () => statusFilter === 'all' ? filteredRows : filteredRows.filter((row) => row.status === statusFilter),
+    [filteredRows, statusFilter],
+  );
+
+  const tableRows = useMemo(() => displayedRows.map((row) => {
+    const age = calculateAge(row.birthDate);
+    const isCalled = row.status === 'called';
+    const isUndoing = pendingUndoId === row.id;
+    const printStatus = getStatus(row.id, row.tt25_data);
+
+    return (
+      <tr
+        key={row.id}
+        className={`dym-table-row ${isCalled ? 'row-called' : 'row-waiting'}`}
+      >
+        {/* Ticket Code */}
+        <td className="col-ticket">
+          <span className="dym-ticket-tag" data-parity={Number(row.queueNumber) % 2 === 0 ? 'even' : 'odd'}>
+            <HighlightText text={row.queueNumber} query={resultQuery} />
+          </span>
+        </td>
+
+        {/* Time */}
+        <td className="col-time">
+          <div className="dym-time-cell">
+            <span>{row.registeredAt}</span>
+          </div>
+        </td>
+
+        {/* Patient Name & Demographics */}
+        <td className="col-patient">
+          <div className="dym-patient-block">
+            <strong className="dym-patient-name">
+              <HighlightText text={row.fullName} query={resultQuery} />
+            </strong>
+            <div className="dym-patient-meta">
+              <span className="dym-meta-gender">{row.gender}</span>
+              {age !== null && (
+                <span className="dym-meta-age">
+                  {age} tuổi ({row.birthDate})
+                </span>
+              )}
+            </div>
+          </div>
+        </td>
+
+        {/* Contact Phone */}
+        <td className="col-contact">
+          <span className="dym-phone-text">
+            <HighlightText text={formatPhone(row.phone)} query={resultQuery} />
+          </span>
+        </td>
+
+        {/* Company / Corporate Health check */}
+        <td className="col-company">
+          {row.companyName && row.companyName !== '—' ? (
+            <div className="dym-company-pill" title={row.companyName}>
+              <span className="truncate">{row.companyName}</span>
+            </div>
+          ) : (
+            <span className="text-slate-300 font-light">—</span>
+          )}
+        </td>
+
+        {/* Status Badge */}
+        <td className="col-status">
+          <span
+            className={`dym-status-badge ${
+              isCalled ? 'badge-called' : 'badge-waiting'
+            }`}
+          >
+            <span className="dym-status-indicator-dot" />
+            {STATUS_META[row.status].label}
+          </span>
+        </td>
+
+        {/* Print Status Badge */}
+        <td className="col-print-status">
+          <span
+            title={printStatus.title}
+            className={`dym-status-badge ${printStatus.cls}`}
+          >
+            <span className="dym-status-indicator-dot" />
+            {printStatus.label}
+          </span>
+        </td>
+
+        {/* Actions */}
+        <td className="col-actions text-right">
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              className="dym-btn-table-action"
+              aria-label={`In phiếu Đồng thuận cho ${row.fullName}`}
+              title="In phiếu Đồng thuận khám sức khỏe"
+              disabled={loadingPrintId === `consent:${row.id}`}
+              onClick={() => void handlePrintConsentClick(row)}
+            >
+              <span>
+                {loadingPrintId === `consent:${row.id}` ? 'Đang nạp...' : 'In Đồng thuận'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="dym-btn-table-action"
+              aria-label={`In phiếu khám TT25 cho ${row.fullName}`}
+              title="In phiếu khám sức khỏe TT25"
+              disabled={loadingPrintId === `tt25:${row.id}`}
+              onClick={() => void handlePrintClick(row)}
+            >
+              <span>
+                {loadingPrintId === `tt25:${row.id}` ? 'Đang nạp...' : 'In TT25'}
+              </span>
+            </button>
+
+            {isCalled && date === today && (
+              <button
+                type="button"
+                className="dym-btn-undo"
+                aria-label={`Đưa số ${row.queueNumber} của ${row.fullName} về hàng chờ`}
+                disabled={isMutating}
+                data-loading={isUndoing}
+                onClick={() => onReturnToWaiting(row)}
+              >
+                <ArrowUturnLeftIcon
+                  className={`w-3.5 h-3.5 ${isUndoing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                <span>{isUndoing ? 'Đang hoàn tác...' : 'Đưa về chờ'}</span>
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  }), [date, displayedRows, getStatus, handlePrintClick, handlePrintConsentClick, isMutating, loadingPrintId, onReturnToWaiting, pendingUndoId, resultQuery, today]);
 
   return (
     <section className="dym-registry-panel" aria-labelledby="registry-ledger-title">
       {printError && <Alert variant="destructive"><AlertDescription>{printError}</AlertDescription></Alert>}
+      {hasIdentitySearchError && (
+        <Alert variant="warning"><AlertDescription>Chưa tải được dữ liệu để tìm theo CCCD hoặc hộ chiếu.</AlertDescription></Alert>
+      )}
       {/* Top Toolbar */}
       <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
         <div className="dym-registry-title-block">
@@ -241,7 +365,7 @@ export function QueueTable({
           {/* Search Box (shadcn Input + Clear Button / Kbd) */}
           <SearchField
                 id={searchInputId}
-                placeholder="Tìm tên, SĐT, số thứ tự, công ty..."
+                placeholder={canSearchIdentity ? 'Tìm số phiếu, tên, SĐT, CCCD/hộ chiếu…' : 'Tìm số phiếu, tên, SĐT…'}
                 value={query}
                 onChange={(e) => onQueryChange(e.target.value)}
                 aria-label="Tìm kiếm lượt đăng ký"
@@ -321,7 +445,7 @@ export function QueueTable({
           </h3>
           <p className="dym-empty-desc">
             {query
-              ? 'Kiểm tra lại tên, số điện thoại hoặc số thứ tự, hoặc đặt lại bộ lọc.'
+              ? 'Kiểm tra từ khóa hoặc đặt lại bộ lọc.'
               : statusFilter !== 'all'
                 ? 'Chọn Tất cả để xem lại danh sách khách hàng trong ngày.'
                 : 'Khách đăng ký tại quầy hoặc qua mã QR sẽ xuất hiện tại đây.'}
@@ -356,155 +480,15 @@ export function QueueTable({
                 </tr>
               </thead>
               <tbody>
-                {displayedRows.map((row) => {
-                  const age = calculateAge(row.birthDate);
-                  const isCalled = row.status === 'called';
-                  const isUndoing = pendingUndoId === row.id;
-                  const printStatus = getStatus(row.id, row.tt25_data);
-
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`dym-table-row ${isCalled ? 'row-called' : 'row-waiting'}`}
-                    >
-                      {/* Ticket Code */}
-                      <td className="col-ticket">
-                        <span className="dym-ticket-tag" data-parity={Number(row.queueNumber) % 2 === 0 ? 'even' : 'odd'}>
-                          <HighlightText text={row.queueNumber} query={query} />
-                        </span>
-                      </td>
-
-                      {/* Time */}
-                      <td className="col-time">
-                        <div className="dym-time-cell">
-                          <span>{row.registeredAt}</span>
-                        </div>
-                      </td>
-
-                      {/* Patient Name & Demographics */}
-                      <td className="col-patient">
-                        <div className="dym-patient-block">
-                          <strong className="dym-patient-name">
-                            <HighlightText text={row.fullName} query={query} />
-                          </strong>
-                          <div className="dym-patient-meta">
-                            <span className="dym-meta-gender">{row.gender}</span>
-                            {age !== null && (
-                              <span className="dym-meta-age">
-                                {age} tuổi (
-                                <HighlightText text={row.birthDate} query={query} />
-                                )
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Contact Phone */}
-                      <td className="col-contact">
-                        <span className="dym-phone-text">
-                          <HighlightText text={formatPhone(row.phone)} query={query} />
-                        </span>
-                      </td>
-
-                      {/* Company / Corporate Health check */}
-                      <td className="col-company">
-                        {row.companyName && row.companyName !== '—' ? (
-                          <div className="dym-company-pill" title={row.companyName}>
-                            <span className="truncate">
-                              <HighlightText text={row.companyName} query={query} />
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
-
-                      {/* Status Badge */}
-                      <td className="col-status">
-                        <span
-                          className={`dym-status-badge ${
-                            isCalled ? 'badge-called' : 'badge-waiting'
-                          }`}
-                        >
-                          <span className="dym-status-indicator-dot" />
-                          {STATUS_META[row.status].label}
-                        </span>
-                      </td>
-
-                      {/* Print Status Badge */}
-                      <td className="col-print-status">
-                        <span
-                          title={printStatus.title}
-                          className={`dym-status-badge ${printStatus.cls}`}
-                        >
-                          <span className="dym-status-indicator-dot" />
-                          {printStatus.label}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="col-actions text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            className="dym-btn-table-action"
-                            aria-label={`In phiếu Đồng thuận cho ${row.fullName}`}
-                            title="In phiếu Đồng thuận khám sức khỏe"
-                            disabled={loadingPrintId === `consent:${row.id}`}
-                            onClick={() => void handlePrintConsentClick(row)}
-                          >
-                            <span>
-                              {loadingPrintId === `consent:${row.id}` ? 'Đang nạp...' : 'In Đồng thuận'}
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            className="dym-btn-table-action"
-                            aria-label={`In phiếu khám TT25 cho ${row.fullName}`}
-                            title="In phiếu khám sức khỏe TT25"
-                            disabled={loadingPrintId === `tt25:${row.id}`}
-                            onClick={() => void handlePrintClick(row)}
-                          >
-                            <span>
-                              {loadingPrintId === `tt25:${row.id}` ? 'Đang nạp...' : 'In TT25'}
-                            </span>
-                          </button>
-
-                          {isCalled && date === today && (
-                            <button
-                              type="button"
-                              className="dym-btn-undo"
-                              aria-label={`Đưa số ${row.queueNumber} của ${row.fullName} về hàng chờ`}
-                              disabled={isMutating}
-                              data-loading={isUndoing}
-                              onClick={() => onReturnToWaiting(row)}
-                            >
-                              <ArrowUturnLeftIcon
-                                className={`w-3.5 h-3.5 ${isUndoing ? 'animate-spin' : ''}`}
-                                aria-hidden="true"
-                              />
-                              <span>{isUndoing ? 'Đang hoàn tác...' : 'Đưa về chờ'}</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {tableRows}
               </tbody>
             </table>
           </div>
 
-          {/* Table Pagination */}
           <div className="dym-pagination-bar">
             <div className="dym-pagination-summary">
-              Hiển thị <strong className="font-semibold text-foreground">{firstVisibleRow}–{lastVisibleRow}</strong> trong tổng số{' '}
-              <strong className="font-semibold text-foreground">{tabCounts[statusFilter]}</strong> lượt khám
+              <strong className="font-semibold text-foreground">{displayedRows.length}</strong> lượt khám
             </div>
-
-            <NumberedPagination currentPage={visiblePage} totalPages={totalPages} onPageChange={onPageChange} pageSize={pageSize} onPageSizeChange={onPageSizeChange} label="Phân trang danh sách tại bàn tiếp nhận" />
           </div>
         </>
       )}

@@ -29,6 +29,7 @@ function loadComponent(file, stateValues, context, category = 'onsite', onStateC
       useContext: () => 'onsite',
       useState(initial) { const current = index++; return [current in stateValues ? stateValues[current] : (initial === 'week' ? 'details' : initial === 'onsite' ? category : typeof initial === 'function' ? initial() : initial), (value) => onStateChange(current, value)]; },
       useMemo: (callback) => callback(), useEffect() {}, useId: () => 'test',
+      useRef: (current) => ({ current }),
     };
     if (name === './rosterService') return service;
     if (name === './shiftTime') return compile('shiftTime.ts', () => ({}));

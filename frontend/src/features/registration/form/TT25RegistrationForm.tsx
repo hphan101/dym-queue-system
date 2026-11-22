@@ -3,7 +3,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import {
   Activity,
   Check,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { BranchCode } from '../../../types/domain';
 import type { SupportedLanguage } from '../../../locales/index';
+import type { RegistrationResponse } from '../types';
 import type {
   TT25RegistrationData,
   TT25MedicalHistory,
@@ -49,10 +50,24 @@ import {
 
 const EMAIL_PATTERN = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
+
+const administrativeLabels = {
+  fullName: ['họ và tên', 'full name'],
+  birthDate: ['ngày sinh', 'date of birth'],
+  pregnancyStatus: ['tình trạng mang thai', 'pregnancy status'],
+  phoneNumber: ['số điện thoại', 'phone number'],
+  email: ['email', 'email address'],
+  province: ['tỉnh/thành phố', 'province or city'],
+  ward: ['phường/xã', 'ward or commune'],
+  addressDetail: ['địa chỉ cụ thể', 'street address'],
+  workplace: ['tên công ty', 'company name'],
+} as const;
+
 interface TT25RegistrationFormProps {
   branch: BranchCode;
   isLoading: boolean;
-  onSubmit: (data: TT25RegistrationData) => void;
+  onSubmit: (data: TT25RegistrationData) => Promise<RegistrationResponse | undefined>;
   lang?: SupportedLanguage;
   initialCheckupReason?: string;
 }
@@ -126,6 +141,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
   // Step 1 Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [reviewAdministrative, setReviewAdministrative] = useState(false);
+  const administrativeForm = useRef<HTMLFormElement>(null);
+  const focusInvalid = useRef(false);
+
+  useEffect(() => {
+    if (currentStep !== 1 || !focusInvalid.current) return;
+    focusInvalid.current = false;
+    const input = administrativeForm.current?.querySelector<HTMLElement>(
+      'input[aria-invalid="true"]:not(:disabled), fieldset[aria-invalid="true"] input',
+    );
+    input?.focus({ preventScroll: true });
+    input?.scrollIntoView({ block: 'center' });
+  }, [currentStep, errors]);
 
   useEffect(() => {
     let isMounted = true;
@@ -196,14 +224,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const validateStep1 = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (companyRequired && !workplace.trim()) {
+    if (companyRequired && !companyName) {
       newErrors.workplace = isEn ? 'Please enter your company name' : 'Vui lòng nhập tên công ty';
+    } else if (companyName.normalize('NFC').length > 150 || CONTROL_CHARACTERS.test(companyName)) {
+      newErrors.workplace = isEn ? 'Company name must be 150 characters or fewer on one line' : 'Tên công ty tối đa 150 ký tự và không xuống dòng';
     }
 
-    if (!fullName.trim()) {
+    const cleanName = fullName.trim().normalize('NFC').toUpperCase();
+    if (!cleanName) {
       newErrors.fullName = isEn ? 'Please enter your full name' : 'Vui lòng nhập họ và tên';
-    } else if (fullName.trim().length < 2) {
+    } else if (cleanName.length < 2) {
       newErrors.fullName = isEn ? 'Full name must be at least 2 characters' : 'Họ và tên phải có ít nhất 2 ký tự';
+    } else if (cleanName.length > 100 || CONTROL_CHARACTERS.test(cleanName)) {
+      newErrors.fullName = isEn ? 'Full name must be 100 characters or fewer on one line' : 'Họ và tên tối đa 100 ký tự và không xuống dòng';
     }
 
     if (!birthDate) {
@@ -242,6 +275,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     });
     if (cccdError) {
       newErrors.cccd = cccdError;
+    } else if (isPassport && (cccd.trim().normalize('NFC').toUpperCase().length > 100 || CONTROL_CHARACTERS.test(cccd.trim()))) {
+      newErrors.cccd = isEn ? 'Passport number must be 100 characters or fewer on one line' : 'Số hộ chiếu tối đa 100 ký tự và không xuống dòng';
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
@@ -253,16 +288,20 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
         : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
     }
 
-    if (email.trim() && !EMAIL_PATTERN.test(email.trim())) {
+    if (email.trim() && (email.trim().length > 120 || !EMAIL_PATTERN.test(email.trim()))) {
       newErrors.email = isEn ? 'Please enter a valid email address' : 'Vui lòng nhập email đúng định dạng';
     }
 
     if (!province) newErrors.province = isEn ? 'Please select a Province / City' : 'Vui lòng chọn Tỉnh/Thành phố';
     if (!ward) newErrors.ward = isEn ? 'Please select a Ward / Commune' : 'Vui lòng chọn Phường/Xã';
-    if (!addressDetail.trim()) {
+    const cleanAddress = addressDetail.trim().normalize('NFC');
+    if (!cleanAddress) {
       newErrors.addressDetail = isEn ? 'Please enter your street address' : 'Vui lòng nhập địa chỉ cụ thể';
+    } else if (cleanAddress.length < 3 || cleanAddress.length > 250 || CONTROL_CHARACTERS.test(cleanAddress)) {
+      newErrors.addressDetail = isEn ? 'Street address must contain 3–250 characters on one line' : 'Địa chỉ cụ thể phải có từ 3 đến 250 ký tự và không xuống dòng';
     }
 
+    focusInvalid.current = Object.keys(newErrors).length > 0;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -270,6 +309,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const handleNextToStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateStep1()) {
+      setReviewAdministrative(false);
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -291,8 +331,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     .filter(Boolean)
     .join(', ');
 
-  const handleFinalSubmit = (e: React.FormEvent) => {
+  const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || !medicalHistory.commitmentAgreed) return;
+    if (!validateStep1()) {
+      setCurrentStep(1);
+      return;
+    }
     const finalData: TT25RegistrationData = {
       branch,
       fullName: fullName.trim().toUpperCase(),
@@ -322,7 +367,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       },
     };
 
-    onSubmit(finalData);
+    const response = await onSubmit(finalData);
+    if (response?.code === 'INVALID_DATA') {
+      setReviewAdministrative(true);
+      const field = response.field === 'companyName' ? 'workplace' : response.field;
+      const labels = field && Object.hasOwn(administrativeLabels, field)
+        ? administrativeLabels[field as keyof typeof administrativeLabels]
+        : undefined;
+      const label = field === 'cccd' ? identityLabel.toLowerCase() : labels?.[isEn ? 1 : 0];
+      if (field && label) {
+        focusInvalid.current = true;
+        setErrors({ [field]: isEn ? `Please check your ${label}` : `Vui lòng kiểm tra lại ${label}` });
+      }
+      setCurrentStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   };
 
   return (
@@ -358,7 +417,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             ] as const).map((item) => {
               const isCompleted = currentStep > item.step;
               const isCurrent = currentStep === item.step;
-              const isClickable = item.step < currentStep;
+              const isClickable = item.step < currentStep && !isLoading;
 
               return (
                 <button
@@ -411,10 +470,15 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
       {/* ================================= STEP 1: HÀNH CHÍNH ================================= */}
       {currentStep === 1 && (
-        <form onSubmit={handleNextToStep2} className="space-y-4 animate-fade-in">
+        <form ref={administrativeForm} noValidate onSubmit={handleNextToStep2} className="space-y-4 animate-fade-in">
           <h2 className="sr-only">
             {isEn ? '1. Administrative Information' : '1. Thông tin hành chính'}
           </h2>
+          {reviewAdministrative && (
+            <Alert variant="destructive"><AlertDescription>
+              {isEn ? 'Please review your administrative information and try again.' : 'Vui lòng kiểm tra thông tin hành chính rồi gửi lại.'}
+            </AlertDescription></Alert>
+          )}
           <div className="bg-accent/60 border border-border rounded-md p-3 text-xs text-foreground flex items-start gap-2">
             <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p>
@@ -435,6 +499,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               autoComplete="name"
               enterKeyHint="next"
               value={fullName}
+              aria-invalid={Boolean(errors.fullName)}
+              maxLength={100}
               onChange={(e) => {
                 setFullName(e.target.value);
                 if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: '' }));
@@ -710,6 +776,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               <input
                 type="text"
                 value={addressDetail}
+                aria-invalid={Boolean(errors.addressDetail)}
+                maxLength={250}
                 onChange={(e) => {
                   setAddressDetail(e.target.value);
                   if (errors.addressDetail) setErrors((prev) => ({ ...prev, addressDetail: '' }));
@@ -818,6 +886,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               autoComplete="tel"
               enterKeyHint="next"
               value={phoneNumber}
+              aria-invalid={Boolean(errors.phoneNumber)}
               onChange={(e) => {
                 setPhoneNumber(e.target.value);
                 if (errors.phoneNumber) setErrors((prev) => ({ ...prev, phoneNumber: '' }));
@@ -852,10 +921,6 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               onChange={(event) => {
                 setEmail(event.target.value);
                 if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
-              }}
-              onInvalid={(event) => {
-                event.preventDefault();
-                validateStep1();
               }}
             />
             {errors.email && <FieldError id={`${emailId}-error`} className="text-xs">{errors.email}</FieldError>}
@@ -931,6 +996,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <input
                   type="text"
                   value={medicalHistory.familyHistory.diseaseDetails}
+                  maxLength={300}
                   onChange={(e) =>
                     setMedicalHistory((prev) => ({
                       ...prev,
@@ -1014,6 +1080,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <input
                   type="text"
                   value={medicalHistory.personalOtherDetails}
+                  maxLength={300}
                   onChange={(e) =>
                     setMedicalHistory((prev) => ({
                       ...prev,
@@ -1079,6 +1146,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   <input
                     type="text"
                     value={medicalHistory.currentTreatment.medications}
+                    maxLength={300}
                     onChange={(e) =>
                       setMedicalHistory((prev) => ({
                         ...prev,
@@ -1141,6 +1209,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     <input
                       type="text"
                       value={medicalHistory.pregnancyHistory?.details || ''}
+                      maxLength={300}
                       onChange={(e) =>
                         setMedicalHistory((prev) => ({
                           ...prev,
@@ -1279,6 +1348,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <input
                   type="text"
                   value={targetPayment.targetOtherDetails}
+                  maxLength={200}
                   onChange={(e) =>
                     setTargetPayment((prev) => ({
                       ...prev,
@@ -1362,6 +1432,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <input
                   type="text"
                   value={targetPayment.paymentOtherDetails}
+                  maxLength={200}
                   onChange={(e) =>
                     setTargetPayment((prev) => ({
                       ...prev,
@@ -1456,6 +1527,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 ? 'Health Checkup Registration Summary (Circular 25)'
                 : 'Tóm tắt hồ sơ khám sức khỏe Thông tư 25'}
             </h3>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => {
+                setCurrentStep(1);
+                window.scrollTo({ top: 0, behavior: 'auto' });
+              }}
+            >
+              {isEn ? 'Edit administrative information' : 'Sửa thông tin hành chính'}
+            </Button>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div>
@@ -1628,6 +1712,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             <Button
               type="button"
               variant="outline"
+              disabled={isLoading}
               onClick={() => setCurrentStep(3)}
               className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >

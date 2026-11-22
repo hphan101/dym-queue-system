@@ -21,27 +21,26 @@ new Function('exports', 'require', code)(exportsForTable, name => {
   return generic;
 });
 
-test('Shift click selects the visible range in either direction and falls back when the anchor is off-page', () => {
+const isCheckbox = node => node.type === 'checkbox' || (node.type === 'input' && node.props.type === 'checkbox');
+const changeRowCheck = (node, checked, shiftKey = false) => node.props.onChange({ currentTarget: { checked }, nativeEvent: { shiftKey } });
+
+test('Shift click selects the visible range in either direction and falls back when the anchor is filtered out', () => {
   const calls = [];
   const rows = ['a', 'b', 'c', 'd'].map(id => ({ id, full_name: id }));
   const render = (checkedIds, pageRows = rows) => nodes(exportsForTable.RegistrationsTable({
     rows: pageRows, checkedIds: new Set(checkedIds), onToggleChecked: (...args) => calls.push(args),
-  })).filter(node => node.type === 'checkbox');
-  let prevented = false;
-  const event = { shiftKey: true, preventDefault() { prevented = true; } };
+  })).filter(isCheckbox);
 
-  render([])[1].props.onCheckedChange(true);
-  render(['a'])[4].props.onClick(event);
-  assert.equal(prevented, true);
+  changeRowCheck(render([])[1], true);
+  changeRowCheck(render(['a'])[4], true, true);
   assert.deepEqual(calls.pop(), [['a', 'b', 'c', 'd'], true]);
 
-  render([])[4].props.onCheckedChange(true);
-  render(['d'])[2].props.onClick(event);
+  changeRowCheck(render([])[4], true);
+  changeRowCheck(render(['d'])[2], true, true);
   assert.deepEqual(calls.pop(), [['b', 'c', 'd'], true]);
 
-  prevented = false;
-  render(['d'], rows.slice(0, 2))[2].props.onClick(event);
-  assert.equal(prevented, false);
+  changeRowCheck(render(['d'], rows.slice(0, 2))[2], true, true);
+  assert.deepEqual(calls.pop(), [['b'], true]);
 });
 
 const nodes = node => !node || typeof node !== 'object' ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
@@ -62,17 +61,17 @@ test('only a female registration marked pregnant shows a pregnancy highlight, in
   assert.ok(nodes(tableRows[0]).some(node => node.props?.children === 'Nữ · Đang mang thai'));
 });
 
-test('registration checkboxes retain partial, all and empty page selection', () => {
+test('registration checkboxes retain partial, all and empty selection', () => {
   const calls = [];
   const rows = [{ id: 'a', full_name: 'Nguyễn An' }, { id: 'b', full_name: 'Trần Bình' }];
-  const render = (checkedIds, pageRows = rows) => nodes(exportsForTable.RegistrationsTable({ rows: pageRows, checkedIds: new Set(checkedIds), onToggleChecked: (...args) => calls.push(args) })).filter(n => n.type === 'checkbox');
+  const render = (checkedIds, pageRows = rows) => nodes(exportsForTable.RegistrationsTable({ rows: pageRows, checkedIds: new Set(checkedIds), onToggleChecked: (...args) => calls.push(args) })).filter(isCheckbox);
   const partial = render(['a']);
   assert.equal(partial[0].props.checked, 'indeterminate');
   assert.equal(partial[1].props.checked, true);
   assert.equal(partial[2].props.checked, false);
   partial[0].props.onCheckedChange(true);
   assert.deepEqual(calls.pop(), [['a', 'b'], true]);
-  partial[1].props.onCheckedChange(false);
+  changeRowCheck(partial[1], false);
   assert.deepEqual(calls.pop(), [['a'], false]);
   assert.equal(render(['a', 'b'])[0].props.checked, true);
   assert.equal(render([])[0].props.checked, false);

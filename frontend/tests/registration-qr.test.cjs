@@ -269,13 +269,14 @@ test('server refuses public QR issuance, wrong staff branches and invalid exchan
 
 test('register endpoint has no QR bypass and delegates issuance to the atomic session RPC', async () => {
   let handler;
+  let issueError;
   const calls = [];
   const Deno = { env: { get: (key) => ({ SUPABASE_URL: 'https://test.invalid', REGISTRATION_FINGERPRINT_SECRET: secret })[key] }, serve: (fn) => { handler = fn; } };
   const http = load('supabase/functions/_shared/http.ts', {}, { Deno });
   const client = { rpc: async (name, args) => {
     calls.push({ name, args });
     return name === 'consume_registration_ip_limit' ? { data: [{ allowed: true }], error: null }
-      : { data: [{ registration_id: 'patient', queue_number: '0001', queue_date: '2026-11-01' }], error: null };
+      : { data: [{ registration_id: 'patient', queue_number: '0001', queue_date: '2026-11-01' }], error: issueError };
   } };
   load('supabase/functions/register/index.ts', {
     '../_shared/http.ts': http,
@@ -285,6 +286,19 @@ test('register endpoint has no QR bypass and delegates issuance to the atomic se
   const payload = { branch: 'q1', fullName: 'Nguyễn Văn A', phoneNumber: '0901234567', birthDate: '2000-01-01',
     gender: 'Nam', cccd: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', addressDetail: '123 đường A' };
   const call = (data) => handler(new Request('https://test.invalid/register', { method: 'POST', body: JSON.stringify(data) }));
+  for (const [fields, field] of [
+    [{ email: 'bad email' }, 'email'],
+    [{ gender: 'Nữ', consentFormVersion: 'DYM.PRO.09.FOR.02.03-2026-11-19' }, 'pregnancyStatus'],
+    [{ identityDocumentType: 'cccd', cccd: '001299123456' }, 'cccd'],
+    [{ addressDetail: 'A' }, 'addressDetail'],
+    [{ phoneNumber: '09' }, 'phoneNumber'],
+  ]) {
+    const response = await call({ ...payload, ...fields });
+    assert.equal(response.status, 400);
+    const result = await response.json();
+    assert.equal(result.code, 'INVALID_DATA');
+    assert.equal(result.field, field);
+  }
   assert.equal((await call(payload)).status, 403);
   assert.equal(calls.length, 0);
   assert.equal((await call({ ...payload, registrationSession: 'forged' })).status, 403);
@@ -293,6 +307,20 @@ test('register endpoint has no QR bypass and delegates issuance to the atomic se
   assert.equal(calls[1].name, 'issue_registration_with_session');
   assert.equal(calls[1].args.p_session_hash, await cryptoHelpers.hashRegistrationSession('a'.repeat(64)));
   assert.equal(calls.some((call) => call.name === 'issue_registration'), false);
+
+  for (const [identityDocumentType, cccd, label] of [
+    ['cccd', '001200123456', 'CCCD'],
+    ['passport', 'B1234567', 'Hộ chiếu'],
+  ]) {
+    issueError = { message: 'IDENTITY_DOCUMENT_COOLDOWN', details: '1799', hint: identityDocumentType };
+    const blocked = await call({ ...payload, identityDocumentType, cccd, registrationSession: 'a'.repeat(64) });
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.headers.get('Retry-After'), '1799');
+    const result = await blocked.json();
+    assert.equal(result.code, 'IDENTITY_DOCUMENT_COOLDOWN');
+    assert.ok(result.error.startsWith(label));
+    assert.match(result.error, /30 phút/);
+  }
 });
 
 test('Postgres migration issues once, rejects expired or mismatched sessions and rolls back failed submissions', async () => {
