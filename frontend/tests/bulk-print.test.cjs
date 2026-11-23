@@ -4,6 +4,32 @@ const { PDFDocument, PDFPage, decodePDFRawStream } = require('pdf-lib');
 const { loadPdfFixtures } = require('./helpers/pdf-fixtures.cjs');
 const { customer } = require('./tt25-pdf.test.cjs');
 
+test('Japanese names use a TrueType font covering their glyphs in both PDFs', async () => {
+  const bulk = loadPdfFixtures();
+  const fullName = '山田 太郎';
+  const originalDraw = PDFPage.prototype.drawText;
+  let japanesePrints = 0;
+  PDFPage.prototype.drawText = function (value, options) {
+    if (value === fullName) {
+      const glyphs = options.font.getCharacterSet();
+      assert.ok([...fullName].every((letter) => glyphs.includes(letter.codePointAt(0))));
+      japanesePrints++;
+    }
+    return originalDraw.call(this, value, options);
+  };
+  try {
+    for (const [mode, pages] of [['consent', 4], ['tt25', 12]]) {
+      japanesePrints = 0;
+      const url = await bulk.generateBulkPrintPdf([{ ...customer, language: 'ja', fullName }], mode);
+      try {
+        const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
+        assert.equal(pdf.getPageCount(), pages);
+        assert.ok(japanesePrints > 0, mode);
+      } finally { URL.revokeObjectURL(url); }
+    }
+  } finally { PDFPage.prototype.drawText = originalDraw; }
+});
+
 test('bulk PDF generation does not depend on timers throttled in background tabs', async () => {
   const bulk = loadPdfFixtures();
   const original = global.setTimeout;
@@ -82,11 +108,12 @@ test('bulk printing shares fonts, saves once and retains mixed-template order an
   const bulk = loadPdfFixtures();
   const originalEmbed = PDFDocument.prototype.embedFont, originalSave = PDFDocument.prototype.save, originalDraw = PDFPage.prototype.drawText;
   let fonts = 0, saves = 0;
-  const names = [], progress = [];
+  const names = [], progress = [], numbers = [];
   PDFDocument.prototype.embedFont = function (...args) { fonts++; return originalEmbed.apply(this, args); };
   PDFDocument.prototype.save = function (...args) { saves++; return originalSave.apply(this, args); };
   PDFPage.prototype.drawText = function (text, options) {
     if (text.startsWith('PATIENT ')) names.push([text, this.doc.getPages().indexOf(this)]);
+    if (text.startsWith('Trang ')) numbers.push([text, this.doc.getPages().indexOf(this)]);
     return originalDraw.call(this, text, options);
   };
   let url;
@@ -102,6 +129,10 @@ test('bulk printing shares fonts, saves once and retains mixed-template order an
     assert.deepEqual(progress, [[1,4],[2,4],[3,4],[4,4]]);
     const pdf = await PDFDocument.load(await (await fetch(url)).arrayBuffer());
     assert.equal(pdf.getPageCount(), 64); // 10 + 16 + 28 + 10
+    assert.deepEqual(numbers, [2, 8, 4, 12, 4, 12, 12, 2, 8].flatMap((count, set, counts) => {
+      const offset = counts.slice(0, set).reduce((total, length) => total + length, 0);
+      return Array.from({ length: count }, (_, index) => [`Trang ${index + 1}/${count}`, offset + index]);
+    }));
     for (const [name, start, end] of [['PATIENT A',0,10],['PATIENT B',10,26],['PATIENT C',26,54],['PATIENT D',54,64]]) {
       const pages = names.filter(([text]) => text === name).map(([, page]) => page);
       assert.ok(pages.length > 0, name);

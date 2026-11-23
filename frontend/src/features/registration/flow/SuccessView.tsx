@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { CheckCircle2, Calendar, User, Phone, CreditCard, Building, Home, Heart, RefreshCw, Eye, FileCheck2 } from 'lucide-react';
 import type { TT25RegistrationData } from '../types';
 import { translations, type SupportedLanguage } from '../../../locales/index';
+import { formatDateForPrint } from '../../../lib/date';
+import { CustomerRegistrationEditPanel } from './CustomerRegistrationEditPanel';
+import type { CustomerEditSession, EditableRegistrationDetails } from './customerRegistrationEdit';
 
 const TT25PrintModal = React.lazy(() => import('../printing/TT25PrintModal'));
 const ConsentPrintModal = React.lazy(() => import('../printing/ConsentPrintModal'));
@@ -14,9 +17,11 @@ interface SuccessViewProps {
   onReset: () => void;
   lang: SupportedLanguage;
   assisted?: boolean;
+  editSession?: CustomerEditSession | null;
+  onEdited: (details: EditableRegistrationDetails) => void;
 }
 
-export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang, assisted = false }) => {
+export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang, assisted = false, editSession, onEdited }) => {
   const t = translations[lang];
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -86,6 +91,8 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
         </p>
       </div>
 
+      {editSession && <CustomerRegistrationEditPanel session={editSession} lang={lang} onEdited={onEdited} />}
+
       {data && <div className="text-left bg-white border border-slate-200 rounded-md p-4 space-y-3 max-w-md mx-auto text-sm shadow-sm">
         <h2 className="text-base font-bold text-slate-700 border-b border-slate-100 pb-2 flex items-center gap-1.5">
           {t.summaryTitle}
@@ -104,7 +111,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
           <div>
             <p className="text-xs text-slate-500">{t.birthDate}</p>
             <p className="font-medium text-slate-700">
-              {new Date(data.birthDate).toLocaleDateString(
+              {lang === 'ja' ? formatDateForPrint(data.birthDate).split('/').reverse().join('/') : new Date(data.birthDate).toLocaleDateString(
                 lang === 'vi' ? 'vi-VN' : 'en-US',
               )}
             </p>
@@ -165,7 +172,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-sky-700 hover:bg-sky-800 active:scale-[0.97] text-white font-semibold text-xs px-4 py-2.5 rounded shadow-sm transition-[transform,background-color,box-shadow] duration-150 ease-out-quint cursor-pointer"
             >
               <FileCheck2 className="w-4 h-4" />
-              {lang === 'en' ? 'View Consent Form' : 'Xem Phiếu Đồng Thuận'}
+              {lang === 'ja' ? '同意書を表示' : lang === 'en' ? 'View Consent Form' : 'Xem Phiếu Đồng Thuận'}
             </button>
 
             <button
@@ -174,7 +181,7 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-dym-blue-600 hover:bg-dym-blue-700 active:scale-[0.97] text-white font-semibold text-xs px-4 py-2.5 rounded shadow-sm transition-[transform,background-color,box-shadow] duration-150 ease-out-quint cursor-pointer"
             >
               <Eye className="w-4 h-4" />
-              {lang === 'en'
+              {lang === 'ja' ? '健診票（TT25）を表示' : lang === 'en'
                 ? 'View Checkup Form TT25'
                 : 'Xem phiếu khám TT25'}
             </button>
@@ -198,12 +205,14 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
             isOpen={isPrintModalOpen}
             onClose={handleClosePrintModal}
             data={data}
+            lang={lang}
             allowPrint={false}
           />
           <ConsentPrintModal
             isOpen={isConsentModalOpen}
             onClose={handleCloseConsentModal}
             data={data}
+            lang={lang}
             allowPrint={false}
           />
         </React.Suspense>

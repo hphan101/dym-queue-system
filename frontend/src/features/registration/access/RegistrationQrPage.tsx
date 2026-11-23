@@ -155,9 +155,21 @@ function QrScreen({ onSessionExpired }: { onSessionExpired: () => void }) {
           <div className="registration-qr-content">
             <section className="registration-qr-instructions" aria-label="Hướng dẫn khám sức khỏe">
               <ol className="registration-qr-steps">
-                <li><span className="registration-qr-step-number" aria-hidden="true">1</span><div><p className="registration-qr-step-vietnamese">Bước 1: Quét mã QR để lấy số thứ tự.</p><p className="registration-qr-step-english" lang="en">Step 1: Scan the QR code to get your queue number.</p></div></li>
-                <li><span className="registration-qr-step-number" aria-hidden="true">2</span><div><p className="registration-qr-step-vietnamese">Bước 2: Chờ gọi tên khám và ký tên theo số thứ tự.</p><p className="registration-qr-step-english" lang="en">Step 2: Wait for your name to be called for your health check and sign the forms in queue order.</p></div></li>
-                <li><span className="registration-qr-step-number" aria-hidden="true">3</span><div><p className="registration-qr-step-vietnamese">Bước 3: Hoàn thành khám và gửi hồ sơ lại quầy lễ tân.</p><p className="registration-qr-step-english" lang="en">Step 3: After your health check, return your documents to the reception desk.</p></div></li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">1</span><div>
+                  <p className="registration-qr-step-vietnamese">Bước 1: Quét mã QR để lấy số thứ tự.</p>
+                  <p className="registration-qr-step-translation" lang="en">Step 1: Scan the QR code to get your queue number.</p>
+                  <p className="registration-qr-step-translation" lang="ja">QRコードを読み取り、受付番号を取得してください。</p>
+                </div></li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">2</span><div>
+                  <p className="registration-qr-step-vietnamese">Bước 2: Chờ gọi tên khám và ký tên theo số thứ tự.</p>
+                  <p className="registration-qr-step-translation" lang="en">Step 2: Wait for your name to be called for your health check and sign the forms in queue order.</p>
+                  <p className="registration-qr-step-translation" lang="ja">受付の順番でお名前が呼ばれるまでお待ちください。呼ばれたら受診し、書類にご署名ください。</p>
+                </div></li>
+                <li><span className="registration-qr-step-number" aria-hidden="true">3</span><div>
+                  <p className="registration-qr-step-vietnamese">Bước 3: Hoàn thành khám và gửi hồ sơ lại quầy lễ tân.</p>
+                  <p className="registration-qr-step-translation" lang="en">Step 3: After your health check, return your documents to the reception desk.</p>
+                  <p className="registration-qr-step-translation" lang="ja">健康診断が終わりましたら、書類を受付にご返却ください。</p>
+                </div></li>
               </ol>
             </section>
             <div className="registration-qr-scan">

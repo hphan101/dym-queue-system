@@ -52,11 +52,15 @@ test('TT25 selects each branch template by language and Work Permit', () => {
   const service = loadService();
   assert.equal(service.getTT25TemplateInfo(customer).key, 'vnm');
   assert.equal(service.getTT25TemplateInfo({ ...customer, language: 'en' }).key, 'bilingual');
+  assert.equal(service.getTT25TemplateInfo({ ...customer, language: 'ja' }).key, 'bilingual');
   for (const language of ['vi', 'en']) assert.equal(service.getTT25TemplateInfo({ ...customer, language, checkupReason: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit' }).key, 'wp');
   assert.equal(service.getTT25TemplateInfo({ ...customer, checkupReason: 'Khám sức khỏe khác' }).key, 'vnm');
   assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn' }).key, 'hn_vnm');
   assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn', language: 'en' }).key, 'hn_bilingual');
   for (const language of ['vi', 'en']) assert.equal(service.getTT25TemplateInfo({ ...customer, branch: 'hn', language, checkupReason: 'Work Permit' }).key, 'hn_wp');
+  for (const [key, page] of Object.entries({ vnm: 2, bilingual: 3, wp: 4, hn_vnm: 2, hn_bilingual: 4, hn_wp: 4 })) {
+    assert.equal(service.getTT25SignaturePage(key), page, key);
+  }
   for (const checkupReason of ['Khám sức khỏe định kì doanh nghiệp', 'Khám sức khỏe định kỳ theo công ty', '']) {
     assert.equal(service.getTT25PrintCopies({ checkupReason }), 1);
   }
@@ -138,6 +142,10 @@ test('Hanoi templates fill all history answers and keep only WP duplex padding',
         assert.equal(texts.includes(customer.workplace), reason === 'Work Permit', 'Hanoi corporate TT25 omits company names in both languages');
         for (const text of ['NGUYỄN THỊ MINH ANH', '001195012345', 'Đái tháo đường', 'Dị ứng thời tiết', 'Vitamin D, mỗi ngày một viên', 'Sinh thường năm 2020']) assert.ok(texts.includes(text), `${info.key}: ${text}`);
         assert.equal(texts.includes(customer.email), reason !== 'Work Permit', 'print email when the existing template has a field');
+        if (blank) {
+          const numbers = Array.from({ length: 11 }, (_, index) => `Trang ${index + 1}/11`);
+          assert.deepEqual(texts.filter((text) => text.startsWith('Trang ')), [...numbers, ...numbers]);
+        }
         for (let page = 0; page < pdf.getPageCount(); page++) {
           const empty = (pdf.getPage(page).node.Contents()?.asArray().length ?? 0) === 0;
           assert.equal(empty, blank && page % expected === expected - 1, `unexpected blank at ${info.key} page ${page}`);

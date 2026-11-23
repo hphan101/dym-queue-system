@@ -16,6 +16,7 @@ import type { RegistrationResponse, TT25RegistrationData } from '../types';
 import { CONSENT_FORM_VERSION } from '../tt25Types';
 import { WelcomeScreen } from './WelcomeScreen';
 import { clearRegistrationReceipt, readRegistrationReceipt, storeRegistrationReceipt } from './registrationReceipt';
+import { readCustomerEditSession, REGISTRATION_EDIT_WINDOW_MS, storeCustomerEditSession } from './customerRegistrationEdit';
 import { useRegistrationAccess } from '../access/useRegistrationAccess';
 import { RegistrationAccessNotice } from '../access/RegistrationAccessNotice';
 import '../access/registration-access.css';
@@ -27,15 +28,24 @@ function getBranchFromUrl(): BranchCode | null {
   return isBranchCode(branch) ? branch : null;
 }
 
+const japaneseRegistrationErrors: Record<string, string> = {
+  REGISTRATION_SESSION_INVALID: '受付のQRコードを読み取り直してください。',
+  REGISTRATION_SESSION_EXPIRED: '登録の有効時間が過ぎました。受付のQRコードを読み取り直してください。',
+  IDENTITY_DOCUMENT_COOLDOWN: '同じ身分証明書またはパスポートで登録済みです。前回の登録から1時間経過してからお試しください。',
+  RATE_LIMITED: '少し時間をおいてから、もう一度お試しください。',
+  PAYLOAD_TOO_LARGE: '入力内容が長すぎます。記述欄の内容を短くしてから、もう一度お試しください。',
+};
+
 export function RegistrationFlowPage() {
   const branch = getBranchFromUrl();
   const assisted = new URLSearchParams(window.location.search).get('staff') === '1';
   const access = useRegistrationAccess(branch, assisted);
   const accessReady = access.state.status === 'ready' && access.state.session.branch === branch;
-  const [receipt, setReceipt] = useState(() => assisted ? null : readRegistrationReceipt(branch));
+  const [editSession, setEditSession] = useState(() => assisted ? null : readCustomerEditSession(branch));
+  const [receipt, setReceipt] = useState(() => assisted ? null : editSession?.receipt ?? readRegistrationReceipt(branch));
   const [lang, setLang] = useState<SupportedLanguage>(() => {
     const saved = localStorage.getItem('dym_registration_lang');
-    return saved === 'en' ? saved : 'vi';
+    return saved === 'en' || saved === 'ja' ? saved : 'vi';
   });
 
   const [step, setStep] = useState<
@@ -52,7 +62,9 @@ export function RegistrationFlowPage() {
   const [queueNumber, setQueueNumber] = useState<string>(() => receipt?.queueNumber ?? '');
 
   useEffect(() => {
-    const saved = assisted ? null : readRegistrationReceipt(branch);
+    const savedEdit = assisted ? null : readCustomerEditSession(branch);
+    const saved = assisted ? null : savedEdit?.receipt ?? readRegistrationReceipt(branch);
+    setEditSession(savedEdit);
     setReceipt(saved);
     setQueueNumber(saved?.queueNumber ?? '');
     setRegisteredData(null);
@@ -62,7 +74,8 @@ export function RegistrationFlowPage() {
   useEffect(() => {
     if (!receipt) return;
     const expireReceipt = () => {
-      if (receipt.branch === branch && receipt.queueDate === getTodayInVietnam()) return;
+      if (receipt.branch === branch && (receipt.queueDate === getTodayInVietnam() ||
+        (editSession && editSession.expiresAt > Date.now()))) return;
       setReceipt(null);
       setQueueNumber('');
       setRegisteredData(null);
@@ -74,7 +87,7 @@ export function RegistrationFlowPage() {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', expireReceipt);
     };
-  }, [receipt, branch]);
+  }, [receipt, branch, editSession]);
 
   const registrationApiUrl = import.meta.env.VITE_REGISTRATION_API_URL;
 
@@ -171,7 +184,6 @@ export function RegistrationFlowPage() {
           queueNumber: formattedQueueNumber,
         });
         setStep('success');
-        access.complete();
 
         // Patient details remain in memory; only the queue receipt persists.
         const nextReceipt = {
@@ -180,7 +192,15 @@ export function RegistrationFlowPage() {
           queueNumber: formattedQueueNumber,
         };
         setReceipt(nextReceipt);
-        if (!assisted) storeRegistrationReceipt(nextReceipt);
+        if (!assisted) {
+          if (result.queueDate) {
+            const session = { receipt: nextReceipt, token: payload.registrationSession, expiresAt: Date.now() + REGISTRATION_EDIT_WINDOW_MS };
+            setEditSession(session);
+            storeCustomerEditSession(session);
+          }
+          storeRegistrationReceipt(nextReceipt);
+        }
+        access.complete();
         try {
           if (!assisted) localStorage.setItem('dym_last_registration_time', Date.now().toString());
         } catch { /* Registration is already saved on the server. */ }
@@ -189,14 +209,17 @@ export function RegistrationFlowPage() {
         if (result?.code === 'INVALID_DATA') {
           return result;
         }
-        throw new Error(result?.error || translations[lang].saveError);
+        const message = lang === 'ja' ? japaneseRegistrationErrors[result?.code ?? ''] : result?.error;
+        throw new Error(message || translations[lang].saveError);
       }
     } catch (err: unknown) {
       console.error('Lỗi khi gửi đăng ký:', err);
       setError(
         err instanceof DOMException && err.name === 'AbortError'
           ? translations[lang].requestTimeout
-          : err instanceof Error
+          : lang === 'ja' && err instanceof TypeError
+            ? translations.ja.networkError
+            : err instanceof Error
             ? err.message
             : translations[lang].networkError,
       );
@@ -215,7 +238,11 @@ export function RegistrationFlowPage() {
     setRegisteredData(null);
     setQueueNumber('');
     setReceipt(null);
-    if (!assisted) clearRegistrationReceipt();
+    setEditSession(null);
+    if (!assisted) {
+      clearRegistrationReceipt();
+      storeCustomerEditSession(null);
+    }
     access.invalidate();
     setError(null);
 
@@ -229,7 +256,7 @@ export function RegistrationFlowPage() {
   const showEntryCard = showAccessGate && access.state.status !== 'checking';
 
   return (
-    <div className={`registration-access-surface min-h-[100dvh] flex flex-col justify-between pt-6${showEntryCard ? ' registration-entry-page' : ''}`}>
+    <div lang={lang} className={`registration-access-surface min-h-[100dvh] flex flex-col justify-between pt-6${showEntryCard ? ' registration-entry-page' : ''}`}>
       {showPageLoader && (
         <div className="page-loader animate-fade-in">
           <img
@@ -245,13 +272,13 @@ export function RegistrationFlowPage() {
         <div className={showEntryCard
           ? 'registration-entry-card'
           : 'bg-white rounded-lg border border-slate-200/80 p-5 sm:p-8 shadow-sm'}>
-          {assisted && accessReady && <a className="mb-4 inline-block text-sm font-medium underline underline-offset-4" href={`/?page=admin&branch=${branch}`}>Về tiếp nhận</a>}
-          {step !== 'success' && <RegistrationAccessNotice state={access.state} assisted={assisted} onRetry={access.retry} />}
+          {assisted && accessReady && <a className="mb-4 inline-block text-sm font-medium underline underline-offset-4" href={`/?page=admin&branch=${branch}`}>{lang === 'ja' ? '受付画面に戻る' : 'Về tiếp nhận'}</a>}
+          {step !== 'success' && <RegistrationAccessNotice state={access.state} assisted={assisted} lang={lang} onRetry={access.retry} />}
           <div hidden={showAccessGate}>
           {branch && step === 'form' && (
             <div className="mb-6 text-center">
               <span className="mb-2 inline-block rounded bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                {lang === 'vi'
+                {lang === 'ja' ? 'ベトナム保健省通達第25/2026/TT-BYT号（様式03）' : lang === 'vi'
                   ? 'Thông tư 25/2026/TT-BYT (Mẫu 03)'
                   : 'Circular 25/2026/TT-BYT (Form 03)'}
               </span>
@@ -261,7 +288,7 @@ export function RegistrationFlowPage() {
                   : translations[lang].title}
               </h1>
               <p className="mt-1 text-xs text-muted-foreground">
-                {lang === 'vi'
+                {lang === 'ja' ? '健診票の作成に必要な基本情報12項目と問診内容を入力してください。' : lang === 'vi'
                   ? 'Vui lòng hoàn tất 12 mục hành chính và tiền sử y tế để in phiếu khám'
                   : 'Please complete the 12 administrative items and medical history to print your checkup form'}
               </p>
@@ -326,6 +353,8 @@ export function RegistrationFlowPage() {
               assisted={assisted && access.state.status === 'ready' && access.state.assisted === true}
               queueNumber={queueNumber}
               data={registeredData}
+              editSession={editSession}
+              onEdited={(details) => setRegisteredData((current) => current ? { ...current, ...details } : null)}
               onReset={handleReset}
               lang={lang}
             />
@@ -337,7 +366,7 @@ export function RegistrationFlowPage() {
       <footer className="mt-auto border-t border-slate-800/80 bg-[#111833] pb-[max(2rem,env(safe-area-inset-bottom,0px))] pt-10 text-xs text-slate-300">
         <div className="mx-auto max-w-5xl px-6">
           <h2 className="sr-only">
-            {lang === 'vi'
+            {lang === 'ja' ? 'クリニックの所在地とお問い合わせ先' : lang === 'vi'
               ? 'Hệ thống cơ sở phòng khám và thông tin liên hệ'
               : 'Clinic branch locations and contact information'}
           </h2>
@@ -377,7 +406,7 @@ export function RegistrationFlowPage() {
                   <Clock className="mt-0.5 size-4 shrink-0 text-slate-400" />
                   <p>
                     <span className="font-semibold text-white">
-                      Thời gian hoạt động:
+                      {lang === 'ja' ? '診療時間' : 'Thời gian hoạt động:'}
                     </span>{' '}
                     8:00 - 18:00
                   </p>
@@ -387,7 +416,7 @@ export function RegistrationFlowPage() {
 
             <div className="flex flex-col gap-3">
               <h3 className="border-b border-slate-800/80 pb-1.5 text-sm font-semibold uppercase tracking-wider text-white">
-                Cơ sở TP. Hồ Chí Minh
+                {lang === 'ja' ? 'ホーチミン市のクリニック' : 'Cơ sở TP. Hồ Chí Minh'}
               </h3>
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2.5">
@@ -425,7 +454,7 @@ export function RegistrationFlowPage() {
 
             <div className="flex flex-col gap-3">
               <h3 className="border-b border-slate-800/80 pb-1.5 text-sm font-semibold uppercase tracking-wider text-white">
-                Cơ sở Hà Nội
+                {lang === 'ja' ? 'ハノイのクリニック' : 'Cơ sở Hà Nội'}
               </h3>
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2.5">

@@ -165,3 +165,78 @@ test('CCCD and passport numbers each have a one-hour cooldown per branch', async
     await db.close();
   }
 });
+
+test('a submitted QR session can edit only its original waiting registration within ten minutes', async () => {
+  const db = new PGlite();
+  try {
+    const migration = await installRegistrationSchema(db);
+    await db.exec('alter table public.registrations add column first_called_at timestamptz');
+    await db.exec(migration('20261122100000_allow_customer_registration_edits.sql'));
+    const hash = 'a'.repeat(64);
+    const unused = 'd'.repeat(64);
+    await db.query(`
+      insert into public.registration_access_sessions (token_hash, branch_id, expires_at)
+      select token, id, now() + interval '20 minutes'
+      from public.branches cross join unnest($1::text[]) as tokens(token) where code = 'q1'
+    `, [[hash, unused]]);
+    const edit = async (changes = null, token = hash, branch = 'q1') => (await db.query(
+      'select public.edit_registration_with_session($1, $2, $3) as result', [token, branch, changes],
+    )).rows[0].result;
+    const request = `select * from public.issue_registration_with_session(
+      $1, repeat('b', 64), 'q1', 'Nguyễn Văn A', '2000-01-01', 'Nam', '0901234567',
+      'TEST123456', '', 'Hà Nội', 'Cầu Giấy', '123 đường A', repeat('c', 64), 600, $2
+    )`;
+    const extras = { checkupReason: constants.CHECKUP_REASONS[1], identityDocumentType: 'passport',
+      email: 'original@example.test', consentAgreed: true, pregnancyStatus: 'suspected' };
+    const receipt = (await db.query(request, [hash, extras])).rows[0];
+    await db.query("update public.registration_access_sessions set expires_at = now() - interval '1 second' where token_hash = $1", [hash]);
+
+    assert.equal((await edit()).details.fullName, 'Nguyễn Văn A');
+    assert.equal((await edit()).phoneRequired, false);
+    assert.deepEqual(Object.keys((await edit()).details).sort(), ['addressDetail', 'email', 'fullName', 'phoneNumber', 'province', 'ward', 'workplace']);
+    await assert.rejects(edit(null, unused), /EDIT_SESSION_INVALID/);
+    await assert.rejects(edit(null, 'b'.repeat(64)), /EDIT_SESSION_INVALID/);
+    await assert.rejects(edit(null, hash, 'q7'), /EDIT_SESSION_INVALID/);
+    for (const changes of [{ queueNumber: 99 }, { cccd: 'TEST999999' }, { printedTT25: false }, { email: null }]) {
+      await assert.rejects(edit(changes), /INVALID_DATA/);
+    }
+    await assert.rejects(edit({ email: 'bad@' }), (error) => error.message === 'INVALID_DATA' && error.detail === 'email');
+    await assert.rejects(edit({ phoneNumber: 'bad' }), (error) => error.message === 'INVALID_DATA' && error.detail === 'phoneNumber');
+
+    const changes = { fullName: 'Nguyễn Văn B', phoneNumber: '', email: '', province: 'Thành phố Hồ Chí Minh',
+      ward: 'Phường Sài Gòn', addressDetail: '45 đường B', workplace: 'Công ty thử' };
+    assert.deepEqual((await edit(changes)).details, changes);
+    assert.deepEqual((await edit(changes)).details, changes);
+    const row = (await db.query('select * from public.registrations')).rows[0];
+    assert.equal(row.id, receipt.registration_id);
+    assert.equal(row.queue_number, Number(receipt.queue_number));
+    assert.equal(row.identity_document, 'TEST123456');
+    assert.equal(row.tt25_data.email, undefined);
+    assert.equal(row.tt25_data.consentAgreed, true);
+    assert.equal(row.tt25_data.pregnancyStatus, 'suspected');
+    assert.equal((await db.query('select count(*)::int as n from public.audit_logs')).rows[0].n, 1);
+
+    await db.query(`update public.registrations set phone_number = '0901234567', tt25_data = tt25_data || $1::jsonb`, [{ checkupReason: constants.CHECKUP_REASONS[0] }]);
+    await assert.rejects(edit({ workplace: '' }), (error) => error.detail === 'workplace');
+    await assert.rejects(edit({ phoneNumber: '' }), (error) => error.detail === 'phoneNumber');
+    for (const printed of ['printedConsent', 'printedTT25']) {
+      await db.query('update public.registrations set tt25_data = tt25_data || $1::jsonb', [{ [printed]: true }]);
+      await assert.rejects(edit(), /EDIT_LOCKED/);
+      await assert.rejects(edit({ fullName: 'Nguyễn Văn C' }), /EDIT_LOCKED/);
+      await db.query('update public.registrations set tt25_data = tt25_data - $1::text', [printed]);
+    }
+    await db.exec(`insert into public.queue_calls (branch_id, registration_id, call_kind, called_by)
+      select branch_id, id, 'next', auth.uid() from public.registrations`);
+    await assert.rejects(edit({ fullName: 'Nguyễn Văn C' }), /EDIT_LOCKED/);
+    await db.exec('delete from public.queue_calls');
+    await db.exec("update public.registrations set registered_at = now() - interval '10 minutes'");
+    await assert.rejects(edit(), /EDIT_SESSION_EXPIRED/);
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await assert.rejects(edit(), /permission denied/);
+      await db.exec('reset role');
+    }
+  } finally {
+    await db.close();
+  }
+});

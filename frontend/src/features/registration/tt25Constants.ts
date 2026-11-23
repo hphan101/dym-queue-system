@@ -21,9 +21,9 @@ export const BLOOD_GROUPS = [
 ];
 
 export const CHECKUP_REASON_OPTIONS = [
-  { value: 'Khám sức khỏe định kì doanh nghiệp', labelEn: 'Corporate periodic health checkup' },
-  { value: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit', labelEn: 'Health checkup for a Work Permit application' },
-  { value: 'Khám sức khỏe khác', labelEn: 'Other health checkups' },
+  { value: 'Khám sức khỏe định kì doanh nghiệp', labelEn: 'Corporate periodic health checkup', labelJa: '企業の定期健康診断' },
+  { value: 'Khám sức khỏe bổ sung hồ sơ xin Work Permit', labelEn: 'Health checkup for a Work Permit application', labelJa: '労働許可証申請用の健康診断' },
+  { value: 'Khám sức khỏe khác', labelEn: 'Other health checkups', labelJa: 'その他の健康診断' },
 ] as const;
 
 export const CHECKUP_REASONS = CHECKUP_REASON_OPTIONS.map((option) => option.value);

@@ -20,23 +20,24 @@ interface NumberedPaginationProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   label?: string;
+  labels?: { previous: string; next: string; page: (page: number) => string };
   pageSize?: number;
   onPageSizeChange?: (size: number) => void;
 }
 
-export function NumberedPagination({ currentPage, totalPages, onPageChange, label = 'Phân trang', pageSize, onPageSizeChange }: NumberedPaginationProps) {
+export function NumberedPagination({ currentPage, totalPages, onPageChange, label = 'Phân trang', labels, pageSize, onPageSizeChange }: NumberedPaginationProps) {
   const pagination = (
     <nav className="dym-numbered-pagination" aria-label={label}>
-      <Button type="button" variant="outline" size="icon" aria-label="Trang trước"
+      <Button type="button" variant="outline" size="icon" aria-label={labels?.previous ?? 'Trang trước'}
         disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
         <ChevronLeft aria-hidden="true" />
       </Button>
       {getPaginationItems(currentPage, totalPages).map((page) => typeof page === 'number' ? (
         <Button key={page} type="button" variant="outline" size="icon"
-          aria-label={`Trang ${page}`} aria-current={page === currentPage ? 'page' : undefined}
+          aria-label={labels?.page(page) ?? `Trang ${page}`} aria-current={page === currentPage ? 'page' : undefined}
           onClick={() => onPageChange(page)}>{page}</Button>
       ) : <span key={page} className="dym-pagination-ellipsis" aria-hidden="true">…</span>)}
-      <Button type="button" variant="outline" size="icon" aria-label="Trang sau"
+      <Button type="button" variant="outline" size="icon" aria-label={labels?.next ?? 'Trang sau'}
         disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)}>
         <ChevronRight aria-hidden="true" />
       </Button>

@@ -23,10 +23,10 @@ function BilingualText({ text }: { text: string }) {
   return <><span lang="vi">{text.slice(0, separator)}</span>{' / '}<span lang="en">{text.slice(separator + 3)}</span></>;
 }
 
-function ConsentSection({ sections, content, bilingual, value, onChange, children }: {
+function ConsentSection({ sections, content, lang, value, onChange, children }: {
   sections: { number: number; title: string; paragraphs: string[] }[];
   content: Pick<typeof copy.vi.examination, 'title' | 'agree' | 'decline'>;
-  bilingual: boolean;
+  lang: SupportedLanguage;
   value: boolean | null;
   onChange: (value: boolean) => void;
   children?: ReactNode;
@@ -50,7 +50,7 @@ function ConsentSection({ sections, content, bilingual, value, onChange, childre
                   {number}. <BilingualText text={title} />
                 </h2>
                 {paragraphs.map((paragraph, index) => (
-                  <p key={paragraph} lang={bilingual && index % 2 === 1 ? 'en' : 'vi'}>{paragraph}</p>
+                  <p key={paragraph} lang={lang === 'en' ? (index % 2 === 1 ? 'en' : 'vi') : lang}>{paragraph}</p>
                 ))}
               </div>
             </Fragment>
@@ -84,6 +84,7 @@ export function ConsentScreen({ branch, lang, onSelectConsent, onBack }: Consent
   const bilingual = lang === 'en';
   const content = copy[lang];
   const examinationParagraphCount = bilingual ? 2 : 1;
+  const paragraphLanguage = (index: number) => bilingual ? (index === 0 ? 'vi' : 'en') : lang;
   return (
     <form className="animate-fade-in flex flex-col gap-5 py-2 [&_[lang=en]]:italic [&_[lang=en]]:text-primary" onSubmit={event => {
       event.preventDefault();
@@ -93,26 +94,26 @@ export function ConsentScreen({ branch, lang, onSelectConsent, onBack }: Consent
         <img src={dymLogoDark} alt="DYM Medical Center Vietnam" className="h-12 w-auto" />
         {branch && <p className="rounded border border-dym-blue-100 bg-dym-blue-50 px-3 py-1 text-xs font-semibold text-dym-blue-800">{BRANCH_NAMES[branch]}</p>}
         <h1 className="text-xl font-semibold text-foreground">
-          <span lang="vi">{content.title[0]}</span>
+          <span lang={paragraphLanguage(0)}>{content.title[0]}</span>
           {bilingual && <span lang="en" className="mt-1 block text-sm font-medium text-muted-foreground">{content.title[1]}</span>}
         </h1>
       </header>
       <div className="flex flex-col gap-1 text-sm leading-relaxed text-muted-foreground">
-        {content.instructions.map((paragraph, index) => <p key={paragraph} lang={index === 0 ? 'vi' : 'en'}>{paragraph}</p>)}
+        {content.instructions.map((paragraph, index) => <p key={paragraph} lang={paragraphLanguage(index)}>{paragraph}</p>)}
       </div>
       <ConsentSection
         sections={[
-          { number: 1, title: bilingual ? 'ĐỒNG Ý KHÁM / CONSENT TO EXAMINATION' : 'ĐỒNG Ý KHÁM', paragraphs: content.examination.paragraphs.slice(0, examinationParagraphCount) },
-          { number: 2, title: bilingual ? 'ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN / CONSENT TO PERSONAL DATA PROCESSING' : 'ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN', paragraphs: content.examination.paragraphs.slice(examinationParagraphCount) },
+          { number: 1, title: lang === 'ja' ? '受診への同意' : bilingual ? 'ĐỒNG Ý KHÁM / CONSENT TO EXAMINATION' : 'ĐỒNG Ý KHÁM', paragraphs: content.examination.paragraphs.slice(0, examinationParagraphCount) },
+          { number: 2, title: lang === 'ja' ? '個人データの取り扱いへの同意' : bilingual ? 'ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN / CONSENT TO PERSONAL DATA PROCESSING' : 'ĐỒNG Ý CHO PHÉP XỬ LÝ DỮ LIỆU CÁ NHÂN', paragraphs: content.examination.paragraphs.slice(examinationParagraphCount) },
         ]}
-        content={content.examination} bilingual={bilingual} value={examination} onChange={setExamination}
+        content={content.examination} lang={lang} value={examination} onChange={setExamination}
       >
         {examination === false ? (
           <Alert variant="warning" className="border-warning/40 bg-warning/15 text-foreground">
             <TriangleAlert aria-hidden="true" />
             <AlertDescription className="flex flex-col gap-1 font-semibold">
               {content.examination.warning.map((paragraph, index) => (
-                <p key={paragraph} lang={index === 0 ? 'vi' : 'en'}>{paragraph}</p>
+                <p key={paragraph} lang={paragraphLanguage(index)}>{paragraph}</p>
               ))}
             </AlertDescription>
           </Alert>
@@ -120,14 +121,14 @@ export function ConsentScreen({ branch, lang, onSelectConsent, onBack }: Consent
       </ConsentSection>
       <ConsentSection
         sections={[{ number: 3, title: content.advertising.title, paragraphs: content.advertising.paragraphs }]}
-        content={content.advertising} bilingual={bilingual} value={advertising} onChange={setAdvertising}
+        content={content.advertising} lang={lang} value={advertising} onChange={setAdvertising}
       />
       <div className="flex flex-col gap-1 text-sm leading-relaxed text-muted-foreground">
-        {content.confirmation.map((paragraph, index) => <p key={paragraph} lang={index === 0 ? 'vi' : 'en'}>{paragraph}</p>)}
+        {content.confirmation.map((paragraph, index) => <p key={paragraph} lang={paragraphLanguage(index)}>{paragraph}</p>)}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="ghost" onClick={onBack}><ChevronLeft aria-hidden="true" />{bilingual ? 'Back' : 'Quay lại'}</Button>
-        <Button type="submit" disabled={examination === null || advertising === null}>{bilingual ? 'Continue' : 'Tiếp tục'}</Button>
+        <Button type="button" variant="ghost" onClick={onBack}><ChevronLeft aria-hidden="true" />{lang === 'ja' ? '戻る' : bilingual ? 'Back' : 'Quay lại'}</Button>
+        <Button type="submit" disabled={examination === null || advertising === null}>{lang === 'ja' ? '次へ' : bilingual ? 'Continue' : 'Tiếp tục'}</Button>
       </div>
     </form>
   );

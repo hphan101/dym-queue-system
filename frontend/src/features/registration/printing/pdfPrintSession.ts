@@ -35,3 +35,19 @@ export function getPrintFont(session: PdfPrintSession, key: string, bytes: Array
   }
   return font;
 }
+
+const JAPANESE_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+let japaneseFontBytes: Promise<ArrayBuffer> | undefined;
+
+export async function getPrintFontForText(session: PdfPrintSession, text: string, defaultFont: PDFFont): Promise<PDFFont> {
+  if (!JAPANESE_TEXT.test(text)) return defaultFont;
+
+  japaneseFontBytes ??= fetch('/fonts/NotoSansJP-Regular.ttf').then(async (response) => {
+    if (!response.ok) throw new Error('Không thể tải phông chữ tiếng Nhật.');
+    const bytes = await response.arrayBuffer();
+    if (!bytes.byteLength) throw new Error('File phông chữ tiếng Nhật không có dữ liệu.');
+    return bytes;
+  }).catch((error) => { japaneseFontBytes = undefined; throw error; });
+
+  return getPrintFont(session, 'noto-sans-jp', await japaneseFontBytes);
+}

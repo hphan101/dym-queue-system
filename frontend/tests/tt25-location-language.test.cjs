@@ -61,6 +61,17 @@ test('TT25 confirmation shows the translated examination location', () => {
   assert.match(render('vi', 4), />CS KBCB</);
 });
 
+test('the Japanese form translates payment choices and keeps custom answers in its confirmation', () => {
+  const payment = render('ja', 3);
+  for (const label of ['受診区分と費用負担', '14 – 学生・研修生', '勤務先負担', '自動選択：医療機関']) {
+    assert.ok(payment.includes(label), label);
+  }
+  const confirmation = render('ja', 4, {
+    targetGroup: 'other', paymentSource: 'other', targetOtherDetails: '研修参加者', paymentOtherDetails: '学校負担',
+  });
+  for (const label of ['登録内容の確認', '研修参加者', '学校負担', '医療機関']) assert.ok(confirmation.includes(label), label);
+});
+
 test('TT25 confirmation translates every target category and payment source', () => {
   for (const [targetGroup, enTarget, viTarget] of [
     ['14', '14 – Student / Trainee', '14 – Sinh viên, học viên'],

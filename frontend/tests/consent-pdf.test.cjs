@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, PDFPage } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 
 const frontend = path.resolve(__dirname, '..');
@@ -59,6 +59,7 @@ const customer = {
 test('consent form follows the selected language, including Vietnamese passport holders', () => {
   assert.equal(service.getConsentFormLanguage({ language: 'vi', cccd: 'B1234567' }), 'vi');
   assert.equal(service.getConsentFormLanguage({ language: 'en', cccd: '001195012345' }), 'bilingual');
+  assert.equal(service.getConsentFormLanguage({ language: 'ja' }), 'bilingual');
   assert.equal(service.getConsentFormLanguage({}), 'vi');
 });
 
@@ -73,22 +74,27 @@ test('consent templates retain original content pages without blank separators',
 });
 
 test('consent generation uses original PDFs, with correct page selection', async () => {
-  for (const language of ['vi', 'en']) {
-    const complete = await service.generateConsentPdf({ ...customer, language });
-    const selected = await service.generateConsentPdf({ ...customer, language }, 'refusal');
-    const consent = await service.generateConsentPdf({ ...customer, language }, 'consent');
-    try {
+  const numbers = [];
+  const drawText = PDFPage.prototype.drawText;
+  PDFPage.prototype.drawText = function (text, options) {
+    if (text.startsWith('Trang ')) numbers.push([this.doc.getPages().indexOf(this), text]);
+    return drawText.call(this, text, options);
+  };
+  try {
+    for (const language of ['vi', 'en']) {
       const pagesPerForm = language === 'vi' ? 1 : 2;
-      assert.equal((await PDFDocument.load(await complete.blob.arrayBuffer())).getPageCount(), 2 * pagesPerForm);
-      assert.equal((await PDFDocument.load(await selected.blob.arrayBuffer())).getPageCount(), pagesPerForm);
-      assert.equal((await PDFDocument.load(await consent.blob.arrayBuffer())).getPageCount(), pagesPerForm);
-      for (const result of [complete, consent, selected]) {
-        const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
-        for (const page of pdf.getPages()) assert.ok(page.node.Contents(), 'no blank page in printed consent/refusal');
+      for (const [option, count, offset] of [['all', 2 * pagesPerForm, 0], ['consent', pagesPerForm, 0], ['refusal', pagesPerForm, pagesPerForm]]) {
+        const result = await service.generateConsentPdf({ ...customer, language }, option);
+        try {
+          assert.equal(result.blob.type, 'application/pdf');
+          const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+          assert.equal(pdf.getPageCount(), count);
+          for (const page of pdf.getPages()) assert.ok(page.node.Contents(), 'no blank page in printed consent/refusal');
+          assert.deepEqual(numbers.splice(0), Array.from({ length: count }, (_, index) => [offset + index, `Trang ${index + 1}/${count}`]));
+        } finally { URL.revokeObjectURL(result.url); }
       }
-      assert.equal(complete.blob.type, 'application/pdf');
-    } finally { URL.revokeObjectURL(complete.url); URL.revokeObjectURL(selected.url); URL.revokeObjectURL(consent.url); }
-  }
+    }
+  } finally { PDFPage.prototype.drawText = drawText; }
   assert.equal(service.fetched.filter((url) => url.startsWith('/fonts/arial.ttf?')).length, 1);
   assert.equal(service.fetched.some((url) => url.startsWith('/templates/dong-thuan-kham.pdf')), false);
 });

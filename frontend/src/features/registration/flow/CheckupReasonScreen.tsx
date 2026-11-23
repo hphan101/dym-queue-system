@@ -39,13 +39,13 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
         )}
 
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-dym-blue-800">
-          {isEn ? 'Reason for Health Checkup' : 'Lý do khám'}
+          {lang === 'ja' ? '健康診断の目的' : isEn ? 'Reason for Health Checkup' : 'Lý do khám'}
         </h1>
 
         <div className="w-10 h-0.5 bg-dym-blue-500/40 my-3.5" />
 
         <p className="text-xs sm:text-sm text-slate-600 leading-relaxed text-balance">
-          {isEn
+          {lang === 'ja' ? '受診の目的を選択してください。' : isEn
             ? 'Please select the purpose of your health checkup to continue.'
             : 'Vui lòng chọn mục đích khám\u00A0sức\u00A0khỏe của Quý khách để tiếp tục.'}
         </p>
@@ -66,7 +66,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
                 {idx + 1}
               </span>
               <span className="text-sm font-semibold leading-snug sm:text-base">
-                {isEn ? item.labelEn : item.value}
+                {lang === 'ja' ? item.labelJa : isEn ? item.labelEn : item.value}
               </span>
             </span>
             <ChevronRight aria-hidden="true" className="text-muted-foreground group-hover:text-primary group-focus-visible:text-primary" />
@@ -78,7 +78,7 @@ export const CheckupReasonScreen: React.FC<CheckupReasonScreenProps> = ({
       <div className="mt-5 flex">
         <Button type="button" variant="ghost" onClick={onBack}>
           <ChevronLeft aria-hidden="true" />
-          {isEn ? 'Back' : 'Quay lại'}
+          {lang === 'ja' ? '戻る' : isEn ? 'Back' : 'Quay lại'}
         </Button>
       </div>
     </div>

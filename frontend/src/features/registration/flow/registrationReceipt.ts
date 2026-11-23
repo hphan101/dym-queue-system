@@ -17,7 +17,7 @@ export function readRegistrationReceipt(
     const receipt = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     if (
       !branch || receipt?.branch !== branch || receipt?.queueDate !== today ||
-      typeof receipt?.queueNumber !== 'string' || !/^\d{4}$/.test(receipt.queueNumber)
+      typeof receipt?.queueNumber !== 'string' || !/^\d{3,4}$/.test(receipt.queueNumber)
     ) return null;
     return receipt;
   } catch {

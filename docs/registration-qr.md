@@ -2,8 +2,8 @@
 
 ## Phạm vi đã duyệt
 
-Khách quét QR đổi mỗi 60 giây, hiệu lực 90 giây. Quét hợp lệ mở phiên điền form
-20 phút. Mỗi phiên cấp số thành công một lần; gửi lại cùng phiên và nội dung trả
+Mã QR đổi mỗi 30 giây. Mã cũ hết hạn ngay khi đến mốc đổi mã. Quét hợp lệ mở phiên
+điền form 20 phút. Mỗi phiên cấp số thành công một lần; gửi lại cùng phiên và nội dung trả
 lại số đã cấp. Tái sử dụng phiên đã cấp số cho nội dung khác bị từ chối.
 QR dùng chung được nhiều khách quét, không dùng hết sau lần quét đầu.
 Màn hình `/registration-qr?branch=q1` yêu cầu nhân viên đăng nhập và có quyền chi

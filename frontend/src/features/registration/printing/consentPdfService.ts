@@ -1,7 +1,7 @@
 import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
-import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
+import { appendTemplate, createPdfPrintSession, getPrintFont, getPrintFontForText, type PdfPrintSession } from './pdfPrintSession';
 import { formatDateForPrint, getTodayInVietnam } from '../../../lib/date';
-import { drawPdfCheck } from './pdfDrawing';
+import { drawPdfCheck, drawPdfPageNumbers } from './pdfDrawing';
 import layouts from './consentTemplateFields.json';
 import { CONSENT_FORM_VERSION, type TT25RegistrationData } from '../tt25Types';
 
@@ -26,7 +26,7 @@ function loadAsset(path: string): Promise<ArrayBuffer> {
 }
 
 export function getConsentFormLanguage(data: Pick<TT25RegistrationData, 'language'>): ConsentFormLanguage {
-  return data.language === 'en' ? 'bilingual' : 'vi';
+  return data.language === 'en' || data.language === 'ja' ? 'bilingual' : 'vi';
 }
 
 export function getConsentPageIndices(language: ConsentFormLanguage, option: ConsentPageOption): number[] {
@@ -35,7 +35,7 @@ export function getConsentPageIndices(language: ConsentFormLanguage, option: Con
     : Array.from({ length: layout.pageCount }, (_, index) => index);
 }
 
-export async function appendConsentPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {
+export async function appendConsentPdf(data: TT25RegistrationData, session: PdfPrintSession, pageOption: ConsentPageOption = 'all'): Promise<void> {
   const language = getConsentFormLanguage(data);
   const layout = layouts[language];
   const [template, regular, bold, italic, boldItalic] = await Promise.all([
@@ -73,7 +73,7 @@ export async function appendConsentPdf(data: TT25RegistrationData, session: PdfP
   for (const field of layout.fields) {
     const value = values[field.field];
     if (!value) continue;
-    const font = fonts[field.font];
+    const font = await getPrintFontForText(session, value, fonts[field.font]);
     const size = Math.min(field.size, field.width / font.widthOfTextAtSize(value, 1));
     const width = font.widthOfTextAtSize(value, size);
     pages[field.page].drawText(value, {
@@ -94,11 +94,12 @@ export async function appendConsentPdf(data: TT25RegistrationData, session: PdfP
       mark(layout.consentMarks.advertising[data.advertisingConsentAgreed ? 'agree' : 'decline']);
     }
   }
+  drawPdfPageNumbers(getConsentPageIndices(language, pageOption).map((index) => pages[index]), fonts.bold);
 }
 
 export async function generateConsentPdf(data: TT25RegistrationData, pageOption: ConsentPageOption = 'all'): Promise<{ blob: Blob; url: string }> {
   const session = await createPdfPrintSession();
-  await appendConsentPdf(data, session);
+  await appendConsentPdf(data, session, pageOption);
   const pdf = session.pdf;
   const language = getConsentFormLanguage(data);
   let output = pdf;

@@ -13,6 +13,7 @@ interface WelcomeScreenProps {
 const languages = [
   { code: 'vi', badge: 'VN', label: 'Tiếng Việt' },
   { code: 'en', badge: 'EN', label: 'English' },
+  { code: 'ja', badge: 'JP', label: '日本語' },
 ] as const;
 
 export function WelcomeScreen({ branch, onSelectLanguage }: WelcomeScreenProps) {
@@ -35,6 +36,7 @@ export function WelcomeScreen({ branch, onSelectLanguage }: WelcomeScreenProps) 
         <h1 id="registration-language-title" className="flex flex-col gap-1 text-center text-2xl font-semibold leading-8 text-foreground" lang="vi">
           Chọn ngôn ngữ
           <span lang="en" className="text-sm font-normal leading-5 text-muted-foreground">Choose your language</span>
+          <span lang="ja" className="text-sm font-normal leading-5 text-muted-foreground">言語を選択してください</span>
         </h1>
         <div className="grid gap-3">
           {languages.map(({ code, badge, label }) => (

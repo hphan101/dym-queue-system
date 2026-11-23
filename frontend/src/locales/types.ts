@@ -1,4 +1,4 @@
-export type SupportedLanguage = 'vi' | 'en';
+export type SupportedLanguage = 'vi' | 'en' | 'ja';
 
 export interface TranslationDictionary {
   // Form titles and subtitles

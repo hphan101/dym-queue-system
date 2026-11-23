@@ -17,7 +17,7 @@ export interface TT25StoredExtras {
   pregnancyStatus?: PregnancyStatus | null;
   printedConsent?: boolean;
   printedTT25?: boolean;
-  language?: 'vi' | 'en';
+  language?: 'vi' | 'en' | 'ja';
   email?: string;
 }
 

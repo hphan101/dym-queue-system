@@ -1,3 +1,5 @@
+import type { SupportedLanguage } from '../../../locales/types';
+
 /**
  * Bảng 63 mã tỉnh, thành phố trực thuộc Trung ương trên thẻ CCCD
  * (Ban hành kèm theo Thông tư số 07/2016/TT-BCA ngày 01/02/2016 của Bộ Công an)
@@ -73,6 +75,7 @@ export interface CccdValidationParams {
   gender: 'Nam' | 'Nữ';
   birthDate?: string; // YYYY-MM-DD
   isEn?: boolean;
+  lang?: SupportedLanguage;
   identityDocumentType?: 'cccd' | 'passport';
 }
 
@@ -93,18 +96,18 @@ export function validateVietnamCccd({
   gender,
   birthDate,
   isEn = false,
+  lang = isEn ? 'en' : 'vi',
   identityDocumentType,
 }: CccdValidationParams): string | null {
+  const text = (vi: string, en: string, ja: string) => ({ vi, en, ja })[lang];
   const clean = cccd.trim().toUpperCase();
 
   if (identityDocumentType === 'passport') {
-    return clean ? null : (isEn ? 'Please enter your passport number' : 'Vui lòng nhập số hộ chiếu');
+    return clean ? null : (text('Vui lòng nhập số hộ chiếu', 'Please enter your passport number', 'パスポート番号を入力してください。'));
   }
 
   if (!clean) {
-    return isEn
-      ? 'Please enter your 12-digit Citizen ID (CCCD)'
-      : 'Vui lòng nhập số CCCD (12 chữ số)';
+    return text('Vui lòng nhập số CCCD (12 chữ số)', 'Please enter your 12-digit Citizen ID (CCCD)', 'CCCDの12桁の番号を入力してください。');
   }
 
   // Allow foreign passport format ONLY if it starts with an uppercase letter (e.g. B1234567)
@@ -113,17 +116,17 @@ export function validateVietnamCccd({
   }
 
   if (!/^\d{12}$/.test(clean)) {
-    return isEn
-      ? 'Citizen ID (CCCD) must consist of exactly 12 digits'
-      : 'Số CCCD phải gồm đúng 12 chữ số tự nhiên';
+    return text('Số CCCD phải gồm đúng 12 chữ số tự nhiên', 'Citizen ID (CCCD) must consist of exactly 12 digits', 'CCCD番号は12桁の数字で入力してください。');
   }
 
   // 1. Check first 3 digits: Province code (001 - 096 across 63 provinces)
   const provinceCode = clean.slice(0, 3);
   if (!CCCD_PROVINCE_CODES[provinceCode]) {
-    return isEn
-      ? `Invalid province code "${provinceCode}" in the first 3 digits of CCCD`
-      : `3 số đầu "${provinceCode}" không phải mã tỉnh/thành phố hợp lệ (001–096)`;
+    return text(
+      `3 số đầu "${provinceCode}" không phải mã tỉnh/thành phố hợp lệ (001–096)`,
+      `Invalid province code "${provinceCode}" in the first 3 digits of CCCD`,
+      `CCCDの最初の3桁（${provinceCode}）が有効な省・市のコードではありません。`,
+    );
   }
 
   // 2. Check 4th digit (century & gender) and 5th-6th digits (2-digit birth year)
@@ -144,29 +147,37 @@ export function validateVietnamCccd({
     const expectedGenderDigit = centuryIndex * 2 + (gender === 'Nữ' ? 1 : 0);
 
     if (centuryGenderDigit !== expectedGenderDigit) {
-      return isEn
-        ? `The 4th digit (${centuryGenderDigit}) does not match ${gender === 'Nam' ? 'Male' : 'Female'} born in ${birthYear} (expected ${expectedGenderDigit})`
-        : `Số thứ 4 của CCCD (${centuryGenderDigit}) không khớp với giới tính ${gender} sinh năm ${birthYear} (đúng phải là số ${expectedGenderDigit})`;
+      return text(
+        `Số thứ 4 của CCCD (${centuryGenderDigit}) không khớp với giới tính ${gender} sinh năm ${birthYear} (đúng phải là số ${expectedGenderDigit})`,
+        `The 4th digit (${centuryGenderDigit}) does not match ${gender === 'Nam' ? 'Male' : 'Female'} born in ${birthYear} (expected ${expectedGenderDigit})`,
+        `CCCDの4桁目（${centuryGenderDigit}）が申告された性別と生年に一致しません（正しい数字：${expectedGenderDigit}）。`,
+      );
     }
 
     const expectedYearTwoDigits = String(birthYear).slice(-2);
     if (cccdYearTwoDigits !== expectedYearTwoDigits) {
-      return isEn
-        ? `Digits 5–6 of CCCD (${cccdYearTwoDigits}) do not match birth year ${birthYear} (expected ${expectedYearTwoDigits})`
-        : `Hai số thứ 5–6 của CCCD (${cccdYearTwoDigits}) không khớp với năm sinh ${birthYear} (đúng phải là ${expectedYearTwoDigits})`;
+      return text(
+        `Hai số thứ 5–6 của CCCD (${cccdYearTwoDigits}) không khớp với năm sinh ${birthYear} (đúng phải là ${expectedYearTwoDigits})`,
+        `Digits 5–6 of CCCD (${cccdYearTwoDigits}) do not match birth year ${birthYear} (expected ${expectedYearTwoDigits})`,
+        `CCCDの5〜6桁目（${cccdYearTwoDigits}）が生年と一致しません（正しい数字：${expectedYearTwoDigits}）。`,
+      );
     }
   } else {
     // Even without birthDate, check gender parity (Nam = even: 0,2,4,6,8; Nữ = odd: 1,3,5,7,9)
     const isFemaleDigit = centuryGenderDigit % 2 === 1;
     if (gender === 'Nam' && isFemaleDigit) {
-      return isEn
-        ? `The 4th digit (${centuryGenderDigit}) is for Female, which does not match Male (must be 0, 2, 4, 6, 8)`
-        : `Số thứ 4 của CCCD (${centuryGenderDigit}) là mã Nữ, không khớp với giới tính Nam (phải là 0, 2, 4, 6, 8)`;
+      return text(
+        `Số thứ 4 của CCCD (${centuryGenderDigit}) là mã Nữ, không khớp với giới tính Nam (phải là 0, 2, 4, 6, 8)`,
+        `The 4th digit (${centuryGenderDigit}) is for Female, which does not match Male (must be 0, 2, 4, 6, 8)`,
+        `CCCDの4桁目（${centuryGenderDigit}）が男性のコードと一致しません（0、2、4、6、8のいずれか）。`,
+      );
     }
     if (gender === 'Nữ' && !isFemaleDigit) {
-      return isEn
-        ? `The 4th digit (${centuryGenderDigit}) is for Male, which does not match Female (must be 1, 3, 5, 7, 9)`
-        : `Số thứ 4 của CCCD (${centuryGenderDigit}) là mã Nam, không khớp với giới tính Nữ (phải là 1, 3, 5, 7, 9)`;
+      return text(
+        `Số thứ 4 của CCCD (${centuryGenderDigit}) là mã Nam, không khớp với giới tính Nữ (phải là 1, 3, 5, 7, 9)`,
+        `The 4th digit (${centuryGenderDigit}) is for Male, which does not match Female (must be 1, 3, 5, 7, 9)`,
+        `CCCDの4桁目（${centuryGenderDigit}）が女性のコードと一致しません（1、3、5、7、9のいずれか）。`,
+      );
     }
   }
 

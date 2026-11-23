@@ -33,8 +33,9 @@ function wildcardOriginMatches(origin: string, rule: string): boolean {
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
 
-  // The current frontend can move hosts without replacing existing allowed origins.
-  if (origin === Deno.env.get("PUBLIC_APP_ORIGIN")?.trim()) return true;
+  if (origin === Deno.env.get("PUBLIC_APP_ORIGIN")?.trim() ||
+    origin === Deno.env.get("LAN_APP_ORIGIN")?.trim() ||
+    origin === Deno.env.get("TUNNEL_APP_ORIGIN")?.trim()) return true;
 
   // 1. If explicit ALLOWED_ORIGINS are configured, enforce them strictly
   const configured = configuredOrigins();

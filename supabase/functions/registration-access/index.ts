@@ -3,7 +3,7 @@ import { getBearerToken, getClientIp, isOriginAllowed, isRecord, jsonResponse, r
 import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
 import {
   createQrChallenge, createRegistrationSessionToken, hashRegistrationSession,
-  REGISTRATION_SESSION_MS, verifyQrChallenge,
+  REGISTRATION_SESSION_MS, SESSION_TOKEN_PATTERN, verifyQrChallenge,
 } from "../_shared/registrationAccess.ts";
 
 Deno.serve(async (request: Request): Promise<Response> => {
@@ -17,16 +17,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!url || !secretKey || !signingSecret) return jsonResponse({ code: "SERVER_NOT_CONFIGURED" }, 503, origin);
 
   try {
-    if (Number(request.headers.get("content-length")) > 2048) return jsonResponse({ code: "INVALID_DATA" }, 413, origin);
+    if (Number(request.headers.get("content-length")) > 4096) return jsonResponse({ code: "INVALID_DATA" }, 413, origin);
     const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > 2048) return jsonResponse({ code: "INVALID_DATA" }, 413, origin);
+    if (new TextEncoder().encode(raw).byteLength > 4096) return jsonResponse({ code: "INVALID_DATA" }, 413, origin);
     let body: unknown;
     try { body = JSON.parse(raw); } catch { return jsonResponse({ code: "INVALID_DATA" }, 400, origin); }
     if (!isRecord(body) || !["q1", "q7", "hn"].includes(String(body.branch))) {
       return jsonResponse({ code: "INVALID_DATA" }, 400, origin);
     }
     const branch = String(body.branch);
-    if (body.action !== "qr" && body.action !== "exchange") return jsonResponse({ code: "INVALID_DATA" }, 400, origin);
+    if (body.action !== "qr" && body.action !== "exchange" && body.action !== "edit-registration") {
+      return jsonResponse({ code: "INVALID_DATA" }, 400, origin);
+    }
     const client = createAdminClient(url, secretKey);
 
     if (body.action === "qr") {
@@ -54,17 +56,41 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return jsonResponse({ success: true, branch, ...await createQrChallenge(branch, signingSecret) }, 200, origin);
     }
 
-    if (typeof body.challenge !== "string" ||
-      await verifyQrChallenge(body.challenge, signingSecret) !== branch) {
+    if (body.action === "edit-registration") {
+      if (typeof body.sessionToken !== "string" || !SESSION_TOKEN_PATTERN.test(body.sessionToken)) {
+        return jsonResponse({ code: "EDIT_SESSION_INVALID" }, 403, origin);
+      }
+      if (body.changes !== undefined && !isRecord(body.changes)) {
+        return jsonResponse({ code: "INVALID_DATA" }, 400, origin);
+      }
+    } else if (typeof body.challenge !== "string" || await verifyQrChallenge(body.challenge, signingSecret) !== branch) {
       return jsonResponse({ code: "QR_EXPIRED" }, 403, origin);
     }
-    const ipHash = await hashRegistrationSession(`access-ip|${signingSecret}|${getClientIp(request) ?? "unknown"}`);
+    const rateLimitScope = body.action === "edit-registration" ? "edit-ip" : "access-ip";
+    const ipHash = await hashRegistrationSession(`${rateLimitScope}|${signingSecret}|${getClientIp(request) ?? "unknown"}`);
     const { data: limits, error: limitError } = await client.rpc("consume_registration_ip_limit", {
       p_ip_hash: ipHash, p_max_requests: 600, p_window_seconds: 600,
     });
     const limit = Array.isArray(limits) ? limits[0] : limits;
     if (limitError) return jsonResponse({ code: "SERVER_ERROR" }, 503, origin);
     if (!limit?.allowed) return jsonResponse({ code: "RATE_LIMITED" }, 429, origin, { "Retry-After": "600" });
+
+    if (body.action === "edit-registration" && typeof body.sessionToken === "string") {
+      const { data, error } = await client.rpc("edit_registration_with_session", {
+        p_session_hash: await hashRegistrationSession(body.sessionToken),
+        p_branch_code: branch,
+        p_changes: body.changes ?? null,
+      });
+      switch (error?.message) {
+        case "EDIT_SESSION_INVALID": return jsonResponse({ code: error.message }, 403, origin);
+        case "EDIT_SESSION_EXPIRED":
+        case "EDIT_LOCKED": return jsonResponse({ code: error.message }, 409, origin);
+        case "INVALID_DATA": return jsonResponse({ code: error.message, field: error.details || undefined }, 400, origin);
+      }
+      if (error || !data) return jsonResponse({ code: "SERVER_ERROR" }, 503, origin);
+      return jsonResponse({ success: true, ...data }, 200, origin);
+    }
+
     const { data: branchRow, error: branchError } = await client.from("branches")
       .select("id").eq("code", branch).eq("is_active", true).maybeSingle();
     if (branchError || !branchRow) return jsonResponse({ code: "ACCESS_DENIED" }, 403, origin);

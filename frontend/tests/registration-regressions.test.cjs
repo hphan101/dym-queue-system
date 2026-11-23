@@ -112,6 +112,8 @@ test('queue receipts restore only for the same branch and Vietnam date', () => {
   assert.equal(receipt.readRegistrationReceipt('q7'), null);
   assert.equal(receipt.readRegistrationReceipt(null), null);
   assert.equal(receipt.readRegistrationReceipt('q1', '2026-11-02'), null);
+  receipt.storeRegistrationReceipt({ branch: 'q1', queueDate: '2026-11-01', queueNumber: '042' });
+  assert.equal(receipt.readRegistrationReceipt('q1').queueNumber, '042');
   receipt.clearRegistrationReceipt();
   assert.equal(receipt.readRegistrationReceipt('q1'), null);
   localStorage.setItem('dym_registration_receipt_v2', '{broken');
@@ -157,6 +159,7 @@ for (const name of ['TT25PrintModal', 'ConsentPrintModal']) {
       './tt25HcmPdfService': {
         getTT25TemplateInfo: () => ({ key: 'vnm', label: 'Tiếng Việt', pageCount: 9 }),
         getTT25PrintCopies: () => 1,
+        getTT25SignaturePage: () => 2,
       },
     }, {
       window: { print() {}, open: () => ({}), innerWidth: 1280 }, navigator: { userAgent: 'Desktop', maxTouchPoints: 0 },

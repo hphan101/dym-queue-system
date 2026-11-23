@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "dym-queue-local-pilot",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-23",
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": { "ip": "127.0.0.1", "port": 8788 },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dym-queue-local-pilot",
+      "database_id": "00000000-0000-4000-8000-000000000001"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "QUEUE_EVENTS", "class_name": "QueueEvents" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["QueueEvents"] }]
+}

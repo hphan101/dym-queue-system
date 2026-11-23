@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
+import type { SupportedLanguage } from '../../../locales/types';
 
 interface Option {
   value: string;
@@ -16,6 +17,7 @@ interface SearchableSelectProps {
   onFocus?: () => void;
   isLoadingOptions?: boolean;
   loadingMessage?: string;
+  lang?: SupportedLanguage;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -27,7 +29,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   error = false,
   onFocus,
   isLoadingOptions = false,
-  loadingMessage = "Loading...",
+  lang = 'vi',
+  loadingMessage = lang === 'ja' ? '読み込み中…' : 'Loading...',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -137,7 +140,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             ))
           ) : (
             <div className="px-4 py-3 text-xs text-slate-500 text-center">
-              {searchTerm ? "Không tìm thấy kết quả" : "Không có dữ liệu"}
+              {lang === 'ja'
+                ? (searchTerm ? '該当する項目がありません' : '選択肢がありません')
+                : (searchTerm ? 'Không tìm thấy kết quả' : 'Không có dữ liệu')}
             </div>
           )}
         </div>

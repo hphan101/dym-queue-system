@@ -1,0 +1,27 @@
+import type { TranslationDictionary } from './types';
+
+export const ja: TranslationDictionary = {
+  title: '健康診断の受付',
+  subtitle: '必要事項を入力すると、受付番号が発行されます。',
+  fullName: '氏名',
+  phoneNumber: '電話番号',
+  birthDate: '生年月日',
+  gender: '性別',
+  genderNam: '男性',
+  genderNu: '女性',
+  cccd: '身分証明書（CCCD）／パスポート',
+  address: '住所',
+  companyName: '会社名',
+  successTitle: '受付が完了しました',
+  successThanks: 'DYMをご利用いただき、ありがとうございます。',
+  queueLabel: '受付番号',
+  successNote: '受付番号をスクリーンショットなどで保存し、窓口でご提示ください。',
+  btnNewTurn: '新しく登録する',
+  summaryTitle: '登録内容',
+  failedTitle: '登録できませんでした',
+  errorUrl: '登録サービスを利用できません。受付にお問い合わせください。',
+  requestTimeout: '通信がタイムアウトしました。もう一度お試しください。',
+  saveError: '登録内容を保存できませんでした。もう一度お試しください。',
+  networkError: 'サーバーに接続できません。インターネット接続をご確認ください。',
+  noBranchError: 'このリンクには受診先が指定されていません。DYMの受付でQRコードを読み取ってください。',
+};

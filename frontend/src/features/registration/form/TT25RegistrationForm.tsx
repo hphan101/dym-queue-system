@@ -53,15 +53,15 @@ const EMAIL_PATTERN = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
 
 const administrativeLabels = {
-  fullName: ['họ và tên', 'full name'],
-  birthDate: ['ngày sinh', 'date of birth'],
-  pregnancyStatus: ['tình trạng mang thai', 'pregnancy status'],
-  phoneNumber: ['số điện thoại', 'phone number'],
-  email: ['email', 'email address'],
-  province: ['tỉnh/thành phố', 'province or city'],
-  ward: ['phường/xã', 'ward or commune'],
-  addressDetail: ['địa chỉ cụ thể', 'street address'],
-  workplace: ['tên công ty', 'company name'],
+  fullName: ['họ và tên', 'full name', '氏名'],
+  birthDate: ['ngày sinh', 'date of birth', '生年月日'],
+  pregnancyStatus: ['tình trạng mang thai', 'pregnancy status', '妊娠の状況'],
+  phoneNumber: ['số điện thoại', 'phone number', '電話番号'],
+  email: ['email', 'email address', 'メールアドレス'],
+  province: ['tỉnh/thành phố', 'province or city', '省・市'],
+  ward: ['phường/xã', 'ward or commune', '行政区（区・社）'],
+  addressDetail: ['địa chỉ cụ thể', 'street address', '詳細住所'],
+  workplace: ['tên công ty', 'company name', '会社名'],
 } as const;
 
 interface TT25RegistrationFormProps {
@@ -79,7 +79,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   lang = 'vi',
   initialCheckupReason,
 }) => {
-  const isEn = lang === 'en';
+  const text = (vi: string, en: string, ja: string) => ({ vi, en, ja })[lang];
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Administrative state
@@ -104,12 +104,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const [email, setEmail] = useState('');
   const emailId = useId();
   const identityId = useId();
+  const fullNameId = useId();
   const [identityDocumentType, setIdentityDocumentType] = useState<'cccd' | 'passport'>('cccd');
   const isPassport = identityDocumentType === 'passport';
   const cccd = documentNumbers[identityDocumentType];
   const identityLabel = isPassport
-    ? (isEn ? 'Passport number' : 'Số hộ chiếu')
-    : (isEn ? 'Citizen ID (CCCD)' : 'Số CCCD');
+    ? (text('Số hộ chiếu', 'Passport number', 'パスポート番号'))
+    : (text('Số CCCD', 'Citizen ID (CCCD)', 'ベトナムの身分証明書番号（CCCD）'));
   const [checkupReason, setCheckupReason] = useState(
     initialCheckupReason || CHECKUP_REASONS[0] || '',
   );
@@ -225,28 +226,38 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (companyRequired && !companyName) {
-      newErrors.workplace = isEn ? 'Please enter your company name' : 'Vui lòng nhập tên công ty';
+      newErrors.workplace = text('Vui lòng nhập tên công ty', 'Please enter your company name', '会社名を入力してください。');
     } else if (companyName.normalize('NFC').length > 150 || CONTROL_CHARACTERS.test(companyName)) {
-      newErrors.workplace = isEn ? 'Company name must be 150 characters or fewer on one line' : 'Tên công ty tối đa 150 ký tự và không xuống dòng';
+      newErrors.workplace = text(
+        'Tên công ty tối đa 150 ký tự và không xuống dòng',
+        'Company name must be 150 characters or fewer on one line',
+        '会社名は改行せず、150文字以内で入力してください。',
+      );
     }
 
     const cleanName = fullName.trim().normalize('NFC').toUpperCase();
     if (!cleanName) {
-      newErrors.fullName = isEn ? 'Please enter your full name' : 'Vui lòng nhập họ và tên';
+      newErrors.fullName = text('Vui lòng nhập họ và tên', 'Please enter your full name', '氏名を入力してください。');
     } else if (cleanName.length < 2) {
-      newErrors.fullName = isEn ? 'Full name must be at least 2 characters' : 'Họ và tên phải có ít nhất 2 ký tự';
+      newErrors.fullName = text('Họ và tên phải có ít nhất 2 ký tự', 'Full name must be at least 2 characters', '氏名は2文字以上で入力してください。');
     } else if (cleanName.length > 100 || CONTROL_CHARACTERS.test(cleanName)) {
-      newErrors.fullName = isEn ? 'Full name must be 100 characters or fewer on one line' : 'Họ và tên tối đa 100 ký tự và không xuống dòng';
+      newErrors.fullName = text(
+        'Họ và tên tối đa 100 ký tự và không xuống dòng',
+        'Full name must be 100 characters or fewer on one line',
+        '氏名は改行せず、100文字以内で入力してください。',
+      );
     }
 
     if (!birthDate) {
-      newErrors.birthDate = isEn
-        ? 'Please enter your date of birth (DD/MM/YYYY)'
-        : 'Vui lòng nhập ngày sinh (định dạng ngày/tháng/năm)';
+      newErrors.birthDate = text(
+        'Vui lòng nhập ngày sinh (định dạng ngày/tháng/năm)',
+        'Please enter your date of birth (DD/MM/YYYY)',
+        '生年月日を日／月／年の順に入力してください。',
+      );
     } else {
       const birth = new Date(birthDate);
       if (isNaN(birth.getTime()) || birth.getFullYear() < 1900) {
-        newErrors.birthDate = isEn ? 'Invalid date of birth' : 'Ngày sinh không hợp lệ';
+        newErrors.birthDate = text('Ngày sinh không hợp lệ', 'Invalid date of birth', '有効な生年月日を入力してください。');
       } else {
         const today = new Date();
         let age = today.getFullYear() - birth.getFullYear();
@@ -255,15 +266,17 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           age--;
         }
         if (age < 18) {
-          newErrors.birthDate = isEn
-            ? 'Circular 25 applies to individuals aged 18 and above'
-            : 'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên';
+          newErrors.birthDate = text(
+            'Thông tư 25 áp dụng cho người từ đủ 18 tuổi trở lên',
+            'Circular 25 applies to individuals aged 18 and above',
+            '通達第25号の対象は18歳以上の方です。',
+          );
         }
       }
     }
 
     if (gender === 'Nữ' && !pregnancyStatus) {
-      newErrors.pregnancyStatus = isEn ? 'Please select your pregnancy status' : 'Vui lòng chọn tình trạng mang thai';
+      newErrors.pregnancyStatus = text('Vui lòng chọn tình trạng mang thai', 'Please select your pregnancy status', '妊娠の状況を選択してください。');
     }
 
     const cccdError = validateVietnamCccd({
@@ -271,34 +284,44 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       cccd,
       gender,
       birthDate,
-      isEn,
+      lang,
     });
     if (cccdError) {
       newErrors.cccd = cccdError;
     } else if (isPassport && (cccd.trim().normalize('NFC').toUpperCase().length > 100 || CONTROL_CHARACTERS.test(cccd.trim()))) {
-      newErrors.cccd = isEn ? 'Passport number must be 100 characters or fewer on one line' : 'Số hộ chiếu tối đa 100 ký tự và không xuống dòng';
+      newErrors.cccd = text(
+        'Số hộ chiếu tối đa 100 ký tự và không xuống dòng',
+        'Passport number must be 100 characters or fewer on one line',
+        'パスポート番号は改行せず、100文字以内で入力してください。',
+      );
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
     if (phoneRequired && !phoneNumber.trim()) {
-      newErrors.phoneNumber = isEn ? 'Please enter your phone number' : 'Vui lòng nhập số điện thoại';
+      newErrors.phoneNumber = text('Vui lòng nhập số điện thoại', 'Please enter your phone number', '電話番号を入力してください。');
     } else if (phoneNumber.trim() && !/^0(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
-      newErrors.phoneNumber = isEn
-        ? 'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)'
-        : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)';
+      newErrors.phoneNumber = text(
+        'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)',
+        'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)',
+        '電話番号は03、05、07、08、09のいずれかで始まる10桁の番号を入力してください。',
+      );
     }
 
     if (email.trim() && (email.trim().length > 120 || !EMAIL_PATTERN.test(email.trim()))) {
-      newErrors.email = isEn ? 'Please enter a valid email address' : 'Vui lòng nhập email đúng định dạng';
+      newErrors.email = text('Vui lòng nhập email đúng định dạng', 'Please enter a valid email address', '有効なメールアドレスを入力してください。');
     }
 
-    if (!province) newErrors.province = isEn ? 'Please select a Province / City' : 'Vui lòng chọn Tỉnh/Thành phố';
-    if (!ward) newErrors.ward = isEn ? 'Please select a Ward / Commune' : 'Vui lòng chọn Phường/Xã';
+    if (!province) newErrors.province = text('Vui lòng chọn Tỉnh/Thành phố', 'Please select a Province / City', '省または市を選択してください。');
+    if (!ward) newErrors.ward = text('Vui lòng chọn Phường/Xã', 'Please select a Ward / Commune', '行政区（区・社）を選択してください。');
     const cleanAddress = addressDetail.trim().normalize('NFC');
     if (!cleanAddress) {
-      newErrors.addressDetail = isEn ? 'Please enter your street address' : 'Vui lòng nhập địa chỉ cụ thể';
+      newErrors.addressDetail = text('Vui lòng nhập địa chỉ cụ thể', 'Please enter your street address', '番地や通り名などの詳細住所を入力してください。');
     } else if (cleanAddress.length < 3 || cleanAddress.length > 250 || CONTROL_CHARACTERS.test(cleanAddress)) {
-      newErrors.addressDetail = isEn ? 'Street address must contain 3–250 characters on one line' : 'Địa chỉ cụ thể phải có từ 3 đến 250 ký tự và không xuống dòng';
+      newErrors.addressDetail = text(
+        'Địa chỉ cụ thể phải có từ 3 đến 250 ký tự và không xuống dòng',
+        'Street address must contain 3–250 characters on one line',
+        '詳細住所は改行せず、3〜250文字で入力してください。',
+      );
     }
 
     focusInvalid.current = Object.keys(newErrors).length > 0;
@@ -374,10 +397,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       const labels = field && Object.hasOwn(administrativeLabels, field)
         ? administrativeLabels[field as keyof typeof administrativeLabels]
         : undefined;
-      const label = field === 'cccd' ? identityLabel.toLowerCase() : labels?.[isEn ? 1 : 0];
+      const label = field === 'cccd' ? identityLabel.toLowerCase() : labels?.[lang === 'ja' ? 2 : lang === 'en' ? 1 : 0];
       if (field && label) {
         focusInvalid.current = true;
-        setErrors({ [field]: isEn ? `Please check your ${label}` : `Vui lòng kiểm tra lại ${label}` });
+        setErrors({ [field]: text(`Vui lòng kiểm tra lại ${label}`, `Please check your ${label}`, `「${label}」を確認してください。`) });
       }
       setCurrentStep(1);
       window.scrollTo({ top: 0, behavior: 'auto' });
@@ -410,10 +433,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Step Items */}
           <div className="flex items-start justify-between relative z-10">
             {([
-              { step: 1, label: isEn ? 'Personal Info' : 'Hành chính' },
-              { step: 2, label: isEn ? 'Medical History' : 'Tiền sử bệnh' },
-              { step: 3, label: isEn ? 'Target & Payment' : 'Đối tượng - Chi trả' },
-              { step: 4, label: isEn ? 'Confirm' : 'Xác nhận' },
+              { step: 1, label: text('Hành chính', 'Personal Info', '基本情報') },
+              { step: 2, label: text('Tiền sử bệnh', 'Medical History', '問診') },
+              { step: 3, label: text('Đối tượng - Chi trả', 'Target & Payment', '受診区分・費用') },
+              { step: 4, label: text('Xác nhận', 'Confirm', '確認') },
             ] as const).map((item) => {
               const isCompleted = currentStep > item.step;
               const isCurrent = currentStep === item.step;
@@ -472,34 +495,44 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {currentStep === 1 && (
         <form ref={administrativeForm} noValidate onSubmit={handleNextToStep2} className="space-y-4 animate-fade-in">
           <h2 className="sr-only">
-            {isEn ? '1. Administrative Information' : '1. Thông tin hành chính'}
+            {text('1. Thông tin hành chính', '1. Administrative Information', '1. 基本情報')}
           </h2>
           {reviewAdministrative && (
             <Alert variant="destructive"><AlertDescription>
-              {isEn ? 'Please review your administrative information and try again.' : 'Vui lòng kiểm tra thông tin hành chính rồi gửi lại.'}
+              {text(
+                'Vui lòng kiểm tra thông tin hành chính rồi gửi lại.',
+                'Please review your administrative information and try again.',
+                '基本情報を確認してから、もう一度送信してください。',
+              )}
             </AlertDescription></Alert>
           )}
-          <div className="bg-accent/60 border border-border rounded-md p-3 text-xs text-foreground flex items-start gap-2">
-            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p>
-              {isEn
-                ? 'Please fill in your details accurately according to your Citizen ID or Passport to issue the Ministry of Health standard medical examination form (Circular 25/2026/TT-BYT).'
-                : 'Vui lòng điền chính xác theo CCCD hoặc Hộ chiếu để xuất giấy khám sức khỏe theo mẫu chuẩn Bộ Y tế (Thông tư 25/2026/TT-BYT).'}
-            </p>
-          </div>
+          <Alert variant="warning" role="note">
+            <AlertDescription id={`${fullNameId}-document-note`} className="flex items-start gap-2 leading-5">
+              <AlertCircle className="h-5 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                {text(
+                  'Thông tin cung cấp cần chính xác với thông tin trên CCCD hoặc passport.',
+                  'The information you provide must match your citizen ID or passport.',
+                  '入力する情報は、ベトナムの身分証明書（CCCD）またはパスポートの記載と一致している必要があります。',
+                )}
+              </span>
+            </AlertDescription>
+          </Alert>
 
           {/* Họ và tên */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {isEn ? '1. Full Name (e.g. NGUYEN VAN A)' : '1. Họ và tên (ví dụ: NGUYỄN VĂN A)'}{' '}
+            <label htmlFor={fullNameId} className="block text-xs font-semibold text-slate-700 mb-1">
+              {text('1. Họ và tên (ví dụ: NGUYỄN VĂN A)', '1. Full Name (e.g. NGUYEN VAN A)', '1. 氏名（例：山田 太郎）')}{' '}
               <span className="text-red-500">*</span>
             </label>
             <input
+              id={fullNameId}
               type="text"
               autoComplete="name"
               enterKeyHint="next"
               value={fullName}
               aria-invalid={Boolean(errors.fullName)}
+              aria-describedby={`${fullNameId}-document-note`}
               maxLength={100}
               onChange={(e) => {
                 setFullName(e.target.value);
@@ -516,7 +549,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             <div className="min-w-0">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '2. Gender' : '2. Giới tính'} <span className="text-red-500">*</span>
+                {text('2. Giới tính', '2. Gender', '2. 性別')} <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {(['Nam', 'Nữ'] as const).map((g) => (
@@ -535,7 +568,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                           cccd,
                           gender: g,
                           birthDate,
-                          isEn,
+                          lang,
                         });
                         setErrors((prev) => ({ ...prev, cccd: err || '' }));
                       }
@@ -546,7 +579,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    {isEn ? (g === 'Nam' ? 'Male' : 'Female') : g}
+                    {g === 'Nam' ? text('Nam', 'Male', '男性') : text('Nữ', 'Female', '女性')}
                   </button>
                 ))}
               </div>
@@ -554,9 +587,10 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
             <div className="min-w-0">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '3. Date of Birth' : '3. Ngày sinh'} <span className="text-red-500">*</span>
+                {text('3. Ngày sinh', '3. Date of Birth', '3. 生年月日（日／月／年）')} <span className="text-red-500">*</span>
               </label>
               <BirthDateInput
+                calendarLabel={text('Chọn ngày từ lịch', 'Choose a date from the calendar', 'カレンダーから日付を選択')}
                 value={birthDate}
                 onChange={(val) => {
                   setBirthDate(val);
@@ -568,7 +602,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                             cccd,
                             gender,
                             birthDate: val,
-                            isEn,
+                            lang,
                           }) || ''
                         : prev.cccd;
                     return {
@@ -593,7 +627,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               aria-invalid={Boolean(errors.pregnancyStatus)}
             >
               <legend className="mb-1 text-xs font-semibold text-slate-700">
-                {isEn ? 'Pregnancy status' : 'Tình trạng mang thai'} <span className="text-red-500">*</span>
+                {text('Tình trạng mang thai', 'Pregnancy status', '妊娠の状況')} <span className="text-red-500">*</span>
               </legend>
               <div className="grid gap-2 sm:grid-cols-3">
                 {(Object.keys(PREGNANCY_STATUS_LABELS) as PregnancyStatus[]).map((status) => (
@@ -620,31 +654,33 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '4. Ethnicity' : '4. Dân tộc'}
+                {text('4. Dân tộc', '4. Ethnicity', '4. 民族')}
               </label>
               <SearchableSelect
+                lang={lang}
                 options={ETHNIC_GROUPS.map((e) => ({
                   value: e,
-                  label: isEn && e === 'Người nước ngoài' ? 'Foreigner (Người nước ngoài)' : e,
+                  label: e === 'Người nước ngoài' ? text(e, 'Foreigner (Người nước ngoài)', '外国籍（Người nước ngoài）') : e,
                 }))}
                 value={ethnicity}
                 onChange={setEthnicity}
-                placeholder={isEn ? 'Select ethnicity' : 'Chọn dân tộc'}
+                placeholder={text('Chọn dân tộc', 'Select ethnicity', '民族を選択')}
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '5. Blood Type (optional)' : '5. Nhóm máu (nếu có)'}
+                {text('5. Nhóm máu (nếu có)', '5. Blood Type (optional)', '5. 血液型（任意）')}
               </label>
               <SearchableSelect
+                lang={lang}
                 options={BLOOD_GROUPS.map((b) => ({
                   value: b,
-                  label: isEn && b === 'Chưa rõ' ? 'Unknown' : b,
+                  label: b === 'Chưa rõ' ? text(b, 'Unknown', '不明') : b,
                 }))}
                 value={bloodGroup}
                 onChange={setBloodGroup}
-                placeholder={isEn ? 'Select blood type' : 'Chọn nhóm máu'}
+                placeholder={text('Chọn nhóm máu', 'Select blood type', '血液型を選択')}
               />
             </div>
           </div>
@@ -653,7 +689,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <FieldSet className="mb-2 gap-2">
-                <FieldLegend variant="label">{isEn ? '6. Identity document' : '6. Giấy tờ tùy thân'}</FieldLegend>
+                <FieldLegend variant="label">{text('6. Giấy tờ tùy thân', '6. Identity document', '6. 本人確認書類')}</FieldLegend>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
                   {(['cccd', 'passport'] as const).map((type) => (
                     <label key={type} className="inline-flex items-center gap-2">
@@ -667,7 +703,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                           setErrors((prev) => ({ ...prev, cccd: '' }));
                         }}
                       />
-                      {type === 'cccd' ? 'CCCD' : isEn ? 'Passport' : 'Hộ chiếu'}
+                      {type === 'cccd' ? 'CCCD' : text('Hộ chiếu', 'Passport', 'パスポート')}
                     </label>
                   ))}
                 </div>
@@ -692,7 +728,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       cccd: nextVal,
                       gender,
                       birthDate,
-                      isEn,
+                      lang,
                     });
                     setErrors((prev) => ({ ...prev, cccd: err || '' }));
                   } else if (errors.cccd) {
@@ -706,13 +742,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       cccd,
                       gender,
                       birthDate,
-                      isEn,
+                      lang,
                     });
                     setErrors((prev) => ({ ...prev, cccd: err || '' }));
                   }
                 }}
                 maxLength={isPassport ? 100 : 12}
-                placeholder={isPassport ? identityLabel : (isEn ? '12 digits' : '12 chữ số CCCD')}
+                placeholder={isPassport ? identityLabel : (text('12 chữ số CCCD', '12 digits', 'CCCDの12桁の番号'))}
                 className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
                   errors.cccd ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
@@ -722,14 +758,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn ? '7. Health Insurance No. (optional)' : '7. Số thẻ BHYT (nếu có)'}
+                {text('7. Số thẻ BHYT (nếu có)', '7. Health Insurance No. (optional)', '7. 健康保険証番号（任意）')}
               </label>
               <input
                 type="text"
                 value={insuranceNumber}
                 onChange={(e) => setInsuranceNumber(e.target.value.toUpperCase())}
                 maxLength={15}
-                placeholder={isEn ? 'e.g. DN4791234567890' : 'VD: DN4791234567890'}
+                placeholder={text('VD: DN4791234567890', 'e.g. DN4791234567890', '例：DN4791234567890')}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors"
               />
             </div>
@@ -738,17 +774,18 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Nơi ở hiện tại: Tỉnh / Huyện / Xã / Địa chỉ */}
           <div className="space-y-2">
             <span className="block text-xs font-semibold text-slate-800">
-              {isEn ? '8. Current Residence Address' : '8. Nơi ở hiện tại'}{' '}
+              {text('8. Nơi ở hiện tại', '8. Current Residence Address', '8. 現住所')}{' '}
               <span className="text-red-500">*</span>
             </span>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <SearchableSelect
+                  lang={lang}
                   options={provinces.map((p) => ({ value: p.name_with_type, label: p.name_with_type }))}
                   value={province}
                   onChange={handleProvinceChange}
-                  placeholder={isEn ? 'Select Province / City' : 'Chọn Tỉnh / Thành phố'}
+                  placeholder={text('Chọn Tỉnh / Thành phố', 'Select Province / City', '省・市を選択')}
                   disabled={isLocationLoading || !locationsLoaded}
                   isLoadingOptions={isLocationLoading}
                   error={Boolean(errors.province)}
@@ -758,13 +795,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
               <div>
                 <SearchableSelect
+                  lang={lang}
                   options={wards.map((w) => ({ value: w.name_with_type, label: w.name_with_type }))}
                   value={ward}
                   onChange={(val) => {
                     setWard(val);
                     if (errors.ward) setErrors((prev) => ({ ...prev, ward: '' }));
                   }}
-                  placeholder={isEn ? 'Select Ward / Commune' : 'Chọn Phường / Xã'}
+                  placeholder={text('Chọn Phường / Xã', 'Select Ward / Commune', '行政区（区・社）を選択')}
                   disabled={!province || wards.length === 0}
                   error={Boolean(errors.ward)}
                 />
@@ -782,7 +820,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   setAddressDetail(e.target.value);
                   if (errors.addressDetail) setErrors((prev) => ({ ...prev, addressDetail: '' }));
                 }}
-                placeholder={isEn ? 'House number, street name...' : 'Số nhà, tên đường, thôn / ấp...'}
+                placeholder={text('Số nhà, tên đường, thôn / ấp...', 'House number, street name...', '番地、通り名、集落名など')}
                 className={`w-full px-3 py-2 bg-white border rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${
                   errors.addressDetail ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
                 }`}
@@ -794,16 +832,15 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Nghề nghiệp */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {isEn ? '9. Occupation' : '9. Nghề nghiệp'}
+              {text('9. Nghề nghiệp', '9. Occupation', '9. 職業')}
             </label>
             <SearchableSelect
+              lang={lang}
               options={occupations.map((occ) => ({ value: occ, label: occ }))}
               value={occupation}
               onChange={setOccupation}
               placeholder={
-                isEn
-                  ? 'Select or type to search occupation...'
-                  : 'Chọn hoặc nhập để tìm nghề nghiệp...'
+                text('Chọn hoặc nhập để tìm nghề nghiệp...', 'Select or type to search occupation...', '職業を選択または検索（ベトナム語）')
               }
               isLoadingOptions={occupations.length === 0 && isLocationLoading}
             />
@@ -813,9 +850,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="space-y-2">
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-1">
-                {isEn
-                  ? '10. Workplace / School (Full company/school name)'
-                  : '10. Nơi làm việc, học tập (Tên đầy đủ công ty/trường)'}
+                {text('10. Nơi làm việc, học tập (Tên đầy đủ công ty/trường)', '10. Workplace / School (Full company/school name)', '10. 勤務先・学校（正式名称）')}
                 {companyRequired && <span className="text-red-500"> *</span>}
               </label>
               <input
@@ -831,9 +866,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   if (errors.workplace) setErrors((prev) => ({ ...prev, workplace: '' }));
                 }}
                 placeholder={
-                  isEn
-                    ? 'Enter company or school name...'
-                    : 'Nhập tên đầy đủ công ty hoặc trường học...'
+                  text('Nhập tên đầy đủ công ty hoặc trường học...', 'Enter company or school name...', '会社または学校の正式名称を入力')
                 }
                 className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors ${errors.workplace ? 'border-red-400 bg-red-50/30' : 'border-slate-200'}`}
               />
@@ -842,31 +875,31 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
             <div>
               <span className="block text-xs font-semibold text-slate-700 mb-1">
-                {isEn
-                  ? 'Ward / Province of workplace or school'
-                  : 'Xã, phường nơi làm việc, học tập'}
+                {text('Xã, phường nơi làm việc, học tập', 'Ward / Province of workplace or school', '勤務先・学校の所在地（省・市、区・社）')}
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <SearchableSelect
+                  lang={lang}
                   options={provinces.map((p) => ({
                     value: p.name_with_type,
                     label: p.name_with_type,
                   }))}
                   value={workplaceProvince}
                   onChange={handleWorkplaceProvinceChange}
-                  placeholder={isEn ? 'Select Province / City' : 'Chọn Tỉnh / Thành phố'}
+                  placeholder={text('Chọn Tỉnh / Thành phố', 'Select Province / City', '省・市を選択')}
                   disabled={isLocationLoading || !locationsLoaded}
                   isLoadingOptions={isLocationLoading}
                 />
 
                 <SearchableSelect
+                  lang={lang}
                   options={workplaceWards.map((w) => ({
                     value: w.name_with_type,
                     label: w.name_with_type,
                   }))}
                   value={workplaceWard}
                   onChange={setWorkplaceWard}
-                  placeholder={isEn ? 'Select Ward / Commune' : 'Chọn Phường / Xã'}
+                  placeholder={text('Chọn Phường / Xã', 'Select Ward / Commune', '行政区（区・社）を選択')}
                   disabled={!workplaceProvince || workplaceWards.length === 0}
                 />
               </div>
@@ -876,7 +909,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Điện thoại di động */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {isEn ? '11. Mobile Phone Number' : '11. Điện thoại di động'}{' '}
+              {text('11. Điện thoại di động', '11. Mobile Phone Number', '11. 携帯電話番号')}{' '}
               {phoneRequired && <span className="text-red-500">*</span>}
             </label>
             <input
@@ -902,7 +935,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
           <Field className="gap-1" data-invalid={errors.email ? true : undefined}>
             <FieldLabel htmlFor={emailId} className="text-xs font-semibold leading-4 text-slate-700">
-              {isEn ? '12. Email (optional)' : '12. Email (không bắt buộc)'}
+              {text('12. Email (không bắt buộc)', '12. Email (optional)', '12. メールアドレス（任意）')}
             </FieldLabel>
             <Input
               id={emailId}
@@ -933,7 +966,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               className="h-auto min-h-11 w-full whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
               <span>
-                {isEn ? 'Next: Medical History Declaration' : 'Tiếp tục: Khai báo tiền sử bệnh'}
+                {text('Tiếp tục: Khai báo tiền sử bệnh', 'Next: Medical History Declaration', '次へ：問診')}
               </span>
               <ChevronRight aria-hidden="true" />
             </Button>
@@ -945,16 +978,18 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {currentStep === 2 && (
         <form onSubmit={handleNextToStep3} className="space-y-5 animate-fade-in">
           <h2 className="sr-only">
-            {isEn ? '2. Medical History' : '2. Tiền sử bệnh'}
+            {text('2. Tiền sử bệnh', '2. Medical History', '2. 問診')}
           </h2>
           {/* 1. Tiền sử gia đình */}
           <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-2">
             <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug">
-              {isEn ? '1. Family Medical History:' : '1. Tiền sử gia đình:'}
+              {text('1. Tiền sử gia đình:', '1. Family Medical History:', '1. 家族歴')}
               <span className="font-normal text-xs text-slate-600 block mt-0.5">
-                {isEn
-                  ? 'Has anyone in your family been diagnosed with: infectious diseases, cardiovascular disease, diabetes, tuberculosis, bronchial asthma, cancer, epilepsy, mental disorders, or other hereditary conditions?'
-                  : 'Có ai trong gia đình ông (bà) mắc một trong các bệnh: truyền nhiễm, tim mạch, đái tháo đường, lao, hen phế quản, ung thư, động kinh, rối loạn tâm thần, bệnh khác:'}
+                {text(
+                  'Có ai trong gia đình ông (bà) mắc một trong các bệnh: truyền nhiễm, tim mạch, đái tháo đường, lao, hen phế quản, ung thư, động kinh, rối loạn tâm thần, bệnh khác:',
+                  'Has anyone in your family been diagnosed with: infectious diseases, cardiovascular disease, diabetes, tuberculosis, bronchial asthma, cancer, epilepsy, mental disorders, or other hereditary conditions?',
+                  'ご家族に、感染症、心血管疾患、糖尿病、結核、気管支喘息、がん、てんかん、精神疾患、またはその他の病気にかかった方はいますか？',
+                )}
               </span>
             </h3>
             <div className="flex items-center gap-3">
@@ -972,7 +1007,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                {isEn ? 'No' : 'Không'}
+                {text('Không', 'No', 'いいえ')}
               </button>
               <button
                 type="button"
@@ -988,7 +1023,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                {isEn ? 'Yes' : 'Có bệnh'}
+                {text('Có bệnh', 'Yes', 'はい')}
               </button>
             </div>
             {medicalHistory.familyHistory.hasDisease && (
@@ -1004,9 +1039,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }))
                   }
                   placeholder={
-                    isEn
-                      ? 'Specify condition name (e.g., Heart disease, diabetes...)'
-                      : 'Ghi cụ thể tên bệnh (VD: Tim mạch, tiểu đường...)'
+                    text('Ghi cụ thể tên bệnh (VD: Tim mạch, tiểu đường...)', 'Specify condition name (e.g., Heart disease, diabetes...)', '病名を入力（例：心疾患、糖尿病）')
                   }
                   className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-200"
                 />
@@ -1018,12 +1051,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-2.5">
             <div className="border-b border-slate-100 pb-2">
               <h3 className="text-sm sm:text-base font-bold text-slate-800">
-                {isEn ? '2. Personal Medical History:' : '2. Tiền sử bệnh, tật của bản thân:'}
+                {text('2. Tiền sử bệnh, tật của bản thân:', '2. Personal Medical History:', '2. 既往歴・治療歴')}
               </h3>
               <p className="text-[11px] text-slate-500">
-                {isEn
-                  ? 'Have you ever had or do you currently have any of the following conditions?'
-                  : 'Ông (bà) đã hoặc đang mắc bệnh, tình trạng nào sau đây không?'}
+                {text(
+                  'Ông (bà) đã hoặc đang mắc bệnh, tình trạng nào sau đây không?',
+                  'Have you ever had or do you currently have any of the following conditions?',
+                  '次の病気や症状にかかったことがありますか、または現在ありますか？',
+                )}
               </p>
             </div>
 
@@ -1041,7 +1076,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   >
                     <span className="font-medium text-slate-800 leading-snug">
                       <strong className="text-slate-500 mr-1">{item.id}.</strong>{' '}
-                      {isEn ? item.nameEn : item.name}
+                      {text(item.name, item.nameEn, item.nameJa)}
                     </span>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
@@ -1053,7 +1088,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        {isEn ? 'No' : 'Không'}
+                        {text('Không', 'No', 'いいえ')}
                       </button>
                       <button
                         type="button"
@@ -1064,7 +1099,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        {isEn ? 'Yes' : 'Có'}
+                        {text('Có', 'Yes', 'はい')}
                       </button>
                     </div>
                   </div>
@@ -1075,7 +1110,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {medicalHistory.personalHistory[22] && (
               <div className="pt-2 animate-fade-in">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  {isEn ? 'Please specify other conditions:' : 'Ghi rõ bệnh khác của bạn:'}
+                  {text('Ghi rõ bệnh khác của bạn:', 'Please specify other conditions:', 'その他の病気を記入してください')}
                 </label>
                 <input
                   type="text"
@@ -1087,7 +1122,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       personalOtherDetails: e.target.value,
                     }))
                   }
-                  placeholder={isEn ? 'Specify other medical conditions...' : 'Ghi rõ tên bệnh lý khác...'}
+                  placeholder={text('Ghi rõ tên bệnh lý khác...', 'Specify other medical conditions...', 'その他の病名を入力')}
                   className="w-full px-3 py-1.5 border border-slate-200 rounded text-xs"
                 />
               </div>
@@ -1097,15 +1132,17 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* 3. Câu hỏi khác */}
           <div className="bg-white border border-slate-200 rounded-md p-3.5 shadow-sm space-y-3">
             <h3 className="text-sm sm:text-base font-bold text-slate-800">
-              {isEn ? '3. Additional Questions (if applicable):' : '3. Câu hỏi khác (nếu có):'}
+              {text('3. Câu hỏi khác (nếu có):', '3. Additional Questions (if applicable):', '3. その他の質問（該当する場合）')}
             </h3>
 
             {/* a) Điều trị bệnh */}
             <div className="space-y-1.5 text-xs">
               <p className="font-medium text-slate-700">
-                {isEn
-                  ? 'a) Are you currently receiving treatment for any medical condition?'
-                  : 'a) Bạn có đang điều trị bệnh gì không?'}
+                {text(
+                  'a) Bạn có đang điều trị bệnh gì không?',
+                  'a) Are you currently receiving treatment for any medical condition?',
+                  'a）現在、何らかの病気の治療を受けていますか？',
+                )}
               </p>
               <div className="flex items-center gap-3">
                 <button
@@ -1122,7 +1159,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
-                  {isEn ? 'No' : 'Không'}
+                  {text('Không', 'No', 'いいえ')}
                 </button>
                 <button
                   type="button"
@@ -1138,7 +1175,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
-                  {isEn ? 'Yes, currently under treatment' : 'Có điều trị'}
+                  {text('Có điều trị', 'Yes, currently under treatment', 'はい、治療中です')}
                 </button>
               </div>
               {medicalHistory.currentTreatment.isTreating && (
@@ -1154,9 +1191,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       }))
                     }
                     placeholder={
-                      isEn
-                        ? 'List current medications and dosages...'
-                        : 'Liệt kê các thuốc đang dùng và liều lượng...'
+                      text('Liệt kê các thuốc đang dùng và liều lượng...', 'List current medications and dosages...', '使用中の薬と用量を入力')
                     }
                     className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900"
                   />
@@ -1168,7 +1203,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {gender === 'Nữ' && (
               <div className="space-y-1.5 text-xs border-t border-slate-100 pt-2.5 animate-fade-in">
                 <p className="font-medium text-slate-700">
-                  {isEn ? 'b) Obstetric / Pregnancy History (For women):' : 'b) Tiền sử thai sản (Đối với phụ nữ):'}
+                  {text('b) Tiền sử thai sản (Đối với phụ nữ):', 'b) Obstetric / Pregnancy History (For women):', 'b）妊娠・出産歴（女性の方）')}
                 </p>
                 <div className="flex items-center gap-3">
                   <button
@@ -1185,7 +1220,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
-                    {isEn ? 'No' : 'Không'}
+                    {text('Không', 'No', 'いいえ')}
                   </button>
                   <button
                     type="button"
@@ -1201,7 +1236,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
-                    {isEn ? 'Yes' : 'Có'}
+                    {text('Có', 'Yes', 'はい')}
                   </button>
                 </div>
                 {medicalHistory.pregnancyHistory?.hasHistory && (
@@ -1217,9 +1252,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         }))
                       }
                       placeholder={
-                        isEn
-                          ? 'Specify pregnancy status or obstetric history...'
-                          : 'Ghi rõ tình trạng thai sản hoặc thuốc đang dùng...'
+                        text('Ghi rõ tình trạng thai sản hoặc thuốc đang dùng...', 'Specify pregnancy status or obstetric history...', '妊娠の状況や出産歴などを入力')
                       }
                       className="w-full px-3 py-1.5 bg-amber-50/50 border border-amber-300 rounded text-xs text-slate-900"
                     />
@@ -1238,16 +1271,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
               <ChevronLeft aria-hidden="true" />
-              {isEn ? 'Back' : 'Quay lại'}
+              {text('Quay lại', 'Back', '戻る')}
             </Button>
             <Button
               type="submit"
               className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
               <span>
-                {isEn
-                  ? 'Next: Target & Payment Info'
-                  : 'Tiếp tục: Thông tin đối tượng - chi trả'}
+                {text('Tiếp tục: Thông tin đối tượng - chi trả', 'Next: Target & Payment Info', '次へ：受診区分・費用')}
               </span>
               <ChevronRight aria-hidden="true" />
             </Button>
@@ -1259,16 +1290,16 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {currentStep === 3 && (
         <form onSubmit={handleNextToStep4} className="space-y-4 animate-fade-in">
           <h2 className="sr-only">
-            {isEn
-              ? '3. Target Category & Payment Source'
-              : '3. Đối tượng & Nguồn chi trả'}
+            {text('3. Đối tượng & Nguồn chi trả', '3. Target Category & Payment Source', '3. 受診区分と費用負担')}
           </h2>
           <div className="bg-accent/60 border border-border rounded-md p-3 text-xs text-foreground flex items-start gap-2">
             <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p>
-              {isEn
-                ? 'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical facility.'
-                : 'Vui lòng chọn thông tin đối tượng và nguồn chi trả theo mẫu Thông tư 25/2026/TT-BYT. Địa điểm khám được tự động tích chọn là Cơ sở KBCB (CS KBCB).'}
+              {text(
+                'Vui lòng chọn thông tin đối tượng và nguồn chi trả theo mẫu Thông tư 25/2026/TT-BYT. Địa điểm khám được tự động tích chọn là Cơ sở KBCB (CS KBCB).',
+                'Please select your target category and payment source in accordance with Circular 25/2026/TT-BYT. Examination location is automatically set to Medical facility.',
+                'ベトナム保健省通達第25/2026/TT-BYT号に沿って、受診区分と費用の負担者を選択してください。受診場所は医療機関に設定されています。',
+              )}
             </p>
           </div>
 
@@ -1276,12 +1307,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="space-y-2.5">
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-slate-800">
-                {isEn ? '1. Target Category' : '1. Đối tượng khám sức khỏe'}
+                {text('1. Đối tượng khám sức khỏe', '1. Target Category', '1. 受診区分')}
               </h3>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {isEn
-                  ? 'Target code from 1 to 17 according to the Circular appendix:'
-                  : 'Đối tượng (ghi số từ 1 đến 17 theo mã đối tượng tại phụ lục):'}
+                {text(
+                  'Đối tượng (ghi số từ 1 đến 17 theo mã đối tượng tại phụ lục):',
+                  'Target code from 1 to 17 according to the Circular appendix:',
+                  '通達の付録にある区分コード（1〜17）に従って選択してください。',
+                )}
               </p>
             </div>
 
@@ -1291,21 +1324,25 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   id: '14' as TT25TargetGroup,
                   labelVi: '14 – Sinh viên, học viên',
                   labelEn: '14 – Student / Trainee',
+                  labelJa: '14 – 学生・研修生',
                 },
                 {
                   id: '15' as TT25TargetGroup,
                   labelVi: '15 – Người lao động chính thức (theo Luật An toàn, Vệ sinh lao động)',
                   labelEn: '15 – Official employee (under Law on Occupational Safety and Health)',
+                  labelJa: '15 – 正規雇用の労働者（労働安全衛生法に基づく）',
                 },
                 {
                   id: '16' as TT25TargetGroup,
                   labelVi: '16 – Người lao động phi chính thức',
                   labelEn: '16 – Informal worker',
+                  labelJa: '16 – インフォーマル部門の労働者',
                 },
                 {
                   id: 'other' as TT25TargetGroup,
                   labelVi: 'Các đối tượng khác',
                   labelEn: 'Other target category',
+                  labelJa: 'その他の受診区分',
                 },
               ]).map((opt) => {
                 const isSelected = targetPayment.targetGroup === opt.id;
@@ -1334,7 +1371,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     >
                       {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                     </span>
-                    <span className="leading-snug">{isEn ? opt.labelEn : opt.labelVi}</span>
+                    <span className="leading-snug">{text(opt.labelVi, opt.labelEn, opt.labelJa)}</span>
                   </button>
                 );
               })}
@@ -1343,7 +1380,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {targetPayment.targetGroup === 'other' && (
               <div className="pt-1 animate-fade-in">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  {isEn ? 'Specify other target category:' : 'Ghi rõ đối tượng khác:'}
+                  {text('Ghi rõ đối tượng khác:', 'Specify other target category:', 'その他の受診区分')}
                 </label>
                 <input
                   type="text"
@@ -1356,9 +1393,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }))
                   }
                   placeholder={
-                    isEn
-                      ? 'Enter target category or code (1 - 17)...'
-                      : 'Nhập cụ thể đối tượng khác...'
+                    text('Nhập cụ thể đối tượng khác...', 'Enter target category or code (1 - 17)...', '受診区分またはコード（1〜17）を入力')
                   }
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
@@ -1370,7 +1405,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="space-y-2.5">
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-slate-800">
-                {isEn ? '2. Payment Source' : '2. Nguồn chi trả'}
+                {text('2. Nguồn chi trả', '2. Payment Source', '2. 費用負担')}
               </h3>
             </div>
 
@@ -1380,16 +1415,19 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   id: 'employer' as TT25PaymentSource,
                   labelVi: 'Người sử dụng lao động chi trả',
                   labelEn: 'Paid by employer',
+                  labelJa: '勤務先負担',
                 },
                 {
                   id: 'self' as TT25PaymentSource,
                   labelVi: 'Người dân tự chi trả',
                   labelEn: 'Self-paid by examinee',
+                  labelJa: '自己負担',
                 },
                 {
                   id: 'other' as TT25PaymentSource,
                   labelVi: 'Nguồn khác',
                   labelEn: 'Other payment source',
+                  labelJa: 'その他の負担者',
                 },
               ]).map((opt) => {
                 const isSelected = targetPayment.paymentSource === opt.id;
@@ -1418,7 +1456,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     >
                       {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                     </span>
-                    <span className="leading-snug">{isEn ? opt.labelEn : opt.labelVi}</span>
+                    <span className="leading-snug">{text(opt.labelVi, opt.labelEn, opt.labelJa)}</span>
                   </button>
                 );
               })}
@@ -1427,7 +1465,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {targetPayment.paymentSource === 'other' && (
               <div className="pt-1 animate-fade-in">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  {isEn ? 'Specify other payment source:' : 'Ghi rõ nguồn chi trả khác:'}
+                  {text('Ghi rõ nguồn chi trả khác:', 'Specify other payment source:', 'その他の負担者')}
                 </label>
                 <input
                   type="text"
@@ -1440,7 +1478,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     }))
                   }
                   placeholder={
-                    isEn ? 'Enter other payment source...' : 'Nhập cụ thể nguồn chi trả khác...'
+                    text('Nhập cụ thể nguồn chi trả khác...', 'Enter other payment source...', '費用の負担者を入力')
                   }
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
@@ -1452,20 +1490,20 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wide">
-                {isEn ? '3. Examination Location' : '3. Địa điểm khám'}
+                {text('3. Địa điểm khám', '3. Examination Location', '3. 受診場所')}
               </h3>
               <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
-                {isEn ? 'Auto-selected: Medical facility' : 'Mặc định: CS KBCB'}
+                {text('Mặc định: CS KBCB', 'Auto-selected: Medical facility', '自動選択：医療機関')}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
               {([
-                { id: 'cs_kbcb', label: isEn ? 'Medical facility' : 'CS KBCB', active: true },
-                { id: 'kham_luu_dong', label: isEn ? 'Mobile clinic' : 'Khám lưu động', active: false },
-                { id: 'tram_y_te', label: isEn ? 'Health station' : 'Trạm Y tế', active: false },
-                { id: 'truong_hoc', label: isEn ? 'School' : 'Trường học', active: false },
-                { id: 'ksk_tai_nha', label: isEn ? 'Home health check' : 'KSK tại nhà', active: false },
+                { id: 'cs_kbcb', label: text('CS KBCB', 'Medical facility', '医療機関'), active: true },
+                { id: 'kham_luu_dong', label: text('Khám lưu động', 'Mobile clinic', '巡回健診'), active: false },
+                { id: 'tram_y_te', label: text('Trạm Y tế', 'Health station', '保健所'), active: false },
+                { id: 'truong_hoc', label: text('Trường học', 'School', '学校'), active: false },
+                { id: 'ksk_tai_nha', label: text('KSK tại nhà', 'Home health check', '自宅での健診'), active: false },
               ] as const).map((loc) => (
                 <div
                   key={loc.id}
@@ -1499,13 +1537,13 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
               <ChevronLeft aria-hidden="true" />
-              {isEn ? 'Back' : 'Quay lại'}
+              {text('Quay lại', 'Back', '戻る')}
             </Button>
             <Button
               type="submit"
               className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-3 font-semibold shadow-none focus-visible:ring-ring"
             >
-              <span>{isEn ? 'Review & Confirm' : 'Xem lại & Xác nhận'}</span>
+              <span>{text('Xem lại & Xác nhận', 'Review & Confirm', '入力内容を確認')}</span>
               <ChevronRight aria-hidden="true" />
             </Button>
           </div>
@@ -1516,16 +1554,12 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
       {currentStep === 4 && (
         <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
           <h2 className="sr-only">
-            {isEn
-              ? '4. Registration Summary & Confirmation'
-              : '4. Xác nhận và tóm tắt hồ sơ'}
+            {text('4. Xác nhận và tóm tắt hồ sơ', '4. Registration Summary & Confirmation', '4. 登録内容の確認')}
           </h2>
           <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm space-y-3 text-xs">
             <h3 className="font-bold text-sm sm:text-base text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-              {isEn
-                ? 'Health Checkup Registration Summary (Circular 25)'
-                : 'Tóm tắt hồ sơ khám sức khỏe Thông tư 25'}
+              {text('Tóm tắt hồ sơ khám sức khỏe Thông tư 25', 'Health Checkup Registration Summary (Circular 25)', '健康診断の登録内容（通達第25号）')}
             </h3>
 
             <Button
@@ -1538,28 +1572,28 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 window.scrollTo({ top: 0, behavior: 'auto' });
               }}
             >
-              {isEn ? 'Edit administrative information' : 'Sửa thông tin hành chính'}
+              {text('Sửa thông tin hành chính', 'Edit administrative information', '基本情報を修正')}
             </Button>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Full Name:' : 'Họ và tên:'}
+                  {text('Họ và tên:', 'Full Name:', '氏名')}
                 </span>
                 <span className="font-bold text-slate-800 text-sm uppercase">{fullName.trim().toUpperCase()}</span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Gender & Date of Birth:' : 'Giới tính & Ngày sinh:'}
+                  {text('Giới tính & Ngày sinh:', 'Gender & Date of Birth:', '性別・生年月日')}
                 </span>
                 <span className="font-medium text-slate-700">
-                  {isEn ? (gender === 'Nam' ? 'Male' : 'Female') : gender} —{' '}
-                  {birthDate.split('-').reverse().join('/')}
+                  {gender === 'Nam' ? text('Nam', 'Male', '男性') : text('Nữ', 'Female', '女性')} —{' '}
+                  {(lang === 'ja' ? birthDate.split('-') : birthDate.split('-').reverse()).join('/')}
                 </span>
               </div>
               {gender === 'Nữ' && pregnancyStatus && (
                 <div>
-                  <span className="text-slate-500 block text-[11px]">{isEn ? 'Pregnancy status:' : 'Tình trạng mang thai:'}</span>
+                  <span className="text-slate-500 block text-[11px]">{text('Tình trạng mang thai:', 'Pregnancy status:', '妊娠の状況')}</span>
                   <span className="font-medium text-slate-700">{PREGNANCY_STATUS_LABELS[pregnancyStatus][lang]}</span>
                 </div>
               )}
@@ -1571,35 +1605,35 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Phone Number:' : 'Số điện thoại:'}
+                  {text('Số điện thoại:', 'Phone Number:', '電話番号')}
                 </span>
                 <span className="font-medium text-slate-700">{phoneNumber}</span>
               </div>
               {email.trim() && (
                 <div>
-                  <span className="text-slate-500 block text-[11px]">Email:</span>
+                  <span className="text-slate-500 block text-[11px]">{text('Email:', 'Email:', 'メールアドレス')}</span>
                   <span className="break-all font-medium text-slate-700">{email.trim()}</span>
                 </div>
               )}
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Ethnicity / Blood Type:' : 'Dân tộc / Nhóm máu:'}
+                  {text('Dân tộc / Nhóm máu:', 'Ethnicity / Blood Type:', '民族・血液型')}
                 </span>
                 <span className="font-medium text-slate-700">
-                  {ethnicity} / {isEn && bloodGroup === 'Chưa rõ' ? 'Unknown' : bloodGroup}
+                  {ethnicity} / {bloodGroup === 'Chưa rõ' ? text(bloodGroup, 'Unknown', '不明') : bloodGroup}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Health Insurance:' : 'Thẻ BHYT:'}
+                  {text('Thẻ BHYT:', 'Health Insurance:', '健康保険証番号')}
                 </span>
                 <span className="font-medium text-slate-700">
-                  {insuranceNumber || (isEn ? 'None' : 'Không có')}
+                  {insuranceNumber || (text('Không có', 'None', 'なし'))}
                 </span>
               </div>
               <div className="col-span-2">
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Current Address:' : 'Nơi ở hiện tại:'}
+                  {text('Nơi ở hiện tại:', 'Current Address:', '現住所')}
                 </span>
                 <span className="font-medium text-slate-700">
                   {addressDetail}, {ward}, {province}
@@ -1608,7 +1642,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               {(companyName || formattedWorkplaceLocation) && (
                 <div className="col-span-2">
                   <span className="text-slate-500 block text-[11px]">
-                    {isEn ? 'Workplace / School:' : 'Nơi làm việc, học tập:'}
+                    {text('Nơi làm việc, học tập:', 'Workplace / School:', '勤務先・学校')}
                   </span>
                   <span className="font-medium text-slate-700">
                     {companyName}{' '}
@@ -1621,7 +1655,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             {/* Tóm tắt tiền sử bệnh */}
             <div className="border-t border-slate-100 pt-2.5 mt-2">
               <span className="text-slate-500 block text-[11px] mb-1">
-                {isEn ? 'Medical History:' : 'Tiền sử y tế:'}
+                {text('Tiền sử y tế:', 'Medical History:', '問診内容')}
               </span>
               {Object.values(medicalHistory.personalHistory).some(Boolean) ||
               medicalHistory.familyHistory.hasDisease ||
@@ -1630,12 +1664,14 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-semibold">
-                      {isEn ? 'Medical history conditions recorded.' : 'Có ghi nhận tiền sử bệnh lý.'}
+                      {text('Có ghi nhận tiền sử bệnh lý.', 'Medical history conditions recorded.', '申告された既往歴があります。')}
                     </p>
                     <p className="text-[11px]">
-                      {isEn
-                        ? 'Your selected items have been saved for your doctor examination form.'
-                        : 'Hệ thống đã lưu đầy đủ các mục bạn chọn để điền vào phiếu khám nộp Bác sĩ.'}
+                      {text(
+                        'Hệ thống đã lưu đầy đủ các mục bạn chọn để điền vào phiếu khám nộp Bác sĩ.',
+                        'Your selected items have been saved for your doctor examination form.',
+                        '選択した内容は、医師が確認する健診票に反映されます。',
+                      )}
                     </p>
                   </div>
                 </AlertDescription></Alert>
@@ -1643,7 +1679,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 <Alert variant="success" role="status" aria-live="polite"><AlertDescription className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <p className="font-medium">
-                    {isEn ? 'No medical history conditions reported.' : 'Tiền sử sức khỏe hoàn toàn bình thường.'}
+                    {text('Tiền sử sức khỏe hoàn toàn bình thường.', 'No medical history conditions reported.', '申告された既往歴はありません。')}
                   </p>
                 </AlertDescription></Alert>
               )}
@@ -1653,35 +1689,35 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             <div className="border-t border-slate-100 pt-2.5 mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Target Category:' : 'Đối tượng:'}
+                  {text('Đối tượng:', 'Target Category:', '受診区分')}
                 </span>
                 <span className="font-medium text-slate-700">
                   {targetPayment.targetGroup === '14'
-                    ? (isEn ? '14 – Student / Trainee' : '14 – Sinh viên, học viên')
+                    ? (text('14 – Sinh viên, học viên', '14 – Student / Trainee', '14 – 学生・研修生'))
                     : targetPayment.targetGroup === '15'
-                      ? (isEn ? '15 – Official employee' : '15 – NLĐ chính thức')
+                      ? (text('15 – NLĐ chính thức', '15 – Official employee', '15 – 正規雇用の労働者'))
                       : targetPayment.targetGroup === '16'
-                        ? (isEn ? '16 – Informal worker' : '16 – NLĐ phi chính thức')
-                        : targetPayment.targetOtherDetails || (isEn ? 'Other target category' : 'Đối tượng khác')}
+                        ? (text('16 – NLĐ phi chính thức', '16 – Informal worker', '16 – インフォーマル部門の労働者'))
+                        : targetPayment.targetOtherDetails || (text('Đối tượng khác', 'Other target category', 'その他の受診区分'))}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Payment Source:' : 'Nguồn chi trả:'}
+                  {text('Nguồn chi trả:', 'Payment Source:', '費用負担')}
                 </span>
                 <span className="font-medium text-slate-700">
                   {targetPayment.paymentSource === 'employer'
-                    ? (isEn ? 'Paid by employer' : 'Người sử dụng lao động')
+                    ? (text('Người sử dụng lao động', 'Paid by employer', '勤務先負担'))
                     : targetPayment.paymentSource === 'self'
-                      ? (isEn ? 'Self-paid by examinee' : 'Người dân tự chi trả')
-                      : targetPayment.paymentOtherDetails || (isEn ? 'Other payment source' : 'Nguồn khác')}
+                      ? (text('Người dân tự chi trả', 'Self-paid by examinee', '自己負担'))
+                      : targetPayment.paymentOtherDetails || (text('Nguồn khác', 'Other payment source', 'その他の負担者'))}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">
-                  {isEn ? 'Exam Location:' : 'Địa điểm khám:'}
+                  {text('Địa điểm khám:', 'Exam Location:', '受診場所')}
                 </span>
-                <span className="font-semibold text-primary">{isEn ? 'Medical facility' : 'CS KBCB'}</span>
+                <span className="font-semibold text-primary">{text('CS KBCB', 'Medical facility', '医療機関')}</span>
               </div>
             </div>
           </div>
@@ -1700,9 +1736,11 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 className="mt-0.5"
               />
               <span className="text-slate-700 leading-relaxed font-medium">
-                {isEn
-                  ? 'I hereby certify that the information declared above is true and accurate to the best of my knowledge.'
-                  : 'Tôi xin cam đoan những điều khai trên đây hoàn toàn đúng với sự thật theo sự hiểu biết của tôi.'}
+                {text(
+                  'Tôi xin cam đoan những điều khai trên đây hoàn toàn đúng với sự thật theo sự hiểu biết của tôi.',
+                  'I hereby certify that the information declared above is true and accurate to the best of my knowledge.',
+                  '私の知る限り、上記の申告内容に誤りがないことを確認します。',
+                )}
               </span>
             </label>
           </div>
@@ -1717,7 +1755,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               className="h-auto min-h-11 shrink-0 px-4 py-3 text-xs shadow-none focus-visible:ring-ring"
             >
               <ChevronLeft aria-hidden="true" />
-              {isEn ? 'Back' : 'Quay lại'}
+              {text('Quay lại', 'Back', '戻る')}
             </Button>
             <Button
               type="submit"
@@ -1727,12 +1765,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               <Activity aria-hidden="true" />
               <span>
                 {isLoading
-                  ? isEn
-                    ? 'Submitting...'
-                    : 'Đang gửi thông tin...'
-                  : isEn
-                    ? 'Confirm & Submit'
-                    : 'Xác nhận & Gửi thông tin'}
+                  ? text('Đang gửi thông tin...', 'Submitting...', '送信中…')
+                  : text('Xác nhận & Gửi thông tin', 'Confirm & Submit', '確認して送信')}
               </span>
             </Button>
           </div>

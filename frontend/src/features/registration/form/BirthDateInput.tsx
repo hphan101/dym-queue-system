@@ -3,6 +3,7 @@ import { Calendar } from 'lucide-react';
 
 export interface BirthDateInputProps {
   id?: string;
+  calendarLabel?: string;
   className?: string;
   value: string; // ISO format 'YYYY-MM-DD'
   onChange: (isoDate: string) => void;
@@ -57,6 +58,7 @@ const DEFAULT_BIRTH_DATE = '1990-01-01';
 
 export const BirthDateInput: React.FC<BirthDateInputProps> = ({
   id,
+  calendarLabel = 'Chọn ngày từ lịch',
   className,
   value,
   onChange,
@@ -146,8 +148,8 @@ export const BirthDateInput: React.FC<BirthDateInputProps> = ({
           ref={hiddenPickerRef}
           type="date"
           tabIndex={-1}
-          aria-label="Chọn ngày từ lịch"
-          title="Chọn ngày từ lịch"
+          aria-label={calendarLabel}
+          title={calendarLabel}
           value={value || DEFAULT_BIRTH_DATE}
           max={maxDate}
           min="1900-01-01"

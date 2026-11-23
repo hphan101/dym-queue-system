@@ -1,7 +1,7 @@
 import { rgb, type PDFFont } from 'pdf-lib';
-import { appendTemplate, createPdfPrintSession, getPrintFont, type PdfPrintSession } from './pdfPrintSession';
+import { appendTemplate, createPdfPrintSession, getPrintFont, getPrintFontForText, type PdfPrintSession } from './pdfPrintSession';
 import { formatDateForPrint, getTodayInVietnam } from '../../../lib/date';
-import { drawPdfCheck } from './pdfDrawing';
+import { drawPdfCheck, drawPdfPageNumbers } from './pdfDrawing';
 import { getDefaultTargetPaymentByReason, getTT25PrintCopies, type TT25RegistrationData, type TT25TargetPaymentInfo } from '../tt25Types';
 import layouts from './tt25TemplateFields.json';
 import { requiresCompanyName } from '../tt25Constants';
@@ -14,12 +14,17 @@ export function getTT25TemplateInfo(data: TT25RegistrationData): { key: keyof ty
     const key = hanoi ? 'hn_wp' : 'wp';
     return { key, label: 'Work Permit', pageCount: layouts[key].pageCount };
   }
-  if (data.language === 'en') {
+  if (data.language === 'en' || data.language === 'ja') {
     const key = hanoi ? 'hn_bilingual' : 'bilingual';
     return { key, label: 'Song ngữ Việt - Anh', pageCount: layouts[key].pageCount };
   }
   const key = hanoi ? 'hn_vnm' : 'vnm';
   return { key, label: 'Tiếng Việt', pageCount: layouts[key].pageCount };
+}
+
+export function getTT25SignaturePage(key: keyof typeof layouts): number | undefined {
+  const signatureName = layouts[key].fields.find((field) => field.field === 'fullName' && field.align === 'center');
+  return signatureName ? signatureName.page + 1 : undefined;
 }
 
 function formatPaymentSource(payment: TT25TargetPaymentInfo, bilingual: boolean): string {
@@ -87,7 +92,7 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   for (const field of layout.fields) {
     const text = (values[field.field] || '').replace(/\s+/g, ' ').trim();
     if (!text) continue;
-    const font = fonts[field.font];
+    const font = await getPrintFontForText(session, text, fonts[field.font]);
     const size = Math.min(field.size, field.width / font.widthOfTextAtSize(text, 1));
     const width = font.widthOfTextAtSize(text, size);
     pages[field.page].drawText(text, { x: field.align === 'center' ? field.x - width / 2 : field.x,
@@ -110,6 +115,8 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
     tick(layout.checks.currentTreatment[history.currentTreatment.isTreating ? 'yes' : 'no']);
     if (data.gender === 'Nữ' && history.pregnancyHistory) tick(layout.checks.pregnancyHistory[history.pregnancyHistory.hasHistory ? 'yes' : 'no']);
   }
+  // Hanoi Work Permit ends with an unprinted reverse side for duplex printing.
+  drawPdfPageNumbers(info.key === 'hn_wp' ? pages.slice(0, -1) : pages, fonts.bold);
 }
 
 export async function appendTT25PrintPdf(data: TT25RegistrationData, session: PdfPrintSession): Promise<void> {

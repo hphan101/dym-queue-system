@@ -1,10 +1,13 @@
 import type { BranchCode } from '../../../types/domain';
+import type { EditableRegistrationDetails } from '../flow/customerRegistrationEdit';
 
 export class RegistrationAccessError extends Error {
   code: string;
-  constructor(code: string) {
+  readonly field?: string;
+  constructor(code: string, field?: string) {
     super(code);
     this.code = code;
+    this.field = field;
   }
 }
 
@@ -24,7 +27,8 @@ export interface AccessSessionResponse {
 }
 
 export async function requestRegistrationAccess<T>(
-  body: { action: 'qr' | 'exchange'; branch: BranchCode; challenge?: string; purpose?: 'staff' },
+  body: { action: 'qr' | 'exchange'; branch: BranchCode; challenge?: string; purpose?: 'staff' }
+    | { action: 'edit-registration'; branch: BranchCode; sessionToken: string; changes?: Partial<EditableRegistrationDetails> },
   signal: AbortSignal,
   accessToken?: string,
 ): Promise<T> {
@@ -40,6 +44,6 @@ export async function requestRegistrationAccess<T>(
   });
   const result = await response.json().catch(() => null);
   if (response.status === 404) throw new RegistrationAccessError('QR_SERVICE_NOT_DEPLOYED');
-  if (!response.ok || !result?.success) throw new RegistrationAccessError(result?.code ?? 'SERVER_ERROR');
+  if (!response.ok || !result?.success) throw new RegistrationAccessError(result?.code ?? 'SERVER_ERROR', result?.field);
   return result as T;
 }

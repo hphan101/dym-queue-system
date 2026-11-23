@@ -29,10 +29,15 @@ const now = Date.UTC(2026, 10, 1, 9, 0, 0);
 const secret = 'test-only-server-signing-secret';
 
 test('moving the frontend permits only its exact configured origin and preserves existing origins', () => {
-  const env = { ALLOWED_ORIGINS: 'https://old.example.test,http://localhost:5173', PUBLIC_APP_ORIGIN: 'https://queue.pages.dev' };
+  const env = {
+    ALLOWED_ORIGINS: 'https://old.example.test,http://localhost:5173',
+    PUBLIC_APP_ORIGIN: 'https://queue.pages.dev',
+    LAN_APP_ORIGIN: 'http://192.168.3.204:5173',
+    TUNNEL_APP_ORIGIN: 'https://queue-preview.trycloudflare.com',
+  };
   const http = load('supabase/functions/_shared/http.ts', {}, { Deno: { env: { get: (key) => env[key] } } });
-  for (const origin of ['https://queue.pages.dev', 'https://old.example.test', 'http://localhost:5173']) assert.equal(http.isOriginAllowed(origin), true);
-  for (const origin of ['https://queue.pages.dev.attacker.test', 'https://other.pages.dev', 'http://queue.pages.dev']) assert.equal(http.isOriginAllowed(origin), false);
+  for (const origin of ['https://queue.pages.dev', 'https://old.example.test', 'http://localhost:5173', env.LAN_APP_ORIGIN, env.TUNNEL_APP_ORIGIN]) assert.equal(http.isOriginAllowed(origin), true);
+  for (const origin of ['https://queue.pages.dev.attacker.test', 'https://other.pages.dev', 'http://queue.pages.dev', 'http://192.168.3.205:5173', 'http://192.168.3.204:5174', 'https://another.trycloudflare.com']) assert.equal(http.isOriginAllowed(origin), false);
   assert.equal(http.responseHeaders('https://queue.pages.dev').get('Access-Control-Allow-Origin'), 'https://queue.pages.dev');
 });
 
@@ -95,13 +100,18 @@ test('QR menu opens a new staff tab for the selected branch and leaves reception
   assert.equal(session.get('dym-staff-auth'), 'existing-staff-session');
 });
 
-test('QRs are branch-bound, rotate each minute and expire exactly after 90 seconds', async () => {
+test('QRs are branch-bound and expire exactly when they rotate after 30 seconds', async () => {
   const qr = await cryptoHelpers.createQrChallenge('q1', secret, now);
-  const same = await cryptoHelpers.createQrChallenge('q1', secret, now + 59_000);
+  const same = await cryptoHelpers.createQrChallenge('q1', secret, now + 29_000);
+  const next = await cryptoHelpers.createQrChallenge('q1', secret, now + 30_000);
   assert.equal(qr.challenge, same.challenge);
-  assert.notEqual(qr.challenge, (await cryptoHelpers.createQrChallenge('q1', secret, now + 60_000)).challenge);
-  assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, secret, now + 89_999), 'q1');
-  assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, secret, now + 90_000), null);
+  assert.equal(qr.expiresAt, new Date(now + 30_000).toISOString());
+  assert.equal(qr.expiresAt, qr.refreshAt);
+  assert.equal(same.expiresAt, qr.expiresAt);
+  assert.notEqual(qr.challenge, next.challenge);
+  assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, secret, now + 29_999), 'q1');
+  assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, secret, now + 30_000), null);
+  assert.equal(await cryptoHelpers.verifyQrChallenge(next.challenge, secret, now + 30_000), 'q1');
   assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, secret, now - 1), null);
   assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge.replace('.q1.', '.q7.'), secret, now), null);
   assert.equal(await cryptoHelpers.verifyQrChallenge(qr.challenge, 'wrong-secret', now), null);
@@ -265,6 +275,44 @@ test('server refuses public QR issuance, wrong staff branches and invalid exchan
   assert.equal((await call({ action: 'exchange', branch: 'q1', challenge: 'forged' })).status, 403);
   const current = await cryptoHelpers.createQrChallenge('q1', secret);
   assert.equal((await call({ action: 'exchange', branch: 'q7', challenge: current.challenge })).status, 403);
+});
+
+test('customer edits pass only a hashed session and map server validation and lock errors', async () => {
+  let handler;
+  let editError;
+  const calls = [];
+  const client = { async rpc(name, args) {
+    calls.push({ name, args });
+    if (name === 'consume_registration_ip_limit') return { data: { allowed: true } };
+    return { error: editError, data: { details: { fullName: 'Test Name' }, phoneRequired: true } };
+  } };
+  const Deno = { env: { get: (key) => ({ SUPABASE_URL: 'https://test.invalid', REGISTRATION_FINGERPRINT_SECRET: secret })[key] }, serve: (fn) => { handler = fn; } };
+  load('supabase/functions/registration-access/index.ts', {
+    '../_shared/http.ts': load('supabase/functions/_shared/http.ts', {}, { Deno }),
+    '../_shared/supabase.ts': { createAdminClient: () => client, getSupabaseSecretKey: () => 'server-secret' },
+    '../_shared/registrationAccess.ts': cryptoHelpers,
+  }, { Deno });
+  const sessionToken = 'a'.repeat(64);
+  const call = (input) => handler(new Request('https://test.invalid/access', {
+    method: 'POST', body: JSON.stringify({ action: 'edit-registration', branch: 'q1', ...input }),
+  }));
+  assert.equal((await call({ sessionToken: 'invalid' })).status, 403);
+  assert.equal(calls.length, 0);
+  assert.equal((await call({ sessionToken, changes: [] })).status, 400);
+  const result = await call({ sessionToken, changes: { fullName: 'Test Name' }, registrationId: 'another-id' });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal((await result.json()).details.fullName, 'Test Name');
+  assert.equal(calls.at(-1).name, 'edit_registration_with_session');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1).args)), {
+    p_session_hash: await cryptoHelpers.hashRegistrationSession(sessionToken), p_branch_code: 'q1', p_changes: { fullName: 'Test Name' },
+  });
+  editError = { message: 'INVALID_DATA', details: 'email' };
+  const invalid = await call({ sessionToken });
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(await invalid.json(), { code: 'INVALID_DATA', field: 'email' });
+  editError = { message: 'EDIT_LOCKED' };
+  assert.equal((await call({ sessionToken })).status, 409);
 });
 
 test('register endpoint has no QR bypass and delegates issuance to the atomic session RPC', async () => {

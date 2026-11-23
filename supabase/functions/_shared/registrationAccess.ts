@@ -1,5 +1,4 @@
-export const QR_ROTATION_MS = 60_000;
-export const QR_VALIDITY_MS = 90_000;
+export const QR_ROTATION_MS = 30_000;
 export const REGISTRATION_SESSION_MS = 20 * 60_000;
 export const SESSION_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -17,10 +16,11 @@ export async function createQrChallenge(branch: string, secret: string, now = Da
   const bucket = Math.floor(now / QR_ROTATION_MS);
   const message = `registration-qr|v1|${branch}|${bucket}`;
   const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), new TextEncoder().encode(message));
+  const refreshAt = new Date((bucket + 1) * QR_ROTATION_MS).toISOString();
   return {
     challenge: `v1.${branch}.${bucket}.${hex(signature)}`,
-    expiresAt: new Date(bucket * QR_ROTATION_MS + QR_VALIDITY_MS).toISOString(),
-    refreshAt: new Date((bucket + 1) * QR_ROTATION_MS).toISOString(),
+    expiresAt: refreshAt,
+    refreshAt,
     serverNow: new Date(now).toISOString(),
   };
 }
@@ -30,7 +30,7 @@ export async function verifyQrChallenge(challenge: string, secret: string, now =
   if (!match) return null;
   const [, branch, rawBucket, signature] = match;
   const startsAt = Number(rawBucket) * QR_ROTATION_MS;
-  if (now < startsAt || now >= startsAt + QR_VALIDITY_MS) return null;
+  if (now < startsAt || now >= startsAt + QR_ROTATION_MS) return null;
   const bytes = Uint8Array.from(signature.match(/../g)!, (value) => Number.parseInt(value, 16));
   const valid = await crypto.subtle.verify(
     "HMAC", await hmacKey(secret), bytes,

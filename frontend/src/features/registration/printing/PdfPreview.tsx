@@ -5,15 +5,18 @@ import { PDFDocument } from 'pdf-lib';
 import { NumberedPagination } from '@/components/numbered-pagination';
 import { isMobilePdfViewer } from './pdfBrowser';
 import { createPdfPagePreview } from './pdfPagePreview';
+import type { SupportedLanguage } from '../../../locales/types';
 
 interface PdfPreviewProps {
   url: string;
   title: string;
   iframeRef: RefObject<HTMLIFrameElement | null>;
   onReady: () => void;
+  lang?: SupportedLanguage;
 }
 
-export function PdfPreview({ url, title, iframeRef, onReady }: PdfPreviewProps) {
+export function PdfPreview({ url, title, iframeRef, onReady, lang = 'vi' }: PdfPreviewProps) {
+  const isJa = lang === 'ja';
   const [mobile] = useState(isMobilePdfViewer);
   const [document, setDocument] = useState<PDFDocument | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -54,13 +57,14 @@ export function PdfPreview({ url, title, iframeRef, onReady }: PdfPreviewProps) 
   return <div className="flex min-h-0 w-full flex-1 flex-col">
     {mobile && <div className="flex shrink-0 justify-center bg-slate-800 px-2 py-2">
       {pageCount ? <NumberedPagination currentPage={pageIndex + 1} totalPages={pageCount}
-        onPageChange={(page) => setPageIndex(page - 1)} label="Chuyển trang PDF" />
-        : <span role="status" className="text-sm text-white">Đang tải…</span>}
+        onPageChange={(page) => setPageIndex(page - 1)} label={isJa ? 'PDFのページ移動' : 'Chuyển trang PDF'}
+        labels={isJa ? { previous: '前のページ', next: '次のページ', page: (page) => `${page}ページ` } : undefined} />
+        : <span role="status" className="text-sm text-white">{isJa ? '読み込み中…' : 'Đang tải…'}</span>}
     </div>}
     {error ? <Alert variant="destructive"><AlertDescription className="flex flex-col items-center gap-3">
-      <p>Không thể tải trang PDF. Vui lòng thử lại.</p>
-      <Button type="button" variant="outline" onClick={() => setAttempt((value) => value + 1)}>Thử lại</Button>
-    </AlertDescription></Alert> : frameUrl ? <iframe ref={iframeRef} src={`${frameUrl}#toolbar=0&navpanes=0&view=FitH`} title={mobile ? `${title}, trang ${pageIndex + 1}` : title} onLoad={onReady} className="h-full min-h-0 w-full flex-1 border-0" />
-      : <p role="status" className="p-6 text-center text-sm text-white">Đang tải trang…</p>}
+      <p>{isJa ? 'PDFページを読み込めませんでした。もう一度お試しください。' : 'Không thể tải trang PDF. Vui lòng thử lại.'}</p>
+      <Button type="button" variant="outline" onClick={() => setAttempt((value) => value + 1)}>{isJa ? '再試行' : 'Thử lại'}</Button>
+    </AlertDescription></Alert> : frameUrl ? <iframe ref={iframeRef} src={`${frameUrl}#toolbar=0&navpanes=0&view=FitH`} title={mobile ? (isJa ? `${title}、${pageIndex + 1}ページ` : `${title}, trang ${pageIndex + 1}`) : title} onLoad={onReady} className="h-full min-h-0 w-full flex-1 border-0" />
+      : <p role="status" className="p-6 text-center text-sm text-white">{isJa ? 'ページを読み込み中…' : 'Đang tải trang…'}</p>}
   </div>;
 }

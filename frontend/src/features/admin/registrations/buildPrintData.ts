@@ -36,7 +36,7 @@ export function buildPrintData(
       : targetRow.birth_date;
 
   const rawId = (targetRow.identity_document || '').trim();
-  const detectedLanguage: 'vi' | 'en' = extras.language === 'en' ? 'en' : 'vi';
+  const detectedLanguage = extras.language === 'en' || extras.language === 'ja' ? extras.language : 'vi';
 
   return createDefaultTT25Data({
     branch,
