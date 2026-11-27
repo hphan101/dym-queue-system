@@ -9,6 +9,9 @@ export async function saveReceptionNote(id: string, note: string, expectedNote: 
     p_expected_note: expectedNote,
   });
   if (error) {
+    if (error.code === 'PREVIEW_DATA_REQUIRED') {
+      throw new Error('Ghi chú bản thử dùng số hoặc có chữ “thử”.');
+    }
     if (error.message?.includes('NOTE_CHANGED')) {
       throw new Error('Ghi chú đã được sửa ở máy khác. Hãy sao chép nội dung đang nhập và tải lại danh sách trước khi sửa tiếp.');
     }

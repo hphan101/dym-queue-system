@@ -40,6 +40,9 @@ import {
 import { SearchableSelect } from './SearchableSelect';
 import { BirthDateInput } from './BirthDateInput';
 import { validateVietnamCccd } from './cccdValidator';
+import { hasChineseOrJapaneseCharacters, isValidPassportName, LATIN_NAME_MESSAGE, PASSPORT_NAME_MESSAGE } from '../../../../../supabase/functions/_shared/passportName';
+
+const previewMode = typeof __DYM_CLOUDFLARE_PREVIEW__ !== 'undefined' && __DYM_CLOUDFLARE_PREVIEW__;
 import {
   loadOccupations,
   loadProvinces,
@@ -107,6 +110,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
   const fullNameId = useId();
   const [identityDocumentType, setIdentityDocumentType] = useState<'cccd' | 'passport'>('cccd');
   const isPassport = identityDocumentType === 'passport';
+  const nameFormatError = isPassport && fullName.trim() && !isValidPassportName(fullName)
+    ? PASSPORT_NAME_MESSAGE[lang]
+    : hasChineseOrJapaneseCharacters(fullName) ? LATIN_NAME_MESSAGE[lang] : '';
   const cccd = documentNumbers[identityDocumentType];
   const identityLabel = isPassport
     ? (text('Số hộ chiếu', 'Passport number', 'パスポート番号'))
@@ -142,6 +148,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
 
   // Step 1 Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const fullNameError = errors.fullName || nameFormatError;
   const [reviewAdministrative, setReviewAdministrative] = useState(false);
   const administrativeForm = useRef<HTMLFormElement>(null);
   const focusInvalid = useRef(false);
@@ -246,6 +253,8 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
         'Full name must be 100 characters or fewer on one line',
         '氏名は改行せず、100文字以内で入力してください。',
       );
+    } else if (nameFormatError) {
+      newErrors.fullName = nameFormatError;
     }
 
     if (!birthDate) {
@@ -280,6 +289,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     }
 
     const cccdError = validateVietnamCccd({
+      allowPreviewCode: previewMode,
       identityDocumentType,
       cccd,
       gender,
@@ -299,11 +309,11 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
     if (phoneRequired && !phoneNumber.trim()) {
       newErrors.phoneNumber = text('Vui lòng nhập số điện thoại', 'Please enter your phone number', '電話番号を入力してください。');
-    } else if (phoneNumber.trim() && !/^0(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
+    } else if (phoneNumber.trim() && !(previewMode ? /^0{8}\d{2}$/ : /^0[35789]\d{8}$/).test(cleanPhone)) {
       newErrors.phoneNumber = text(
-        'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)',
-        'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)',
-        '電話番号は03、05、07、08、09のいずれかで始まる10桁の番号を入力してください。',
+        previewMode ? 'Nhập số điện thoại thử dạng 00000000xx' : 'Số điện thoại gồm 10 số (bắt đầu bằng 03, 05, 07, 08, 09)',
+        previewMode ? 'Use a test phone number like 0000000001' : 'Phone number must be 10 digits (starting with 03, 05, 07, 08, 09)',
+        previewMode ? 'テスト用の電話番号（例：0000000001）を入力してください。' : '電話番号は03、05、07、08、09のいずれかで始まる10桁の番号を入力してください。',
       );
     }
 
@@ -322,6 +332,24 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
         'Street address must contain 3–250 characters on one line',
         '詳細住所は改行せず、3〜250文字で入力してください。',
       );
+    }
+
+    if (previewMode) {
+      const synthetic = /thử|demo|\btest\b/i;
+      const testTextError = text('Thêm “test” hoặc “demo” vào ô này.', 'Include “test” or “demo” in this field.', '「test」または「demo」を含めてください。');
+      if (!newErrors.fullName && !synthetic.test(cleanName)) newErrors.fullName = testTextError;
+      if (!newErrors.addressDetail && !synthetic.test(cleanAddress)) newErrors.addressDetail = testTextError;
+      if (!newErrors.workplace && companyName && !synthetic.test(companyName)) newErrors.workplace = testTextError;
+      const demoDocument = isPassport ? /^DEMO-[A-Z0-9-]{1,24}$/i : /^000\d{9}$/;
+      if (!newErrors.cccd && !demoDocument.test(cccd.trim())) {
+        newErrors.cccd = text('Nhập hộ chiếu DEMO- hoặc CCCD thử bắt đầu bằng 000.', 'Use a DEMO- passport or a test citizen ID starting with 000.', 'DEMO-で始まるパスポート番号、または000で始まる身分証明書番号を入力してください。');
+      }
+      if (!newErrors.email && email.trim() && !/@(?:example\.(?:com|org|net)|[a-z0-9.-]+\.test)$/i.test(email.trim())) {
+        newErrors.email = text('Dùng email thử @example.com hoặc để trống.', 'Use an @example.com test email or leave it blank.', 'example.comのメールアドレスを使用するか、空欄のままにしてください。');
+      }
+      if (insuranceNumber.trim() && !/^0{10}\d{0,5}$/.test(insuranceNumber.trim())) {
+        newErrors.insuranceNumber = text('Dùng số thẻ BHYT thử, ví dụ 0000000000, hoặc để trống.', 'Use a test insurance number like 0000000000 or leave it blank.', 'テスト用の保険証番号（例：0000000000）を入力するか、空欄のままにしてください。');
+      }
     }
 
     focusInvalid.current = Object.keys(newErrors).length > 0;
@@ -510,7 +538,11 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
             <AlertDescription id={`${fullNameId}-document-note`} className="flex items-start gap-2 leading-5">
               <AlertCircle className="h-5 w-4 shrink-0" aria-hidden="true" />
               <span>
-                {text(
+                {previewMode ? text(
+                  'Bản thử dùng thông tin giả. Thêm “test” vào tên và địa chỉ, dùng hộ chiếu bắt đầu bằng DEMO- hoặc CCCD thử bắt đầu bằng 000. Dùng số điện thoại dạng 00000000xx và email @example.com nếu cần.',
+                  'Use test data. Include “test” in names and addresses, use a passport starting with DEMO- or a test citizen ID starting with 000, and use a phone number like 0000000001 and an @example.com email when needed.',
+                  'テスト用の情報を入力してください。氏名・住所に「test」を含め、パスポート番号にはDEMO-、身分証明書番号には000から始まる番号を使用してください。',
+                ) : text(
                   'Thông tin cung cấp cần chính xác với thông tin trên CCCD hoặc passport.',
                   'The information you provide must match your citizen ID or passport.',
                   '入力する情報は、ベトナムの身分証明書（CCCD）またはパスポートの記載と一致している必要があります。',
@@ -522,7 +554,9 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
           {/* Họ và tên */}
           <div>
             <label htmlFor={fullNameId} className="block text-xs font-semibold text-slate-700 mb-1">
-              {text('1. Họ và tên (ví dụ: NGUYỄN VĂN A)', '1. Full Name (e.g. NGUYEN VAN A)', '1. 氏名（例：山田 太郎）')}{' '}
+              {isPassport
+                ? text('1. Họ và tên trên hộ chiếu', '1. Full name on passport', '1. パスポートに記載された氏名')
+                : text('1. Họ và tên (ví dụ: NGUYỄN VĂN A)', '1. Full Name (e.g. NGUYEN VAN A)', '1. 氏名（例：NGUYEN VAN A）')}{' '}
               <span className="text-red-500">*</span>
             </label>
             <input
@@ -531,18 +565,21 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               autoComplete="name"
               enterKeyHint="next"
               value={fullName}
-              aria-invalid={Boolean(errors.fullName)}
-              aria-describedby={`${fullNameId}-document-note`}
+              aria-invalid={Boolean(fullNameError)}
+              aria-describedby={`${fullNameId}-document-note ${fullNameId}-name-note`}
               maxLength={100}
               onChange={(e) => {
                 setFullName(e.target.value);
                 if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: '' }));
               }}
               className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-[border-color,box-shadow] duration-150 ${
-                errors.fullName ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
+                fullNameError ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
               }`}
             />
-            {errors.fullName && <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>}
+            <p id={`${fullNameId}-name-note`} role="status"
+              className={fullNameError ? 'mt-1 text-xs text-red-700' : isPassport ? 'mt-1 text-xs text-slate-600' : 'sr-only'}>
+              {fullNameError || (isPassport ? PASSPORT_NAME_MESSAGE[lang] : '')}
+            </p>
           </div>
 
           {/* Giới tính & Ngày sinh */}
@@ -564,6 +601,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                       }
                       if (cccd.trim().length === 12) {
                         const err = validateVietnamCccd({
+                          allowPreviewCode: previewMode,
                           identityDocumentType,
                           cccd,
                           gender: g,
@@ -598,6 +636,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                     const nextCccdErr =
                       cccd.trim().length === 12
                         ? validateVietnamCccd({
+                          allowPreviewCode: previewMode,
                             identityDocumentType,
                             cccd,
                             gender,
@@ -700,7 +739,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                         checked={identityDocumentType === type}
                         onChange={() => {
                           setIdentityDocumentType(type);
-                          setErrors((prev) => ({ ...prev, cccd: '' }));
+                          setErrors((prev) => ({ ...prev, cccd: '', fullName: '' }));
                         }}
                       />
                       {type === 'cccd' ? 'CCCD' : text('Hộ chiếu', 'Passport', 'パスポート')}
@@ -724,6 +763,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                   setDocumentNumbers((prev) => ({ ...prev, [identityDocumentType]: nextVal }));
                   if (!isPassport && nextVal.trim().length === 12) {
                     const err = validateVietnamCccd({
+                      allowPreviewCode: previewMode,
                       identityDocumentType,
                       cccd: nextVal,
                       gender,
@@ -738,6 +778,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 onBlur={() => {
                   if (!isPassport && cccd.trim()) {
                     const err = validateVietnamCccd({
+                      allowPreviewCode: previewMode,
                       identityDocumentType,
                       cccd,
                       gender,
@@ -763,11 +804,16 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
               <input
                 type="text"
                 value={insuranceNumber}
-                onChange={(e) => setInsuranceNumber(e.target.value.toUpperCase())}
+                aria-invalid={Boolean(errors.insuranceNumber)}
+                onChange={(e) => {
+                  setInsuranceNumber(e.target.value.toUpperCase());
+                  if (errors.insuranceNumber) setErrors((prev) => ({ ...prev, insuranceNumber: '' }));
+                }}
                 maxLength={15}
                 placeholder={text('VD: DN4791234567890', 'e.g. DN4791234567890', '例：DN4791234567890')}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors"
               />
+              {errors.insuranceNumber && <p className="text-xs text-red-500 mt-1">{errors.insuranceNumber}</p>}
             </div>
           </div>
 
@@ -925,7 +971,7 @@ export const TT25RegistrationForm: React.FC<TT25RegistrationFormProps> = ({
                 if (errors.phoneNumber) setErrors((prev) => ({ ...prev, phoneNumber: '' }));
               }}
               maxLength={10}
-              placeholder="0912345678"
+              placeholder={previewMode ? '0000000001' : '0912345678'}
               className={`w-full px-3 py-2 bg-white border rounded text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring/30 transition-[border-color,box-shadow] duration-150 ${
                 errors.phoneNumber ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
               }`}

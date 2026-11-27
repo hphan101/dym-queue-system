@@ -34,10 +34,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Table,TableBody,TableCaption,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
 import { handleInternalLinkClick } from '../../../../lib/navigation';
-import { BRANCH_NAMES } from '../../../../config/branches';
+import { BRANCH_NAMES, isBranchCode } from '../../../../config/branches';
+import type { BranchCode } from '../../../../types/domain';
 import { formatDisplayDate } from '../../shared/adminFormatters';
+import type { StaffIdentity } from '../../shared/useStaffIdentity';
 import { RosterShell } from '../shared/RosterShell';
 import { useRosterData } from '../data/useRosterData';
+import { RegistrationFailuresCard } from './RegistrationFailuresCard';
 import {
   fetchRosterBundleForRange,
   formatVndCurrency,
@@ -48,7 +51,6 @@ import {
 import {
   buildDashboardSummary,
   dashboardHref,
-  type DashboardBranch,
   type DashboardBundle,
 } from './dashboardSummary';
 import './dashboard.css';
@@ -79,9 +81,11 @@ function PageLink({
 export function RosterDashboardPage({
   authorizedIsAdmin=true,
   isActiveTab=true,
+  branchIds,
 }: {
   authorizedIsAdmin?: boolean;
   isActiveTab?: boolean;
+  branchIds: StaffIdentity['branchIds'];
 }) {
   const {
     selectedDate,
@@ -98,7 +102,9 @@ export function RosterDashboardPage({
     errorBanner,
     reloadAll,
   }=useRosterData();
-  const [branch,setBranch]=useState<DashboardBranch>('all');
+  const [branchFilter,setBranchFilter]=useState<'all'|BranchCode>('all');
+  const branch=branchFilter==='all'||branchIds[branchFilter]? branchFilter:'all';
+  const receptionOnly=branch==='hn';
   const [showCosts,setShowCosts]=useState(false);
   const [refresh,setRefresh]=useState(0);
   const [result,setResult]=useState<{
@@ -118,7 +124,7 @@ export function RosterDashboardPage({
   const rangeKey=`${month}:${rangeEnd}`;
 
   useEffect(() => {
-    if(!isActiveTab||isLoading) return;
+    if(!isActiveTab||isLoading||receptionOnly) return;
     let current=true;
     setLoadingRange(true);
     setLoadError(null);
@@ -146,6 +152,7 @@ export function RosterDashboardPage({
     rangeKey,
     isActiveTab,
     isLoading,
+    receptionOnly,
     schedules,
     assignments,
     dailyRoomOverrides,
@@ -154,7 +161,7 @@ export function RosterDashboardPage({
 
   const summary=useMemo(
     () =>
-      result?.key===rangeKey
+      !receptionOnly&&result?.key===rangeKey
         ? buildDashboardSummary(
           result.bundle,
           roomsList,
@@ -166,7 +173,7 @@ export function RosterDashboardPage({
     [result,rangeKey,roomsList,selectedDate,branch,rosterToday],
   );
   const busy=isLoading||loadingRange||!summary;
-  const scopeBranch=branch==='all'? selectedBranch:branch;
+  const scopeBranch=branch==='q1'||branch==='q7'? branch:selectedBranch;
   const settlementHref=dashboardHref(
     'roster-settlement',
     selectedDate,
@@ -250,6 +257,15 @@ export function RosterDashboardPage({
     ]
     :[];
 
+  const receptionOverview=(
+    <>
+      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+        <ReceptionTrendChart date={selectedDate} today={rosterToday} branch={branch} isActiveTab={isActiveTab} refresh={refresh} />
+      </Suspense>
+      <RegistrationFailuresCard date={selectedDate} branch={branch} isActiveTab={isActiveTab} refresh={refresh} />
+    </>
+  );
+
   return (
     <RosterShell
       activePage="roster-dashboard"
@@ -266,8 +282,9 @@ export function RosterDashboardPage({
           <Select
             value={branch}
             onValueChange={(value) => {
-              setBranch(value as DashboardBranch);
-              if(value!=='all') setSelectedBranch(value as 'q1'|'q7');
+              if(value!=='all'&&(!isBranchCode(value)||!branchIds[value])) return;
+              setBranchFilter(value);
+              if(value==='q1'||value==='q7') setSelectedBranch(value);
             }}
           >
             <SelectTrigger className="w-44" aria-label="Lọc chi nhánh">
@@ -276,20 +293,21 @@ export function RosterDashboardPage({
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="all">Tất cả chi nhánh</SelectItem>
-                <SelectItem value="q1">D1 – Quận 1</SelectItem>
-                <SelectItem value="q7">D7 – Quận 7</SelectItem>
+                {branchIds.q1 && <SelectItem value="q1">D1 – Quận 1</SelectItem>}
+                {branchIds.q7 && <SelectItem value="q7">D7 – Quận 7</SelectItem>}
+                {branchIds.hn && <SelectItem value="hn">Hà Nội</SelectItem>}
               </SelectGroup>
             </SelectContent>
           </Select>
           <Button
             variant="outline"
             size="sm"
-            disabled={isLoading||loadingRange}
-            aria-busy={isLoading||loadingRange}
+            disabled={!receptionOnly&&(isLoading||loadingRange)}
+            aria-busy={!receptionOnly&&(isLoading||loadingRange)}
             className="roster-dashboard-refresh"
             onClick={() => {
               setRefresh((value) => value+1);
-              void reloadAll(true);
+              if(!receptionOnly) void reloadAll(true);
             }}
           >
             <RefreshCw data-icon="inline-start" />
@@ -300,7 +318,7 @@ export function RosterDashboardPage({
     >
       <div className="dym-roster-dashboard dym-onsite-page">
 
-        {loadError||errorBanner? (
+        {receptionOnly? receptionOverview:loadError||errorBanner? (
           <Alert variant="destructive">
             <AlertTitle>Chưa tải được dữ liệu tổng quan</AlertTitle>
             <AlertDescription>{loadError||errorBanner}</AlertDescription>
@@ -434,9 +452,7 @@ export function RosterDashboardPage({
                   </CardContent>
                 </Card>
               </div>
-              <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-                <ReceptionTrendChart date={selectedDate} today={rosterToday} branch={branch} isActiveTab={isActiveTab} refresh={refresh} />
-              </Suspense>
+              {receptionOverview}
               <Card className="roster-dashboard-panel">
                 <CardHeader>
                   <CardTitle className="roster-dashboard-section-title">Đoàn khám sắp tới</CardTitle>

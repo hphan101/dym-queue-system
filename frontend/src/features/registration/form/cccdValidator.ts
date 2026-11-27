@@ -77,6 +77,7 @@ export interface CccdValidationParams {
   isEn?: boolean;
   lang?: SupportedLanguage;
   identityDocumentType?: 'cccd' | 'passport';
+  allowPreviewCode?: boolean;
 }
 
 /**
@@ -98,6 +99,7 @@ export function validateVietnamCccd({
   isEn = false,
   lang = isEn ? 'en' : 'vi',
   identityDocumentType,
+  allowPreviewCode = false,
 }: CccdValidationParams): string | null {
   const text = (vi: string, en: string, ja: string) => ({ vi, en, ja })[lang];
   const clean = cccd.trim().toUpperCase();
@@ -121,7 +123,7 @@ export function validateVietnamCccd({
 
   // 1. Check first 3 digits: Province code (001 - 096 across 63 provinces)
   const provinceCode = clean.slice(0, 3);
-  if (!CCCD_PROVINCE_CODES[provinceCode]) {
+  if (!CCCD_PROVINCE_CODES[provinceCode] && !(allowPreviewCode && provinceCode === '000')) {
     return text(
       `3 số đầu "${provinceCode}" không phải mã tỉnh/thành phố hợp lệ (001–096)`,
       `Invalid province code "${provinceCode}" in the first 3 digits of CCCD`,

@@ -1,6 +1,7 @@
 import { hasPermission } from "../_shared/staffPermissions.ts";
 import { getBearerToken, getClientIp, isOriginAllowed, isRecord, jsonResponse, responseHeaders } from "../_shared/http.ts";
 import { createAdminClient, getSupabaseSecretKey } from "../_shared/supabase.ts";
+import { countExpiredQrFailure } from "../_shared/registrationFailureResponse.ts";
 import {
   createQrChallenge, createRegistrationSessionToken, hashRegistrationSession,
   REGISTRATION_SESSION_MS, SESSION_TOKEN_PATTERN, verifyQrChallenge,
@@ -63,8 +64,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
       if (body.changes !== undefined && !isRecord(body.changes)) {
         return jsonResponse({ code: "INVALID_DATA" }, 400, origin);
       }
-    } else if (typeof body.challenge !== "string" || await verifyQrChallenge(body.challenge, signingSecret) !== branch) {
-      return jsonResponse({ code: "QR_EXPIRED" }, 403, origin);
+    } else {
+      const now = Date.now();
+      if (typeof body.challenge !== "string") return jsonResponse({ code: "QR_EXPIRED" }, 403, origin);
+      if (await verifyQrChallenge(body.challenge, signingSecret, now) !== branch) {
+        return countExpiredQrFailure(jsonResponse({ code: "QR_EXPIRED" }, 403, origin),
+          client, branch, body.challenge, signingSecret, getClientIp(request), now);
+      }
     }
     const rateLimitScope = body.action === "edit-registration" ? "edit-ip" : "access-ip";
     const ipHash = await hashRegistrationSession(`${rateLimitScope}|${signingSecret}|${getClientIp(request) ?? "unknown"}`);
@@ -85,7 +91,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
         case "EDIT_SESSION_INVALID": return jsonResponse({ code: error.message }, 403, origin);
         case "EDIT_SESSION_EXPIRED":
         case "EDIT_LOCKED": return jsonResponse({ code: error.message }, 409, origin);
-        case "INVALID_DATA": return jsonResponse({ code: error.message, field: error.details || undefined }, 400, origin);
+        case "INVALID_DATA": return jsonResponse({
+          code: error.hint === "passport_name" ? "INVALID_PASSPORT_NAME" : error.message,
+          field: error.details || undefined,
+        }, 400, origin);
       }
       if (error || !data) return jsonResponse({ code: "SERVER_ERROR" }, 503, origin);
       return jsonResponse({ success: true, ...data }, 200, origin);

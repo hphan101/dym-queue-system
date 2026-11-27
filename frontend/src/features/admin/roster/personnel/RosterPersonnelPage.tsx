@@ -18,6 +18,7 @@ import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/comp
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
 import { cn } from '@/lib/utils';
+import { getTodayInVietnam } from '@/lib/date';
 import {
 ArrowDownTrayIcon,
 ArrowUpTrayIcon,
@@ -25,6 +26,7 @@ ArrowUpTrayIcon,
 import { FileText, Lock, LockOpen, Trash2, Pencil, Plus, RefreshCw, Upload } from 'lucide-react';
 import { useEffect,useId,useMemo,useRef,useState } from 'react';
 import { HighlightText } from '../../shared/HighlightText';
+import { useStaffPermissions } from '../../shared/useStaffPermissions';
 import {
 formatVndCurrency,
 generateNextPersonnelCode,
@@ -46,6 +48,8 @@ parseSpreadsheetFileToRows,
 } from '../shared/exportRosterExcel';
 import { PersonnelDocumentsDialog } from './PersonnelDocumentsDialog';
 import { PersonnelFormDialog } from './PersonnelFormDialog';
+import { PersonnelUnavailabilityDialog } from './PersonnelUnavailabilityDialog';
+import { PersonnelWeekDialog } from './PersonnelWeekDialog';
 import { getSpecialtyLabels } from './doctorSpecialties';
 import './personnel.css';
 
@@ -140,6 +144,10 @@ export function RosterPersonnelPage({
   const [documentPerson, setDocumentPerson] = useState<MedicalPersonnel | null>(
     null,
   );
+  const [unavailabilityPerson, setUnavailabilityPerson] = useState<MedicalPersonnel | null>(null);
+  const [weekPerson, setWeekPerson] = useState<MedicalPersonnel | null>(null);
+  const { can } = useStaffPermissions();
+  const canViewWeek = can('clinic') || can('onsite') || can('overview') || can('settlement');
   const [form, setForm] = useState<MedicalPersonnelInput>(EMPTY_PERSONNEL_FORM);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -742,8 +750,8 @@ export function RosterPersonnelPage({
                 <TableRow>
                   <TableHead scope="col">Staff ID</TableHead>
                   <TableHead scope="col">Tên</TableHead>
+                  <TableHead scope="col">Vai trò / Chuyên môn</TableHead>
                   <TableHead scope="col">CCCD</TableHead>
-                  <TableHead scope="col">Số CCHN</TableHead>
                   <TableHead scope="col">SĐT</TableHead>
                   <TableHead scope="col">Email</TableHead>
                   <TableHead scope="col" className="text-right">
@@ -765,7 +773,7 @@ export function RosterPersonnelPage({
                       <Skeleton className="h-4 w-36" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-5 w-24 rounded-md" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-28" />
@@ -818,8 +826,8 @@ export function RosterPersonnelPage({
                 <TableRow>
                   <TableHead scope="col">Staff ID</TableHead>
                   <TableHead scope="col">Tên</TableHead>
+                  <TableHead scope="col">Vai trò / Chuyên môn</TableHead>
                   <TableHead scope="col">CCCD</TableHead>
-                  <TableHead scope="col">Số CCHN</TableHead>
                   <TableHead scope="col">SĐT</TableHead>
                   <TableHead scope="col">Email</TableHead>
                   <TableHead scope="col" className="text-right">
@@ -863,13 +871,33 @@ export function RosterPersonnelPage({
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-muted-foreground">
+                          <Button type="button" variant="link" size="sm" permissionAction="view"
+                            className="personnel-availability-link h-auto w-fit px-0 py-0"
+                            aria-label={`Giờ bận và ngày nghỉ của ${person.full_name}`}
+                            onClick={() => setUnavailabilityPerson(person)}>
+                            Giờ bận và ngày nghỉ
+                          </Button>
+                          {canViewWeek && (
+                            <Button type="button" variant="link" size="sm" permissionAction="view"
+                              className="personnel-availability-link h-auto w-fit px-0 py-0"
+                              aria-label={`Xem lịch tuần của ${person.full_name}`}
+                              onClick={() => setWeekPerson(person)}>
+                              Xem lịch tuần
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="personnel-role-cell flex flex-col items-start gap-1">
+                          <Badge variant="secondary" className="personnel-role-badge" data-role={person.role_type}>
                             {ROLE_LABELS[person.role_type]}
-                          </span>
+                          </Badge>
                           {person.role_type === 'doctor' && (
                             <span className="text-xs text-muted-foreground">
-                              {getSpecialtyLabels(person.specialties) ||
-                                'Chưa khai báo chuyên môn'}
+                              <HighlightText
+                                text={getSpecialtyLabels(person.specialties) || 'Chưa khai báo chuyên môn'}
+                                query={searchQuery}
+                              />
                             </span>
                           )}
                         </div>
@@ -877,12 +905,6 @@ export function RosterPersonnelPage({
                       <TableCell className="tabular-nums">
                         <HighlightText
                           text={person.identity_number || '—'}
-                          query={searchQuery}
-                        />
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        <HighlightText
-                          text={person.practicing_certificate || '—'}
                           query={searchQuery}
                         />
                       </TableCell>
@@ -992,6 +1014,18 @@ export function RosterPersonnelPage({
           person={documentPerson}
           onClose={() => setDocumentPerson(null)}
         />
+      )}
+
+      {unavailabilityPerson && (
+        <PersonnelUnavailabilityDialog
+          key={unavailabilityPerson.id}
+          person={unavailabilityPerson}
+          initialDate={getTodayInVietnam()}
+          onClose={() => setUnavailabilityPerson(null)}
+        />
+      )}
+      {weekPerson && (
+        <PersonnelWeekDialog person={weekPerson} initialDate={getTodayInVietnam()} onClose={() => setWeekPerson(null)} />
       )}
 
       {/* 1. Create / Edit Personnel Modal (shadcn Dialog) */}

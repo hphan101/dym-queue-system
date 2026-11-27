@@ -33,6 +33,7 @@ function loadComponent(file, stateValues, context, category = 'onsite', onStateC
     };
     if (name === './rosterService') return service;
     if (name === './shiftTime') return compile('shiftTime.ts', () => ({}));
+    if (name === './rosterUnavailability') return { useRosterUnavailability: () => ({ data: context?.unavailability ?? [] }) };
     if (name === './campaignTemplates') return { ...templates, fetchCampaignTemplates: async () => service.CAMPAIGN_POSITION_TEMPLATES };
     if (name === './onsiteCalendar') return compile('onsiteCalendar.ts', () => ({ supabase: {} }));
     if (name === './campaignGroups') return campaignGroups;
@@ -71,6 +72,24 @@ test('clinic personnel picker offers staff again at the end of a previous shift'
   }).RosterAssignmentCell(props));
   assert.doesNotMatch(render(720), /Bác sĩ An/);
   assert.match(render(735), /Bác sĩ An/);
+});
+
+test('clinic and onsite hide unavailable personnel only during overlapping shifts', () => {
+  const context = { unavailability: [{ personnel_id: person.id, start_minute: 780, end_minute: 900 }] };
+  const props = {
+    rowKey: 'room', targetLabel: 'Phòng', assignmentDate: '2026-11-26', assignments: [],
+    activePersonnel: [person], personnelMap: new Map([[person.id, person]]),
+    sameDayAssignmentsByPerson: new Map(), getConflictLocationLabel: () => '', isOpen: true,
+    isMutating: false, onOpenChange() {}, onSaveAssignment() {}, onDeleteAssignment() {},
+  };
+  const render = (timedShifts, state) => JSON.stringify(loadComponent('RosterAssignmentCell.tsx', state, context)
+    .RosterAssignmentCell({ ...props, timedShifts }));
+  assert.doesNotMatch(render(true, { 9: 840, 10: 960 }), /Bác sĩ An/);
+  assert.match(render(true, { 9: 900, 10: 960 }), /Bác sĩ An/);
+  assert.doesNotMatch(render(false, { 4: 'PM' }), /Bác sĩ An/);
+  assert.match(render(false, { 4: 'AM' }), /Bác sĩ An/);
+  context.unavailability[0] = { personnel_id: person.id, start_minute: 0, end_minute: 1440 };
+  assert.doesNotMatch(render(false, { 4: 'AM' }), /Bác sĩ An/);
 });
 
 test('the campaign screenshot mode removes monetary summaries, allowance controls and cost columns', () => {
@@ -160,7 +179,7 @@ test('HC creation can include setup in the same save and keeps setup dates and p
   const context = { rosterToday: '2026-11-05', canEditHistory: false, selectedBranch: 'q1', selectedDate: form.schedule_date, schedules: [], assignments: [], activePersonnel: [], personnelMap: new Map(), roomMap: new Map(), dailyRoomOverrides: [], isLoading: false, isMutating: false,
     createCampaigns: async (hc, setup) => { savedHc = hc; savedSetup = setup; return [...hc, ...setup].map((item, i) => ({ ...item, id: `${i}` })); },
     upsertCampaign() { throw new Error('Expected a single combined save'); }, setSelectedBranch() {}, setSelectedDate() {}, setSelectedMonth() {}, showNotice(message) { notice = message; } };
-  const view = loadComponent('RosterOnsitePage.tsx', { 4: true, 5: 'create', 9: form, 26: ['2026-11-10', '2026-11-11'], 29: true, 30: ['2026-11-09'], 31: ['Chuẩn bị bàn'] }, context).RosterOnsitePage({});
+  const view = loadComponent('RosterOnsitePage.tsx', { 4: true, 5: 'create', 9: form, 27: ['2026-11-10', '2026-11-11'], 30: true, 31: ['2026-11-09'], 32: ['Chuẩn bị bàn'] }, context).RosterOnsitePage({});
   function elements(node) { if (!node || typeof node !== 'object') return []; if (Array.isArray(node)) return node.flatMap(elements); return [node, ...elements(node.props?.children)]; }
   const nodes = elements(view);
   assert.match(JSON.stringify(view), /Tạo kèm lịch set-up/);
@@ -179,11 +198,11 @@ test('adding a campaign from a calendar day prefills that exact day, its code an
   const updates = new Map();
   const context = { rosterToday: '2026-11-05', canEditHistory: false, selectedBranch: 'q7', selectedDate: '2026-11-05', schedules: [], assignments: [], activePersonnel: [], personnelMap: new Map(), roomMap: new Map(), dailyRoomOverrides: [], isLoading: false, isMutating: false,
     setErrorMessage(message) { throw new Error(message); } };
-  const tree = loadComponent('RosterOnsitePage.tsx', { 22: 'week' }, context, 'onsite', (slot, value) => updates.set(slot, value)).RosterOnsitePage({});
+  const tree = loadComponent('RosterOnsitePage.tsx', { 23: 'week' }, context, 'onsite', (slot, value) => updates.set(slot, value)).RosterOnsitePage({});
   function elements(node) { if (!node || typeof node !== 'object') return []; if (Array.isArray(node)) return node.flatMap(elements); return [node, ...elements(node.props?.children)]; }
   elements(tree).find((node) => node.props?.onCreateCampaign).props.onCreateCampaign('2026-11-07');
   await new Promise(setImmediate);
-  assert.deepEqual(updates.get(26), ['2026-11-07']);
+  assert.deepEqual(updates.get(27), ['2026-11-07']);
   assert.equal(updates.get(9).schedule_date, '2026-11-07');
   assert.equal(updates.get(9).branch_code, 'q7');
   assert.match(updates.get(9).campaign_code, /^DOAN-20261107-/);

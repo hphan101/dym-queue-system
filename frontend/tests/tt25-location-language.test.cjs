@@ -34,6 +34,7 @@ function render(lang, step, targetPayment) {
     './SearchableSelect': {},
     './BirthDateInput': {},
     './cccdValidator': {},
+    '../../../../../supabase/functions/_shared/passportName': load('../../../../supabase/functions/_shared/passportName.ts'),
     './locationService': {},
   }, step);
   return renderToStaticMarkup(React.createElement(TT25RegistrationForm, {

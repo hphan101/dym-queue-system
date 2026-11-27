@@ -823,7 +823,7 @@ export function fetchRosterBundleForMonth(monthStr: string) {
   return fetchRosterBundleForRange(startDate, endDate);
 }
 
-async function readRosterPages<T>(
+export async function readRosterPages<T>(
   read: (
     start: number,
     end: number,
@@ -840,6 +840,39 @@ async function readRosterPages<T>(
     rows.push(...((data ?? []) as T[]));
     if (!data || data.length < size) return rows;
   }
+}
+
+export async function fetchPersonnelWeek(
+  personnelId: string,
+  startDate: string,
+  endDate: string,
+  access: { clinic: boolean; onsite: boolean },
+) {
+  const types: RosterScheduleType[] = [];
+  if (access.clinic) types.push('insite');
+  if (access.onsite) types.push('onsite_exam', 'blood_draw', 'setup');
+  if (!types.length) return [];
+
+  type Schedule = Pick<RosterSchedule, 'id' | 'schedule_date' | 'schedule_type' | 'branch_code' | 'campaign_code' | 'company_name' | 'company_address'>;
+  type Assignment = Pick<RosterAssignment, 'id' | 'schedule_id' | 'position_label' | 'shift_period' | 'start_minute' | 'end_minute'>;
+  const schedules = await readRosterPages<Schedule>((start, end) => supabase
+    .from('roster_schedules').select('id,schedule_date,schedule_type,branch_code,campaign_code,company_name,company_address')
+    .gte('schedule_date', startDate).lte('schedule_date', endDate).in('schedule_type', types).order('id').range(start, end));
+  const shifts: { schedule: Schedule; assignment: Assignment }[] = [];
+  for (let offset = 0; offset < schedules.length; offset += 100) {
+    const byId = new Map(schedules.slice(offset, offset + 100).map((schedule) => [schedule.id, schedule]));
+    const assignments = await readRosterPages<Assignment>((start, end) => supabase
+      .from('roster_assignments').select('id,schedule_id,position_label,shift_period,start_minute,end_minute')
+      .eq('personnel_id', personnelId).in('schedule_id', [...byId.keys()]).order('id').range(start, end));
+    for (const assignment of assignments) {
+      const schedule = byId.get(assignment.schedule_id);
+      if (schedule) shifts.push({ assignment, schedule });
+    }
+  }
+  return shifts.sort((a, b) => a.schedule.schedule_date.localeCompare(b.schedule.schedule_date)
+    || (a.assignment.start_minute ?? (a.assignment.shift_period === 'PM' ? 720 : 0))
+      - (b.assignment.start_minute ?? (b.assignment.shift_period === 'PM' ? 720 : 0))
+    || a.assignment.position_label.localeCompare(b.assignment.position_label, 'vi'));
 }
 
 export async function fetchRosterBundleForRange(
@@ -1311,29 +1344,20 @@ export async function duplicateOnsiteCampaign(
   schedule: RosterSchedule;
   insertedAssignments: RosterAssignment[];
 }> {
-  const createdSchedule = await saveOnsiteSchedule({
-    ...input,
-    id: null,
-  });
-
-  if (!copyAssignments || sourceAssignments.length === 0) {
-    return { schedule: createdSchedule, insertedAssignments: [] };
-  }
-
   const targetAllowance = Math.max(
     0,
-    Math.round(
-      Number(input.default_allowance ?? createdSchedule.default_allowance) || 0,
-    ),
+    Math.round(Number(input.default_allowance) || 0),
   );
 
-  const payloads = sourceAssignments.map((item, idx) => ({
-    schedule_id: createdSchedule.id,
+  const payloads = (copyAssignments ? sourceAssignments : []).map((item, idx) => ({
     room_id: null,
     daily_override_id: null,
     position_label: item.position_label,
     personnel_id: item.personnel_id,
     shift_period: item.shift_period,
+    start_minute: item.start_minute ?? null,
+    end_minute: item.end_minute ?? null,
+    day_rate_snapshot: item.day_rate_snapshot ?? null,
     base_cost_snapshot: Math.max(
       0,
       Math.round(Number(item.base_cost_snapshot) || 0),
@@ -1346,9 +1370,22 @@ export async function duplicateOnsiteCampaign(
     sort_order: item.sort_order ?? (idx + 1) * 10,
   }));
 
+  if (typeof __DYM_CLOUDFLARE__ !== 'undefined' && __DYM_CLOUDFLARE__) {
+    const { data, error } = await supabase.rpc('create_onsite_with_assignments', {
+      p_schedule: buildOnsiteSchedulePayload(input),
+      p_assignments: payloads,
+    });
+    if (error) throw new Error(error.message || 'Không thể nhân bản đoàn khám.');
+    const result = data as { schedule: RosterSchedule; insertedAssignments: RosterAssignment[] };
+    return { schedule: normalizeRosterSchedule(result.schedule), insertedAssignments: result.insertedAssignments };
+  }
+
+  const createdSchedule = await saveOnsiteSchedule({ ...input, id: null });
+  if (!payloads.length) return { schedule: createdSchedule, insertedAssignments: [] };
+
   const { data: insertedData, error: insertErr } = await supabase
     .from('roster_assignments')
-    .insert(payloads)
+    .insert(payloads.map(payload => ({ ...payload, schedule_id: createdSchedule.id })))
     .select('*');
 
   if (insertErr) {
@@ -1427,18 +1464,21 @@ export async function saveRosterAssignment(
     base_cost_snapshot: baseCost,
     allowance_cost: allowanceCost,
     note: (input.note ?? '').trim(),
-    sort_order: input.sort_order ?? 100,
+    sort_order: input.sort_order ?? (input.id ? undefined : 100),
   };
 
   if (input.id) {
-    const { data, error } = await supabase
+    const update = supabase
       .from('roster_assignments')
       .update(payload)
-      .eq('id', input.id)
-      .select('*')
-      .single();
+      .eq('id', input.id);
+    if (input.expected_personnel_id) update.eq('personnel_id', input.expected_personnel_id);
+    const { data, error } = await update.select('*').single();
 
     if (error) {
+      if (input.expected_personnel_id && error.code === 'PGRST116') {
+        throw new Error('Ca trực đã thay đổi hoặc không còn quyền sửa. Vui lòng tải lại lịch.');
+      }
       throw new Error(error.message || 'Không thể cập nhật phân công nhân sự.');
     }
     return {
@@ -1467,6 +1507,18 @@ export async function saveRosterAssignment(
     allowance_cost: Number(data.allowance_cost ?? 0),
     total_cost: Number(data.total_cost ?? baseCost + allowanceCost),
   };
+}
+
+export async function fetchRosterAssignmentChanges(assignmentId: string) {
+  const { data, error } = await supabase.rpc('get_roster_assignment_changes', { p_assignment_id: assignmentId });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Array<{
+    id: string;
+    changed_at: string;
+    actor_name: string;
+    from_name: string;
+    to_name: string;
+  }>;
 }
 
 export async function deleteRosterAssignment(

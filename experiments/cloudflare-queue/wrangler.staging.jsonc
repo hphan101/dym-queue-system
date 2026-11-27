@@ -1,0 +1,49 @@
+{
+  "name": "dym-queue-staging",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-23",
+  "workers_dev": true,
+  "preview_urls": false,
+  "account_id": "e14976f4afca6204e40ba49a9dc5fbb1",
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
+  "assets": {
+    "directory": "./.wrangler/preview-assets",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "DEMO_HOST": "dym-queue-staging.sweet-snowflake-17c2.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "database_name": "dym-queue-staging-db",
+      "binding": "DB",
+      "database_id": "bc3885db-1e46-4912-a025-25bf78e15a01"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PERSONNEL_FILES",
+      "bucket_name": "dym-queue-staging-personnel"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "QueueEvents",
+        "name": "QUEUE_EVENTS"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "QueueEvents"
+      ]
+    }
+  ]
+}

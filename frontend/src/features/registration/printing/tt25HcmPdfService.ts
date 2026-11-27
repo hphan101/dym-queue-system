@@ -108,12 +108,18 @@ export async function appendTT25OriginalPdf(data: TT25RegistrationData, session:
   }
   // Missing history is left blank, never asserted as a negative answer.
   if (history) {
-    tick(layout.checks.familyHistory[history.familyHistory.hasDisease ? 'yes' : 'no']);
-    for (const [id, points] of Object.entries(layout.checks.personalHistory)) {
-      if (typeof history.personalHistory[Number(id)] === 'boolean') tick(points[history.personalHistory[Number(id)] ? 'yes' : 'no']);
+    if (typeof history.familyHistory?.hasDisease === 'boolean') {
+      tick(layout.checks.familyHistory[history.familyHistory.hasDisease ? 'yes' : 'no']);
     }
-    tick(layout.checks.currentTreatment[history.currentTreatment.isTreating ? 'yes' : 'no']);
-    if (data.gender === 'Nữ' && history.pregnancyHistory) tick(layout.checks.pregnancyHistory[history.pregnancyHistory.hasHistory ? 'yes' : 'no']);
+    for (const [id, points] of Object.entries(layout.checks.personalHistory)) {
+      if (typeof history.personalHistory?.[Number(id)] === 'boolean') tick(points[history.personalHistory[Number(id)] ? 'yes' : 'no']);
+    }
+    if (typeof history.currentTreatment?.isTreating === 'boolean') {
+      tick(layout.checks.currentTreatment[history.currentTreatment.isTreating ? 'yes' : 'no']);
+    }
+    if (data.gender === 'Nữ' && typeof history.pregnancyHistory?.hasHistory === 'boolean') {
+      tick(layout.checks.pregnancyHistory[history.pregnancyHistory.hasHistory ? 'yes' : 'no']);
+    }
   }
   // Hanoi Work Permit ends with an unprinted reverse side for duplex printing.
   drawPdfPageNumbers(info.key === 'hn_wp' ? pages.slice(0, -1) : pages, fonts.bold);

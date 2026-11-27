@@ -2,6 +2,8 @@ import type { RosterAssignment, ShiftPeriod } from './types';
 
 type Shift = Pick<RosterAssignment, 'shift_period' | 'start_minute' | 'end_minute'>;
 
+export const SHIFT_MINUTES = Array.from({ length: 73 }, (_, index) => 360 + index * 15);
+
 const LEGACY_RANGES: Record<ShiftPeriod, [number, number]> = {
   FULL: [0, 1440], AM: [0, 720], PM: [720, 1440],
 };

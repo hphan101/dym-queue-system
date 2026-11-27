@@ -71,6 +71,21 @@
 .dym-personnel-content .dym-table-precision tr { background:transparent; }
 .dym-personnel-content .dym-patient-name { font-size:14px; font-weight:500; text-transform:none; white-space:normal; overflow-wrap:anywhere; }
 .dym-personnel-content .dym-patient-block { min-width:200px; }
+.dym-personnel-content .personnel-availability-link {
+  color:hsl(var(--foreground));
+  text-decoration:underline;
+}
+.personnel-role-cell { min-width:144px; white-space:normal; }
+.personnel-role-cell .personnel-role-badge {
+  background-color:var(--personnel-role-bg, #48546b);
+  color:white;
+  padding:0 8px;
+  line-height:20px;
+}
+.personnel-role-badge[data-role="doctor"] { --personnel-role-bg:#307416; }
+.personnel-role-badge[data-role="nurse"] { --personnel-role-bg:#225ba3; }
+.personnel-role-badge[data-role="technician"] { --personnel-role-bg:#60469a; }
+.personnel-role-badge[data-role="ctv"] { --personnel-role-bg:#855211; }
 .dym-personnel-content .dym-table-actions-group { gap:8px; }
 .dym-personnel-content .dym-table-actions-group > button { width:36px; height:36px; min-height:36px; padding:0; border-radius:8px; box-shadow:none; }
 .dym-personnel-content .dym-table-actions-group > button svg { width:18px; height:18px; stroke-width:1.75; }
@@ -82,6 +97,8 @@
  .personnel-panel-heading { padding:20px 16px 16px; }
  .personnel-toolbar { padding:0 16px 16px; }
  .personnel-filter-controls { width:100%; }
+ .dym-personnel-content .dym-patient-block { min-width:144px; }
+ .dym-personnel-content .dym-table-precision :is(th, td):nth-child(-n+3) { padding-inline:12px; }
  .dym-personnel-content .personnel-empty { min-height:280px; padding:32px 20px; }
 }
 

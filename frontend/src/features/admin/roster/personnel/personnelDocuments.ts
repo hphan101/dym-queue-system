@@ -13,6 +13,9 @@ export interface PersonnelDocument {
 }
 
 const BUCKET = 'personnel-documents';
+const previewMode = typeof __DYM_CLOUDFLARE_PREVIEW__ !== 'undefined' && __DYM_CLOUDFLARE_PREVIEW__;
+const cloudflare = typeof __DYM_CLOUDFLARE__ !== 'undefined' && __DYM_CLOUDFLARE__;
+const previewPath = '/functions/v1/personnel-documents';
 export const PERSONNEL_FILE_ACCEPT = '.pdf,.jpg,.jpeg,.png';
 const FILE_TYPES: Record<string, { mime: string; extension: string }> = {
   pdf: { mime: 'application/pdf', extension: 'pdf' },
@@ -20,6 +23,15 @@ const FILE_TYPES: Record<string, { mime: string; extension: string }> = {
   jpeg: { mime: 'image/jpeg', extension: 'jpg' },
   png: { mime: 'image/png', extension: 'png' },
 };
+
+async function previewRequest<T>(query: URLSearchParams, init?: RequestInit): Promise<T> {
+  const response = await fetch(previewPath + '?' + query, init);
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message || 'Không thể xử lý tệp hồ sơ.');
+  }
+  return (response.status === 204 ? undefined : await response.json()) as T;
+}
 
 export async function validatePersonnelFile(file: File) {
   const type = FILE_TYPES[file.name.split('.').pop()?.toLowerCase() ?? ''];
@@ -48,6 +60,7 @@ export async function validatePersonnelFile(file: File) {
 export async function fetchPersonnelDocuments(
   personnelId: string,
 ): Promise<PersonnelDocument[]> {
+  if (cloudflare) return previewRequest(new URLSearchParams({ personnelId }));
   const { data, error } = await supabase
     .from('personnel_documents')
     .select('*')
@@ -63,12 +76,19 @@ export async function uploadPersonnelDocument(
   file: File,
 ): Promise<PersonnelDocument> {
   if (
-    !/^[0-9a-f-]{36}$/i.test(personnelId) ||
+    (!/^[0-9a-f-]{36}$/i.test(personnelId) && !(previewMode && /^staff-demo-[12]$/.test(personnelId))) ||
     !['identity', 'certificate'].includes(kind)
   ) {
     throw new Error('Nhân sự hoặc loại hồ sơ không hợp lệ.');
   }
   const type = await validatePersonnelFile(file);
+  if (cloudflare) {
+    return previewRequest(new URLSearchParams({ personnelId, kind }), {
+      method: 'POST',
+      headers: { 'Content-Type': type.mime, 'X-File-Name': encodeURIComponent(file.name) },
+      body: file,
+    });
+  }
   // getRandomValues also works on HTTP LAN, where randomUUID is unavailable.
   const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
     byte.toString(16).padStart(2, '0'),
@@ -114,6 +134,7 @@ export async function uploadPersonnelDocument(
 export async function getPersonnelDocumentUrl(
   document: PersonnelDocument,
 ): Promise<string> {
+  if (cloudflare) return new URL(previewPath + '?' + new URLSearchParams({ id: document.id }), window.location.origin).href;
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(document.object_path, 60);
@@ -127,6 +148,7 @@ export async function getPersonnelDocumentUrl(
 export async function deletePersonnelDocument(
   document: PersonnelDocument,
 ): Promise<void> {
+  if (cloudflare) return previewRequest(new URLSearchParams({ id: document.id }), { method: 'DELETE' });
   // Keep the row on storage failure so the file remains visible and retryable.
   const { error: storageError } = await supabase.storage
     .from(BUCKET)

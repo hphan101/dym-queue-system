@@ -39,17 +39,17 @@ export const TT25_PERSONAL_DISEASES: TT25PersonalHistoryItem[] = [
 
 export interface TT25MedicalHistory {
   familyHistory: {
-    hasDisease: boolean;
+    hasDisease: boolean | null;
     diseaseDetails: string;
   };
   personalHistory: Record<number, boolean>;
   personalOtherDetails: string;
   currentTreatment: {
-    isTreating: boolean;
+    isTreating: boolean | null;
     medications: string;
   };
   pregnancyHistory?: {
-    hasHistory: boolean;
+    hasHistory: boolean | null;
     details: string;
   };
   commitmentAgreed: boolean;

@@ -51,3 +51,47 @@ Pages tự phục vụ `index.html` cho đường dẫn SPA không khớp file k
 chép vào `dist/_headers`.
 
 Tài liệu: https://developers.cloudflare.com/pages/get-started/git-integration/
+
+## Diễn tập chuyển dữ liệu vào Worker local
+
+Chạy các lệnh dưới đây từ thư mục `experiments/cloudflare-queue`. File cấu
+hình local cần có hai binding `DB` và `PERSONNEL_FILES`. Thay các tên trong
+ví dụ bằng file cấu hình, tên D1 và đường dẫn của bản diễn tập.
+
+```powershell
+node rehearse-snapshot.mjs --source-query
+npm exec -- wrangler d1 execute dym-local --local --config dym-local.jsonc --persist-to .wrangler/rehearsal --file schema.sql
+node rehearse-snapshot.mjs dym-local.jsonc .wrangler/rehearsal snapshot.json source-objects
+```
+
+Lệnh đầu in một truy vấn PostgreSQL để lấy cùng thời điểm dữ liệu tiếp nhận,
+tài khoản, lịch và metadata của tệp. Khi tạo bộ dữ liệu diễn tập, dùng dữ liệu
+mẫu và đặt tệp theo `object_path` trong thư mục nguồn. Nếu Wrangler được cài
+qua npm exec, có thể đặt `DYM_WRANGLER_PACKAGE` thành đường dẫn tới
+`wrangler/package.json` để Node tìm được thư viện.
+
+Trước khi nhập, đặt `DYM_MIGRATION_ADMIN_LOGIN` và
+`DYM_MIGRATION_ADMIN_PASSWORD` cho quản trị viên đã có quyền quản lý nhân viên
+ở tất cả chi nhánh hoạt động. Các tài khoản còn lại cần được cấp mật khẩu mới.
+Lệnh nhập kiểm tra tệp đã sao chép lên R2 trước khi ghi dữ liệu vào D1. Dùng
+cùng thư mục trạng thái với Wrangler dev để mở giao diện trên bộ dữ liệu đã nhập.
+
+## Bản dựng Pages dùng backend Cloudflare
+
+`npm run build -- --mode cloudflare-pages` thêm một Pages Function vào
+`dist/`. Pages tiếp tục phục vụ giao diện, phông chữ và mẫu PDF. Function
+chuyển tiếp API và WebSocket qua service binding `QUEUE_BACKEND`. Vì trình
+duyệt dùng cùng địa chỉ cho giao diện và API, link QR, đường dẫn TV và cookie
+đăng nhập cùng dùng địa chỉ Pages.
+
+Bản dựng này cần một Worker backend riêng có D1, R2 và Durable Object.
+Worker đặt `DYM_APP_ORIGIN` bằng địa chỉ HTTPS của Pages và cấu hình
+`REGISTRATION_FINGERPRINT_SECRET` bằng secret của môi trường đó. Trong bản
+diễn tập có nhập phiên QR từ hệ thống cũ, giá trị secret phải khớp nguồn thì
+yêu cầu gửi lại mới nhận được số cũ. Pages cấu hình `QUEUE_BACKEND` trỏ tới
+Worker cùng môi trường. Worker phục vụ qua binding có thể tắt
+`workers_dev` và `preview_urls`.
+
+Bản dựng mặc định `npm run build` tiếp tục dùng cấu hình Supabase ở đầu tài
+liệu. Chế độ `cloudflare-pages` được kiểm thử riêng trước khi đổi cấu hình
+triển khai của dự án chính.

@@ -25,6 +25,22 @@ function load(file, mocks = {}, globals = {}) {
 }
 
 const cryptoHelpers = load('supabase/functions/_shared/registrationAccess.ts');
+function registrationServerMocks(client, Deno) {
+  const supabase = { createAdminClient: () => client, getSupabaseSecretKey: () => 'server-secret' };
+  const reporter = load('supabase/functions/_shared/registrationFailureResponse.ts', {
+    './registrationAccess.ts': cryptoHelpers,
+    './supabase.ts': supabase,
+  }, { Deno, AbortSignal });
+  return {
+    '../_shared/supabase.ts': supabase,
+    '../_shared/registrationFailureResponse.ts': reporter,
+  };
+}
+
+function rpcResult(value) {
+  const response = Promise.resolve(value);
+  return Object.assign(response, { abortSignal: () => response });
+}
 const now = Date.UTC(2026, 10, 1, 9, 0, 0);
 const secret = 'test-only-server-signing-secret';
 
@@ -261,7 +277,7 @@ test('server refuses public QR issuance, wrong staff branches and invalid exchan
   const http = load('supabase/functions/_shared/http.ts', {}, { Deno });
   load('supabase/functions/registration-access/index.ts', {
     '../_shared/http.ts': http,
-    '../_shared/supabase.ts': { createAdminClient: () => client, getSupabaseSecretKey: () => 'server-secret' },
+    ...registrationServerMocks(client, Deno),
     '../_shared/registrationAccess.ts': cryptoHelpers,
   }, { Deno });
   const call = (body, auth) => handler(new Request('https://test.invalid/access', {
@@ -289,7 +305,7 @@ test('customer edits pass only a hashed session and map server validation and lo
   const Deno = { env: { get: (key) => ({ SUPABASE_URL: 'https://test.invalid', REGISTRATION_FINGERPRINT_SECRET: secret })[key] }, serve: (fn) => { handler = fn; } };
   load('supabase/functions/registration-access/index.ts', {
     '../_shared/http.ts': load('supabase/functions/_shared/http.ts', {}, { Deno }),
-    '../_shared/supabase.ts': { createAdminClient: () => client, getSupabaseSecretKey: () => 'server-secret' },
+    ...registrationServerMocks(client, Deno),
     '../_shared/registrationAccess.ts': cryptoHelpers,
   }, { Deno });
   const sessionToken = 'a'.repeat(64);
@@ -321,21 +337,26 @@ test('register endpoint has no QR bypass and delegates issuance to the atomic se
   const calls = [];
   const Deno = { env: { get: (key) => ({ SUPABASE_URL: 'https://test.invalid', REGISTRATION_FINGERPRINT_SECRET: secret })[key] }, serve: (fn) => { handler = fn; } };
   const http = load('supabase/functions/_shared/http.ts', {}, { Deno });
-  const client = { rpc: async (name, args) => {
+  const client = { rpc: (name, args) => {
     calls.push({ name, args });
-    return name === 'consume_registration_ip_limit' ? { data: [{ allowed: true }], error: null }
-      : { data: [{ registration_id: 'patient', queue_number: '0001', queue_date: '2026-11-01' }], error: issueError };
+    return rpcResult(name === 'issue_registration_with_session'
+      ? { data: [{ registration_id: 'patient', queue_number: '0001', queue_date: '2026-11-01' }], error: issueError }
+      : { data: [{ allowed: true }], error: null });
   } };
   load('supabase/functions/register/index.ts', {
     '../_shared/http.ts': http,
-    '../_shared/supabase.ts': { createAdminClient: () => client, getSupabaseSecretKey: () => 'server-secret' },
+    '../_shared/registrationPayload.ts': load('supabase/functions/_shared/registrationPayload.ts', {
+      './http.ts': http, './passportName.ts': load('supabase/functions/_shared/passportName.ts'),
+    }),
+    ...registrationServerMocks(client, Deno),
     '../_shared/registrationAccess.ts': cryptoHelpers,
   }, { Deno });
-  const payload = { branch: 'q1', fullName: 'Nguyễn Văn A', phoneNumber: '0901234567', birthDate: '2000-01-01',
+  const payload = { branch: 'q1', fullName: 'NGUYEN VAN A', phoneNumber: '0901234567', birthDate: '2000-01-01',
     gender: 'Nam', cccd: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', addressDetail: '123 đường A' };
   const call = (data) => handler(new Request('https://test.invalid/register', { method: 'POST', body: JSON.stringify(data) }));
   for (const [fields, field] of [
     [{ email: 'bad email' }, 'email'],
+    [{ fullName: '王小明', identityDocumentType: 'passport' }, 'fullName'],
     [{ gender: 'Nữ', consentFormVersion: 'DYM.PRO.09.FOR.02.03-2026-11-19' }, 'pregnancyStatus'],
     [{ identityDocumentType: 'cccd', cccd: '001299123456' }, 'cccd'],
     [{ addressDetail: 'A' }, 'addressDetail'],
@@ -368,7 +389,50 @@ test('register endpoint has no QR bypass and delegates issuance to the atomic se
     assert.equal(result.code, 'IDENTITY_DOCUMENT_COOLDOWN');
     assert.ok(result.error.startsWith(label));
     assert.match(result.error, /30 phút/);
+    assert.equal(calls.at(-1).name, 'record_registration_failure');
+    assert.equal(calls.at(-1).args.p_kind, 'duplicate_document');
   }
+  const registrationSession = 'a'.repeat(64);
+  assert.equal((await call({ ...payload, registrationSession, phoneNumber: '09' })).status, 400);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), {
+    name: 'record_registration_failure',
+    args: { p_branch_code: 'q1', p_kind: 'invalid_data', p_session_hash: await cryptoHelpers.hashRegistrationSession(registrationSession) },
+  });
+  issueError = { message: 'REGISTRATION_SESSION_EXPIRED' };
+  assert.equal((await call({ ...payload, registrationSession })).status, 403);
+  assert.equal(calls.at(-1).args.p_kind, 'session_expired');
+  issueError = { message: 'INTERNAL_ERROR', code: 'XX000' };
+  assert.equal((await call({ ...payload, registrationSession })).status, 500);
+  assert.equal(calls.at(-1).args.p_kind, 'server_error');
+});
+
+test('expired QR metrics count signed recent codes for the same branch only', async () => {
+  let handler;
+  const writes = [];
+  const Deno = { env: { get: (key) => ({ SUPABASE_URL: 'https://test.invalid', REGISTRATION_FINGERPRINT_SECRET: secret })[key] }, serve: fn => { handler = fn; } };
+  const client = { rpc(name, args) {
+    writes.push({ name, args });
+    return rpcResult({ data: { allowed: true }, error: null });
+  } };
+  load('supabase/functions/registration-access/index.ts', {
+    '../_shared/http.ts': load('supabase/functions/_shared/http.ts', {}, { Deno }),
+    '../_shared/registrationAccess.ts': cryptoHelpers,
+    ...registrationServerMocks(client, Deno),
+  }, { Deno });
+  const exchange = async (branch, challenge) => handler(new Request('https://test.invalid/access', {
+    method: 'POST', body: JSON.stringify({ action: 'exchange', branch, challenge }),
+  }));
+  const recent = (await cryptoHelpers.createQrChallenge('hn', secret, Date.now() - 60_000)).challenge;
+  const old = (await cryptoHelpers.createQrChallenge('hn', secret, Date.now() - 2 * 86_400_000)).challenge;
+  assert.equal((await exchange('q7', recent)).status, 403);
+  assert.equal((await exchange('hn', old)).status, 403);
+  assert.equal((await exchange('hn', recent.slice(0, -64) + '0'.repeat(64))).status, 403);
+  assert.equal(writes.length, 0);
+  assert.equal((await exchange('hn', recent)).status, 403);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes.at(-1))), {
+    name: 'record_registration_failure',
+    args: { p_branch_code: 'hn', p_kind: 'qr_expired', p_session_hash: null },
+  });
 });
 
 test('Postgres migration issues once, rejects expired or mismatched sessions and rolls back failed submissions', async () => {

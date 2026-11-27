@@ -9,6 +9,7 @@ import {
   PlusIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PermissionButton as Button } from '@/features/admin/shared/PermissionButton';
@@ -22,6 +23,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { queryClient } from '@/lib/queryClient';
 import {
   formatCurrencyInput,
   formatNumberPlain,
@@ -36,13 +38,14 @@ import {
   type RosterAssignment,
   type ShiftPeriod,
 } from '../data/rosterService';
-import { assignmentShiftsOverlap, calculateClinicShiftCost, CLINIC_SHIFT_DEFAULTS, formatAssignmentShift, formatShiftMinute } from '../data/shiftTime';
+import { useRosterUnavailability } from '../data/rosterUnavailability';
+import { assignmentShiftsOverlap, calculateClinicShiftCost, CLINIC_SHIFT_DEFAULTS, formatAssignmentShift, formatShiftMinute, SHIFT_MINUTES } from '../data/shiftTime';
+import { RosterAssignmentHistory } from './RosterAssignmentHistory';
 import './assignmentPopover.css';
-
-const SHIFT_MINUTES = Array.from({ length: 73 }, (_, index) => 360 + index * 15);
 
 export interface RosterAssignmentDraft {
   editingAssignmentId: string | null;
+  expectedPersonnelId: string | null;
   personnelId: string;
   shiftPeriod: ShiftPeriod;
   startMinute?: number;
@@ -60,6 +63,7 @@ interface RosterAssignmentCellProps {
   readOnly?: boolean;
   rowKey: string;
   targetLabel: string;
+  assignmentDate: string;
   assignments: RosterAssignment[];
   activePersonnel: MedicalPersonnel[];
   personnelMap: Map<string, MedicalPersonnel>;
@@ -87,6 +91,7 @@ export function RosterAssignmentCell({
   readOnly = false,
   rowKey,
   targetLabel,
+  assignmentDate,
   assignments,
   activePersonnel,
   personnelMap,
@@ -108,9 +113,9 @@ export function RosterAssignmentCell({
   const titleId = useId();
   const popoverAnchor = useRef<HTMLButtonElement | null>(null);
   const module = useContext(PermissionModuleContext) ?? 'clinic';
-  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(
-    null,
-  );
+  const [editing, setEditing] = useState<{ id: string; personnelId: string } | null>(null);
+  const editingAssignmentId = editing?.id ?? null;
+  const expectedPersonnelId = editing?.personnelId ?? null;
   const [personSearchQuery, setPersonSearchQuery] = useState('');
   const [personRoleFilter, setPersonRoleFilter] = useState<
     'all' | PersonnelRoleType
@@ -125,11 +130,27 @@ export function RosterAssignmentCell({
   const [endMinute, setEndMinute] = useState(CLINIC_SHIFT_DEFAULTS.FULL[1]);
   const [saveError, setSaveError] = useState('');
   const editingAssignment = assignments.find((item) => item.id === editingAssignmentId);
-  const keepLegacyShift = timedShifts && editingAssignment && editingAssignment.start_minute == null
-    && editingAssignment.personnel_id === assignPersonId
+  const replacing = Boolean(expectedPersonnelId && assignPersonId && expectedPersonnelId !== assignPersonId);
+  const sameLegacyHours = timedShifts && editingAssignment && editingAssignment.start_minute == null
     && startMinute === CLINIC_SHIFT_DEFAULTS[editingAssignment.shift_period][0]
-    && endMinute === CLINIC_SHIFT_DEFAULTS[editingAssignment.shift_period][1]
-    && assignBaseCost === (personnelMap.get(assignPersonId)?.fixed_cost ?? 0);
+    && endMinute === CLINIC_SHIFT_DEFAULTS[editingAssignment.shift_period][1];
+  const keepLegacyShift = sameLegacyHours && (replacing
+    || assignBaseCost === (personnelMap.get(assignPersonId)?.fixed_cost ?? 0));
+  const availability = useRosterUnavailability(assignmentDate, isOpen && !readOnly);
+  const availabilityReady = !availability.isPending && !availability.isError && !availability.isFetching;
+  const unavailablePeople = useMemo(() => {
+    const ids = new Set<string>();
+    for (const block of availability.data ?? []) {
+      const hasClockTime = timedShifts && !(sameLegacyHours && (block.personnel_id !== expectedPersonnelId || keepLegacyShift));
+      if (assignmentShiftsOverlap({ shift_period: assignShift,
+        start_minute: hasClockTime ? startMinute : null,
+        end_minute: hasClockTime ? endMinute : null,
+      }, { shift_period: 'FULL', start_minute: block.start_minute, end_minute: block.end_minute })) {
+        ids.add(block.personnel_id);
+      }
+    }
+    return ids;
+  }, [availability.data, timedShifts, sameLegacyHours, expectedPersonnelId, keepLegacyShift, assignShift, startMinute, endMinute]);
 
   const getOtherSameDayAssignments = (personId: string): RosterAssignment[] => {
     const list = sameDayAssignmentsByPerson.get(personId);
@@ -144,12 +165,13 @@ export function RosterAssignmentCell({
   ): RosterAssignment | null => {
     const personAssigns = getOtherSameDayAssignments(personId);
     if (personAssigns.length === 0) return null;
+    const hasClockTime = timedShifts && !(sameLegacyHours && (personId !== expectedPersonnelId || keepLegacyShift));
     return (
       personAssigns.find((existing) =>
         assignmentShiftsOverlap(existing, {
           shift_period: targetShift,
-          start_minute: timedShifts ? startMinute : null,
-          end_minute: timedShifts ? endMinute : null,
+          start_minute: hasClockTime ? startMinute : null,
+          end_minute: hasClockTime ? endMinute : null,
         }),
       ) ?? null
     );
@@ -158,14 +180,16 @@ export function RosterAssignmentCell({
   const filteredPersonnel = useMemo(() => {
     const query = personSearchQuery.trim().toLowerCase();
     return activePersonnel.filter((person) => {
+      if (unavailablePeople.has(person.id)) return false;
       const personAssigns = (
         sameDayAssignmentsByPerson.get(person.id) ?? []
       ).filter((item) => item.id !== editingAssignmentId);
+      const hasClockTime = timedShifts && !(sameLegacyHours && (person.id !== expectedPersonnelId || keepLegacyShift));
       const hasConflict = personAssigns.some((existing) =>
         assignmentShiftsOverlap(existing, {
           shift_period: assignShift,
-          start_minute: timedShifts ? startMinute : null,
-          end_minute: timedShifts ? endMinute : null,
+          start_minute: hasClockTime ? startMinute : null,
+          end_minute: hasClockTime ? endMinute : null,
         }),
       );
       if (hasConflict) {
@@ -188,15 +212,19 @@ export function RosterAssignmentCell({
     startMinute,
     endMinute,
     timedShifts,
+    sameLegacyHours,
+    expectedPersonnelId,
+    keepLegacyShift,
     editingAssignmentId,
     personRoleFilter,
     personSearchQuery,
     sameDayAssignmentsByPerson,
+    unavailablePeople,
   ]);
 
   const openAddPopover = () => {
     setSaveError('');
-    setEditingAssignmentId(null);
+    setEditing(null);
     setPersonSearchQuery('');
     setPersonRoleFilter('all');
     setAssignPersonId('');
@@ -212,7 +240,7 @@ export function RosterAssignmentCell({
 
   const openEditPopover = (item: RosterAssignment) => {
     setSaveError('');
-    setEditingAssignmentId(item.id);
+    setEditing({ id: item.id, personnelId: item.personnel_id });
     setPersonSearchQuery('');
     setPersonRoleFilter('all');
     setAssignPersonId(item.personnel_id);
@@ -236,12 +264,15 @@ export function RosterAssignmentCell({
   };
 
   const handleSelectPerson = (personId: string) => {
+    if (personId === assignPersonId) return;
     const conflict = getPersonConflictForShift(personId, assignShift);
     if (conflict) return;
     setAssignPersonId(personId);
     const person = personnelMap.get(personId);
     if (person) {
-      setAssignBaseCost(person.fixed_cost);
+      setAssignBaseCost(editingAssignment && personId === expectedPersonnelId
+        ? timedShifts ? editingAssignment.day_rate_snapshot ?? person.fixed_cost : editingAssignment.base_cost_snapshot
+        : person.fixed_cost);
     }
   };
 
@@ -257,7 +288,7 @@ export function RosterAssignmentCell({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (timedShifts && endMinute <= startMinute) return;
+    if (!availabilityReady || unavailablePeople.has(assignPersonId) || (timedShifts && endMinute <= startMinute)) return;
     setSaveError('');
 
     let targetPersonId = assignPersonId;
@@ -281,12 +312,13 @@ export function RosterAssignmentCell({
 
     const didClose = await onSaveAssignment({
       editingAssignmentId,
+      expectedPersonnelId,
       personnelId: targetPersonId,
       shiftPeriod: timedShifts && !keepLegacyShift ? 'FULL' : assignShift,
       startMinute: timedShifts && !keepLegacyShift ? startMinute : undefined,
       endMinute: timedShifts && !keepLegacyShift ? endMinute : undefined,
       dayRate: timedShifts && !keepLegacyShift ? targetBaseCost : undefined,
-      baseCostSnapshot: keepLegacyShift ? editingAssignment.base_cost_snapshot
+      baseCostSnapshot: keepLegacyShift ? (replacing ? targetBaseCost : editingAssignment.base_cost_snapshot)
         : timedShifts ? calculateClinicShiftCost(targetBaseCost, startMinute, endMinute) : targetBaseCost,
       allowanceCost: assignAllowance,
       note: assignNote,
@@ -296,6 +328,10 @@ export function RosterAssignmentCell({
     if (typeof didClose === 'string') {
       setSaveError(didClose);
     } else if (didClose) {
+      if (replacing && editingAssignmentId) {
+        void queryClient.invalidateQueries({ queryKey: ['roster-assignment-changes', editingAssignmentId] });
+        void queryClient.invalidateQueries({ queryKey: ['roster', 'settlement-campaign'] });
+      }
       closePopover();
     }
   };
@@ -313,7 +349,7 @@ export function RosterAssignmentCell({
     : undefined;
 
   const isSubmitDisabled =
-    isMutating ||
+    isMutating || !availabilityReady || unavailablePeople.has(assignPersonId) ||
     (timedShifts && (endMinute <= startMinute
       || Boolean(assignPersonId && getPersonConflictForShift(assignPersonId, assignShift)))) ||
     (!assignPersonId &&
@@ -329,7 +365,7 @@ export function RosterAssignmentCell({
           assignments.map((assignment) => (
             <span
               key={assignment.id}
-              className="rounded-md border border-border px-2 py-1 text-sm"
+              className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border px-2 py-1 text-sm"
             >
               {personnelMap.get(assignment.personnel_id)?.full_name ??
                 'Nhân sự'}{' '}
@@ -342,6 +378,17 @@ export function RosterAssignmentCell({
                   )}
                 </span>
               )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" permissionAction="view" variant="ghost" size="icon-sm"
+                    aria-label={`Lịch sử ca của ${personnelMap.get(assignment.personnel_id)?.full_name ?? 'nhân sự'}`}>
+                    <History aria-hidden="true" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent aria-label="Lịch sử đổi người trực">
+                  <RosterAssignmentHistory assignmentId={assignment.id} defaultOpen />
+                </PopoverContent>
+              </Popover>
             </span>
           ))
         ) : (
@@ -503,7 +550,7 @@ export function RosterAssignmentCell({
           >
             <div className="dym-assignment-header">
               <div>
-                <h3 id={titleId}>{editingAssignmentId ? 'Sửa ca trực' : 'Thêm nhân sự'}</h3>
+                <h3 id={titleId}>{replacing ? 'Đổi người trực' : editingAssignmentId ? 'Sửa ca trực' : 'Thêm nhân sự'}</h3>
                 <p>{targetLabel}{editingAssignment && ` · ${formatAssignmentShift(editingAssignment)}`}</p>
               </div>
               {selectedPerson && (
@@ -544,7 +591,14 @@ export function RosterAssignmentCell({
               </Tabs>
 
               <div className="dym-assignment-person-list" role="group" aria-label="Nhân sự phù hợp">
-                {filteredPersonnel.length === 0 ? (
+                {availability.isError ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-3 text-sm">
+                    <span>Chưa tải được lịch bận</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void availability.refetch()}>Thử lại</Button>
+                  </div>
+                ) : !availabilityReady ? (
+                  <p className="px-2 py-3 text-sm text-muted-foreground" role="status">Đang kiểm tra lịch bận…</p>
+                ) : filteredPersonnel.length === 0 ? (
                   <div className="px-2 py-3 text-center text-[13px] text-muted-foreground">
                     Không tìm thấy nhân sự phù hợp.
                   </div>
@@ -700,6 +754,7 @@ export function RosterAssignmentCell({
                   inputMode="numeric"
                   placeholder="0"
                   value={formatCurrencyInput(assignBaseCost)}
+                  readOnly={replacing}
                   onChange={(e) =>
                     setAssignBaseCost(parseCurrencyInput(e.target.value))
                   }
@@ -714,7 +769,7 @@ export function RosterAssignmentCell({
                   {keepLegacyShift ? 'Chi phí đã lưu' : `Chi phí ca · ${(endMinute - startMinute) / 15} khung`}
                 </span>
                 <output className="font-medium">{formatVndCurrency(keepLegacyShift
-                  ? editingAssignment.base_cost_snapshot
+                  ? (replacing ? assignBaseCost : editingAssignment.base_cost_snapshot)
                   : calculateClinicShiftCost(assignBaseCost, startMinute, endMinute))}</output>
               </div>
             )}
@@ -779,10 +834,11 @@ export function RosterAssignmentCell({
                 </FieldGroup>
               )}
             </div>
+            {editingAssignmentId && <RosterAssignmentHistory key={editingAssignmentId} assignmentId={editingAssignmentId} />}
             </FieldGroup>
-            {saveError && (
+            {(saveError || unavailablePeople.has(assignPersonId)) && (
               <Alert variant="destructive" className="mx-3 mb-2">
-                <AlertDescription>{saveError}</AlertDescription>
+                <AlertDescription>{saveError || 'Nhân sự đang chọn đã khai báo bận hoặc nghỉ trong ca này.'}</AlertDescription>
               </Alert>
             )}
             <div className="dym-assignment-footer">
@@ -815,7 +871,7 @@ export function RosterAssignmentCell({
                   disabled={isSubmitDisabled || !can(module, editingAssignmentId ? 'update' : 'create')}
                   className="h-8 px-3.5 text-[13px] font-medium"
                 >
-                  {isMutating ? 'Đang lưu…' : editingAssignmentId ? updateButtonLabel : 'Lưu'}
+                  {isMutating ? 'Đang lưu…' : replacing ? 'Đổi người trực' : editingAssignmentId ? updateButtonLabel : 'Lưu'}
                 </Button>
               </div>
             </div>

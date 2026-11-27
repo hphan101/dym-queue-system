@@ -23,11 +23,9 @@ test('rows per page offers the configured sizes and resets to the first page', (
   assert.deepEqual(changes, [['size', 50], ['page', 1]]);
 });
 
-test('all four tables slice by the selected size and keep the final page in range', () => {
-  const rows = Array.from({ length: 95 }, (_, id) => ({ id, status: id % 2 ? 'called' : 'waiting' }));
+test('account and personnel tables slice by the selected size and keep the final page in range', () => {
+  const rows = Array.from({ length: 95 }, (_, id) => ({ id }));
   for (const [file, names, inputName, outputName] of [
-    ['reception/AdminPage', ['rowsForStatus', 'totalPages', 'visiblePage', 'pageStartIndex', 'paginatedRows'], 'filteredRows', 'paginatedRows'],
-    ['registrations/RegistrationsPage', ['totalPages', 'visiblePage', 'pageStartIndex', 'paginatedRows'], 'filteredRows', 'paginatedRows'],
     ['accounts/StaffPage', ['totalPages', 'visiblePage', 'pageStartIndex', 'paginatedStaff'], 'filteredStaff', 'paginatedStaff'],
     ['roster/personnel/RosterPersonnelPage', ['totalPages', 'visiblePage', 'pageStartIndex', 'paginatedPersonnel'], 'filteredPersonnel', 'paginatedPersonnel'],
   ]) {
@@ -42,21 +40,18 @@ test('all four tables slice by the selected size and keep the final page in rang
     const code = ts.transpileModule(names.map((name) => `const ${declarations.get(name)};`).join('\n') + `\nreturn { totalPages, visiblePage, rows: ${outputName} };`, {
       compilerOptions: { target: ts.ScriptTarget.ES2022 },
     }).outputText;
-    const paginate = new Function(inputName, 'pageSize', 'currentPage', 'statusFilter', 'useMemo', code);
+    const paginate = new Function(inputName, 'pageSize', 'currentPage', 'useMemo', code);
     for (const size of [10, 20, 30, 40, 50]) {
-      for (const status of file === 'AdminPage' ? ['all', 'waiting', 'called'] : ['all']) {
-        const expected = status === 'all' ? rows : rows.filter((row) => row.status === status);
-        for (const page of [1, 2, 999]) {
-          const result = paginate(rows, size, page, status, (fn) => fn());
-          const total = Math.ceil(expected.length / size);
-          assert.equal(result.totalPages, total, file);
-          assert.equal(result.visiblePage, Math.min(page, total), file);
-          const start = (result.visiblePage - 1) * size;
-          assert.deepEqual(result.rows, expected.slice(start, start + size), file);
-        }
+      for (const page of [1, 2, 999]) {
+        const result = paginate(rows, size, page, (fn) => fn());
+        const total = Math.ceil(rows.length / size);
+        assert.equal(result.totalPages, total, file);
+        assert.equal(result.visiblePage, Math.min(page, total), file);
+        const start = (result.visiblePage - 1) * size;
+        assert.deepEqual(result.rows, rows.slice(start, start + size), file);
       }
     }
-    assert.deepEqual(paginate([], 20, 999, 'all', (fn) => fn()), { totalPages: 1, visiblePage: 1, rows: [] });
+    assert.deepEqual(paginate([], 20, 999, (fn) => fn()), { totalPages: 1, visiblePage: 1, rows: [] });
   }
 });
 

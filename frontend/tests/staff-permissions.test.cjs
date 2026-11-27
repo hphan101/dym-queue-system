@@ -150,6 +150,7 @@ test('database matrix enforces grants, denied mutations and branch scope through
     await assert.rejects(db.query(`insert into public.clinic_rooms(branch_code,room_name) values('q1','Denied room')`));
     await assert.rejects(db.query(`select * from public.get_dashboard_registrations('q1',current_date)`), /PERMISSION_DENIED/);
     await assert.rejects(db.query(`select * from public.get_reception_trend(2024)`), /PERMISSION_DENIED/);
+    await assert.rejects(db.query(`select * from public.get_registration_failures(current_date)`), /PERMISSION_DENIED/);
     await db.exec('reset role');
     await db.exec(`create function public.test_privileged_room_insert() returns void language plpgsql security definer set search_path='' as $$ begin insert into public.clinic_rooms(branch_code,room_name) values('q1','Bypass attempt'); end; $$;`);
     await db.exec('set role authenticated');
@@ -176,6 +177,24 @@ test('database matrix enforces grants, denied mutations and branch scope through
     }
     permissions.overview.view = true;
     await db.query(`update public.profiles set permissions=$2::jsonb where user_id=$1`, [user, JSON.stringify(permissions)]);
+    const failureToken = 'e'.repeat(64);
+    const failureDay = "(statement_timestamp() at time zone 'Asia/Ho_Chi_Minh')::date";
+    await db.query(`insert into public.registration_access_sessions(token_hash, branch_id, expires_at)
+      select $1, id, now() + interval '20 minutes' from public.branches where code='q1'`, [failureToken]);
+    await db.exec('set role service_role');
+    await db.query("select public.record_registration_failure('q1','invalid_data',$1)", [failureToken]);
+    await db.query("select public.record_registration_failure('q1','invalid_data',$1)", [failureToken]);
+    await db.query("select public.record_registration_failure('q7','invalid_data',$1)", [failureToken]);
+    await db.query("select public.record_registration_failure('q1','server_error',$1)", ['f'.repeat(64)]);
+    await db.query("select public.record_registration_failure('q7','qr_expired',null)");
+    await db.exec('reset role; set role authenticated');
+    await assert.rejects(db.query("select public.record_registration_failure('q1','qr_expired',null)"), /permission denied/);
+    await assert.rejects(db.query("select * from public.registration_failure_counts"), /permission denied/);
+    await assert.rejects(db.query(`select * from public.get_registration_failures(${failureDay}, 'q7')`), /ACCESS_DENIED/);
+    const failures = (await db.query(`select * from public.get_registration_failures(${failureDay})`)).rows;
+    assert.deepEqual(failures.map(row => [row.kind, Number(row.total)]), [['invalid_data', 2]]);
+    assert.deepEqual((await db.query(`select * from public.get_registration_failures(${failureDay} - 1)`)).rows, []);
+    await db.exec('reset role');
     await db.exec(`insert into public.registrations(branch_id,queue_date,queue_number,full_name,birth_date,gender,phone_number,identity_document,province,ward,address_detail,state,completed_at,cancelled_at)
       select b.id,v.day::date,v.ticket,'Test patient','1990-01-01','Nam','0901234567','001090000001','Test','Test','Test address',v.state::public.registration_state,
         case when v.state='completed' then now() end,case when v.state='cancelled' then now() end
@@ -188,8 +207,13 @@ test('database matrix enforces grants, denied mutations and branch scope through
     const edit = (branch) => db.query(`select public.update_registration_details(
       $1, 'Updated patient', '1990-01-01', 'Nam', '0901234567', '001090000001', '', 'Test', 'Test', 'Test address'
     )`, [targetRows.find(row => row.code === branch).id]);
+    const historyDraft = { familyHistory: { hasDisease: true, diseaseDetails: 'Ghi chú thử' },
+      personalHistory: { 7: true }, personalOtherDetails: '', currentTreatment: { isTreating: null, medications: '' } };
+    const editHistory = (branch, draft = historyDraft, expected = null) => db.query(`select public.update_registration_medical_history($1, $2, $3) as history`,
+      [targetRows.find(row => row.code === branch).id, draft, expected]);
     await db.exec('set role authenticated');
     await assert.rejects(edit('q1'), /PERMISSION_DENIED/);
+    await assert.rejects(editHistory('q1'), /PERMISSION_DENIED/);
     await db.exec('reset role');
     permissions.registrations.view = true;
     permissions.registrations.update = true;
@@ -197,6 +221,19 @@ test('database matrix enforces grants, denied mutations and branch scope through
     await db.exec('set role authenticated');
     await edit('q1');
     await assert.rejects(edit('q7'), /ACCESS_DENIED/);
+    await assert.rejects(editHistory('q7'), /ACCESS_DENIED/);
+    await assert.rejects(editHistory('q1', { ...historyDraft, commitmentAgreed: true }), /INVALID_MEDICAL_HISTORY/);
+    const { rows: [{ history: savedHistory }] } = await editHistory('q1');
+    assert.deepEqual(savedHistory, { ...historyDraft, commitmentAgreed: false });
+    await editHistory('q1');
+    await assert.rejects(editHistory('q1', { ...historyDraft, personalHistory: { 7: false } }), /MEDICAL_HISTORY_CHANGED/);
+    await db.exec('reset role');
+    const { rows: [recorded] } = await db.query(`select r.tt25_data, a.actor_id from public.registrations r
+      join public.audit_logs a on a.entity_id=r.id and a.action='registration.medical_history_updated' where r.id=$1`,
+      [targetRows.find(row => row.code === 'q1').id]);
+    assert.equal(recorded.actor_id, user);
+    assert.deepEqual(recorded.tt25_data.medicalHistory, savedHistory);
+    await db.exec('set role authenticated');
     let trend = (await db.query(`select * from public.get_reception_trend(2024)`)).rows;
     assert.deepEqual(trend.map((row) => [row.queue_date.toISOString().slice(0, 10), Number(row.total)]), [['2024-02-29', 2], ['2024-03-01', 1]]);
     assert.deepEqual(Object.keys(trend[0]), ['queue_date', 'total']);
@@ -209,7 +246,63 @@ test('database matrix enforces grants, denied mutations and branch scope through
     assert.equal(Number(trend[0].total), 3);
     await db.exec(`reset role; set role anon;`);
     await assert.rejects(db.query(`select * from public.get_reception_trend(2024)`), /permission denied/);
+    await assert.rejects(db.query(`select * from public.get_registration_failures(current_date)`), /permission denied/);
+    await assert.rejects(db.query('select * from public.roster_unavailability'), /permission denied/);
     await db.exec('reset role');
+    await db.exec("select set_config('request.role','service_role',false)");
+    const { rows: [person] } = await db.query("insert into public.medical_personnel(personnel_code,full_name,role_type) values('TEST-UB','Test availability','doctor') returning id");
+    const { rows: [schedule] } = await db.query("insert into public.roster_schedules(branch_code,schedule_date,schedule_type,campaign_code,company_name) values('q7',current_date + 10,'onsite_exam','TEST-UB','Test company') returning id");
+    const declareBusy = (start, end) => db.query(`insert into public.roster_unavailability(personnel_id,unavailable_date,start_minute,end_minute)
+      values($1,current_date + 10,$2,$3)`, [person.id, start, end]);
+    await declareBusy(780, 900);
+    const assign = (shift) => db.query(`insert into public.roster_assignments(schedule_id,personnel_id,position_label,shift_period)
+      values($1,$2,'Test position',$3)`, [schedule.id, person.id, shift]);
+    await assert.rejects(assign('PM'), { code: '23P01' });
+    await assign('AM');
+    await assert.rejects(declareBusy(0, 1440), { code: '23P01' });
+    await assert.rejects(declareBusy(781, 900), { code: '23514' });
+    await db.exec("select set_config('request.role','authenticated',false); set role authenticated;");
+    assert.equal((await db.query('select * from public.roster_unavailability')).rows.length, 1);
+    await assert.rejects(declareBusy(900, 915), /row-level security/);
+    await db.exec('reset role');
+
+    await db.exec("select set_config('request.role','service_role',false)");
+    const { rows: [original, replacement, legacyOriginal] } = await db.query(`insert into public.medical_personnel(personnel_code,full_name,role_type,fixed_cost)
+      values('TEST-OLD','Original nurse','nurse',1200000),('TEST-NEW','Replacement nurse','nurse',1800000),
+      ('TEST-LEGACY','Onsite nurse','nurse',1300000) returning id`);
+    const { rows: [clinic] } = await db.query(`insert into public.roster_schedules(branch_code,schedule_date,schedule_type)
+      values('q1',current_date + 10,'insite') returning id`);
+    const { rows: [shift] } = await db.query(`insert into public.roster_assignments(schedule_id,personnel_id,position_label,shift_period,
+      start_minute,end_minute,day_rate_snapshot,base_cost_snapshot,allowance_cost)
+      values($1,$2,'Phòng khám','FULL',420,660,1200000,600000,50000) returning id`, [clinic.id, original.id]);
+    const { rows: [legacy] } = await db.query(`insert into public.roster_assignments(schedule_id,personnel_id,position_label,shift_period)
+      values($1,$2,'Lễ tân','AM') returning id`, [schedule.id, legacyOriginal.id]);
+    permissions.clinic.update = true;
+    permissions.onsite.view = true;
+    permissions.onsite.update = true;
+    await db.query('update public.profiles set permissions=$2::jsonb where user_id=$1', [user, JSON.stringify(permissions)]);
+    await db.exec("select set_config('request.role','authenticated',false); set role authenticated;");
+    const replace = (assignment, target) => db.query(`update public.roster_assignments
+      set personnel_id=$2 where id=$1 returning base_cost_snapshot, total_cost`, [assignment, target]);
+    const getChanges = (assignment) => db.query('select * from public.get_roster_assignment_changes($1)', [assignment]);
+    await assert.rejects(replace(shift.id, person.id), { code: '23P01' });
+    await assert.rejects(replace(legacy.id, person.id), { code: '23P01' });
+    assert.deepEqual((await getChanges(shift.id)).rows, []);
+    const { rows: [changed] } = await replace(shift.id, replacement.id);
+    assert.equal(Number(changed.base_cost_snapshot), 900000);
+    assert.equal(Number(changed.total_cost), 950000);
+    const { rows: [history] } = await getChanges(shift.id);
+    assert.equal(history.actor_name, 'Test user');
+    assert.equal(history.from_name, 'Original nurse');
+    assert.equal(history.to_name, 'Replacement nurse');
+    await replace(shift.id, replacement.id);
+    assert.equal((await getChanges(shift.id)).rows.length, 1);
+    await db.exec('reset role');
+    await db.query(`delete from public.staff_branch_access where user_id=$1 and branch_id in (select id from public.branches where code='q1')`, [user]);
+    await db.exec('set role authenticated');
+    assert.deepEqual((await getChanges(shift.id)).rows, []);
+    await db.exec('reset role');
+
     await db.query(`update public.profiles set is_active=false where user_id=$1`, [user]);
     assert.equal((await db.query(`select public.has_permission('clinic') as allowed`)).rows[0].allowed, false);
     await db.exec('set role authenticated');

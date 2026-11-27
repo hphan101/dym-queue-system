@@ -244,6 +244,7 @@ function QueueDisplayPage() {
   useEffect(() => {
     let isMounted = true;
     let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    let connectionRetry: number | undefined;
     lastSeenRevisionRef.current = null;
 
     const applyDisplayRecord = (record: DisplayRecord | null) => {
@@ -273,13 +274,23 @@ function QueueDisplayPage() {
         .eq('is_active', true)
         .maybeSingle();
 
-      if (!isMounted || branchError || !branchRecord) return;
+      if (!isMounted) return;
+      if (branchError) {
+        retryDisplay();
+        return;
+      }
+      if (!branchRecord) return;
 
-      const { data: initialState } = await supabase
+      const { data: initialState, error: displayError } = await supabase
         .from('branch_display_state')
         .select('queue_date, queue_number, called_at, revision')
         .eq('branch_id', branchRecord.id)
         .maybeSingle();
+      if (!isMounted) return;
+      if (displayError) {
+        retryDisplay();
+        return;
+      }
 
       lastSeenRevisionRef.current = Number(initialState?.revision ?? 0);
       applyDisplayRecord(initialState);
@@ -327,9 +338,14 @@ function QueueDisplayPage() {
         .subscribe();
     };
 
+    const retryDisplay = () => {
+      connectionRetry = window.setTimeout(() => void connectDisplay(), 2000);
+    };
+
     void connectDisplay();
     return () => {
       isMounted = false;
+      window.clearTimeout(connectionRetry);
       if (realtimeChannel) {
         void supabase.removeChannel(realtimeChannel);
       }

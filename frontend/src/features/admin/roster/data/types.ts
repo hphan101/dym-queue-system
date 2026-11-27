@@ -133,6 +133,7 @@ export interface OnsiteScheduleInput {
 
 export interface RosterAssignmentInput {
   id?: string | null;
+  expected_personnel_id?: string | null;
   schedule_id: string;
   room_id?: string | null;
   daily_override_id?: string | null;

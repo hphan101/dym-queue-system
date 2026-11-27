@@ -352,6 +352,7 @@ export function RegistrationFlowPage() {
             <SuccessView
               assisted={assisted && access.state.status === 'ready' && access.state.assisted === true}
               queueNumber={queueNumber}
+              receipt={assisted ? null : receipt}
               data={registeredData}
               editSession={editSession}
               onEdited={(details) => setRegisteredData((current) => current ? { ...current, ...details } : null)}

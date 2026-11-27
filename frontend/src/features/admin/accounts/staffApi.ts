@@ -16,12 +16,16 @@ export function apiErrorMessage(code?: string) {
       return 'Bạn không thể tự khóa, tự xóa hoặc tự thu hồi quyền quản lý nhân viên của mình.';
     case 'INVALID_DATA':
       return 'Thông tin không hợp lệ. Vui lòng kiểm tra lại họ tên, tài khoản và mật khẩu.';
+    case 'PREVIEW_STAFF_DATA_REQUIRED':
+      return 'Trên bản thử, dùng tài khoản bắt đầu bằng demo-, tên có chữ “thử” và chọn chi nhánh được cấp quyền.';
     case 'ADMIN_REQUIRED':
       return 'Tài khoản chưa được cấp quyền thực hiện thao tác này.';
     case 'PERMISSION_API_NOT_READY':
       return 'Cần cập nhật database và API phân quyền trước khi lưu. Các quyền hiện tại chưa bị thay đổi.';
     case 'STAFF_NOT_FOUND':
       return 'Không tìm thấy tài khoản nhân viên.';
+    case 'STAFF_CHANGED':
+      return 'Tài khoản vừa được cập nhật. Vui lòng tải lại danh sách và thử lại.';
     case 'CREATE_FAILED':
       return 'Không thể tạo tài khoản trên hệ thống xác thực. Vui lòng kiểm tra lại mật khẩu (tối thiểu 6 ký tự).';
     case 'ORIGIN_NOT_ALLOWED':

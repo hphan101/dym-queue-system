@@ -897,19 +897,15 @@ export function RosterOnsitePage({
   const handleSubmitPositionAssignment = async (
     positionName: string,
     draft: RosterAssignmentDraft,
-  ): Promise<boolean> => {
+  ): Promise<boolean | string> => {
     if (!selectedCampaign) return false;
     if (!draft.personnelId) {
-      setErrorMessage('Vui lòng chọn nhân sự.');
-      return false;
+      return 'Vui lòng chọn nhân sự.';
     }
 
     if (draft.conflictAssignment) {
       const conflictPerson = personnelMap.get(draft.personnelId);
-      setErrorMessage(
-        `${conflictPerson?.full_name || 'Nhân sự'} đã xếp tại ${getConflictLocationLabel(draft.conflictAssignment)} (${formatAssignmentShift(draft.conflictAssignment)}).`,
-      );
-      return false;
+      return `${conflictPerson?.full_name || 'Nhân sự'} đã xếp tại ${getConflictLocationLabel(draft.conflictAssignment)} (${formatAssignmentShift(draft.conflictAssignment)}).`;
     }
 
     const posAssigns = assignmentsByPosition.get(positionName) ?? [];
@@ -922,6 +918,7 @@ export function RosterOnsitePage({
 
       await upsertCampaignAssignment({
         id: draft.editingAssignmentId,
+        expected_personnel_id: draft.expectedPersonnelId,
         schedule_id: selectedCampaign.id,
         room_id: null,
         daily_override_id: null,
@@ -938,12 +935,7 @@ export function RosterOnsitePage({
 
       return true;
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : 'Không thể lưu phân công vào đoàn khám.',
-      );
-      return false;
+      return err instanceof Error ? err.message : 'Không thể lưu phân công vào đoàn khám.';
     }
   };
 
@@ -1927,6 +1919,7 @@ export function RosterOnsitePage({
                                         showCosts={showCosts}
                                         rowKey={`onsite-${positionName}`}
                                         targetLabel={positionName}
+                                        assignmentDate={selectedCampaign.schedule_date}
                                         assignments={posAssignments}
                                         activePersonnel={activePersonnel}
                                         personnelMap={personnelMap}

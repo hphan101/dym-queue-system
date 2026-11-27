@@ -176,7 +176,7 @@ function QrScreen({ onSessionExpired }: { onSessionExpired: () => void }) {
               {activeQr ? <div className="registration-qr-code"><QRCodeSVG value={registrationUrl} size={640} level="M" marginSize={4} bgColor="#ffffff" fgColor="#17324d" title={`Quét để đăng ký tại ${BRANCH_NAMES[branch]}`} /></div>
                 : <div className="registration-qr-code-placeholder">{isLoading ? <Skeleton className="size-full aspect-square" /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><WifiOff /></EmptyMedia><EmptyTitle>Đang chờ mã mới</EmptyTitle><EmptyDescription>Vui lòng chờ kết nối hoặc liên hệ lễ tân.</EmptyDescription></EmptyHeader></Empty>}</div>}
               <p className="registration-qr-countdown">{activeQr ? <>Mã mới sau <strong>00:{String(seconds).padStart(2, '0')}</strong></> : 'QR hết hạn sẽ tự ẩn để tránh khách quét nhầm.'}</p>
-              <div className="registration-qr-track" aria-hidden="true"><div style={{ width: `${Math.min(100, seconds / 60 * 100)}%` }} /></div>
+              <div className="registration-qr-track" aria-hidden="true"><div style={{ width: `${Math.min(100, seconds / 30 * 100)}%` }} /></div>
             </div>
           </div>
           {error && <Alert variant="destructive"><WifiOff className="size-4" /><AlertTitle>Chưa cập nhật được mã QR</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

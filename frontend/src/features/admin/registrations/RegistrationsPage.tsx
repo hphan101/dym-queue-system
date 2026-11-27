@@ -1307,6 +1307,12 @@ export function RegistrationsPage({
           selectedRow={rows.find((row) => row.id === selectedRow?.id) ?? null}
           branch={branch}
           onClose={() => setSelectedRow(null)}
+          onHistoryUpdated={(id, medicalHistory) => {
+            queryClient.setQueryData<RegistrationDetails[]>(['registrationDetails', branch, date],
+              (current) => current?.map((row) => row.id === id
+                ? { ...row, tt25_data: { ...row.tt25_data, medicalHistory } } : row));
+            void queryClient.invalidateQueries({ queryKey: ['registrationDetails', branch, date] });
+          }}
           onUpdated={(updated) => {
             queryClient.setQueryData<RegistrationDetails[]>(
               ['registrationDetails', branch, date],

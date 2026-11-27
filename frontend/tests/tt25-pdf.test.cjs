@@ -110,6 +110,16 @@ test('TT25 fills 8/12/12-page PDFs and all 22 history answers', async () => {
     assert.equal(lines, 2, 'missing medical history must not be marked No');
     const emailField = layout.vnm.fields.find((field) => field.field === 'email');
     assert.equal(drawn.some(({ options }) => options.x === emailField.x && options.y === emailField.y), false);
+    lines = 0;
+    drawn.length = 0;
+    const partial = await service.generateTT25OriginalPdf({ ...customer, medicalHistory: {
+      familyHistory: { hasDisease: true, diseaseDetails: 'Tiền sử gia đình đã sửa' },
+      personalHistory: { 7: true }, personalOtherDetails: '', currentTreatment: { isTreating: null, medications: '' },
+      pregnancyHistory: { hasHistory: null, details: '' }, commitmentAgreed: false,
+    } });
+    URL.revokeObjectURL(partial.url);
+    assert.equal(lines, 6, 'only gender and the two recorded answers should be ticked');
+    assert.ok(drawn.some(({ text }) => text === 'Tiền sử gia đình đã sửa'));
     const hanoi = await service.generateTT25OriginalPdf({ ...customer, branch: 'hn' });
     try { assert.equal((await PDFDocument.load(await hanoi.blob.arrayBuffer())).getPageCount(), 8); }
     finally { URL.revokeObjectURL(hanoi.url); }

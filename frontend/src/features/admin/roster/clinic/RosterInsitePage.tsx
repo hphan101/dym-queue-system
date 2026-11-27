@@ -645,6 +645,7 @@ export function RosterInsitePage({
     try {
       await upsertInsiteAssignment(selectedBranch, selectedDate, {
         id: draft.editingAssignmentId,
+        expected_personnel_id: draft.expectedPersonnelId,
         room_id: targetRoom.roomId,
         daily_override_id: targetRoom.overrideId,
         position_label: targetRoom.roomName,
@@ -1160,6 +1161,7 @@ export function RosterInsitePage({
                                   readOnly={historyLocked}
                                   rowKey={roomRow.key}
                                   targetLabel={roomRow.roomName}
+                                  assignmentDate={selectedDate}
                                   assignments={roomAssigns}
                                   activePersonnel={activePersonnel.filter(
                                     (person) =>

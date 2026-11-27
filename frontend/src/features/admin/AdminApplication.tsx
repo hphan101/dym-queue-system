@@ -194,7 +194,11 @@ function AdminApplication({ destination }: { destination: AdminDestination }) {
                   destination === 'roster-dashboard' ? 'contents' : 'hidden'
                 }
               >
-                <RosterDashboardPage authorizedIsAdmin={isAdmin} isActiveTab={destination === 'roster-dashboard'} />
+                <RosterDashboardPage
+                  authorizedIsAdmin={isAdmin}
+                  isActiveTab={destination === 'roster-dashboard'}
+                  branchIds={staffIdentity.branchIds}
+                />
               </div>
             )}
 

@@ -5,6 +5,8 @@ import { translations, type SupportedLanguage } from '../../../locales/index';
 import { formatDateForPrint } from '../../../lib/date';
 import { CustomerRegistrationEditPanel } from './CustomerRegistrationEditPanel';
 import type { CustomerEditSession, EditableRegistrationDetails } from './customerRegistrationEdit';
+import { CurrentQueueStatus } from './CurrentQueueStatus';
+import type { RegistrationReceipt } from './registrationReceipt';
 
 const TT25PrintModal = React.lazy(() => import('../printing/TT25PrintModal'));
 const ConsentPrintModal = React.lazy(() => import('../printing/ConsentPrintModal'));
@@ -17,11 +19,12 @@ interface SuccessViewProps {
   onReset: () => void;
   lang: SupportedLanguage;
   assisted?: boolean;
+  receipt?: RegistrationReceipt | null;
   editSession?: CustomerEditSession | null;
   onEdited: (details: EditableRegistrationDetails) => void;
 }
 
-export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang, assisted = false, editSession, onEdited }) => {
+export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onReset, lang, assisted = false, receipt, editSession, onEdited }) => {
   const t = translations[lang];
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -90,6 +93,8 @@ export const SuccessView: React.FC<SuccessViewProps> = ({ queueNumber, data, onR
           {t.successNote}
         </p>
       </div>
+
+      {receipt && <CurrentQueueStatus receipt={receipt} lang={lang} />}
 
       {editSession && <CustomerRegistrationEditPanel session={editSession} lang={lang} onEdited={onEdited} />}
 

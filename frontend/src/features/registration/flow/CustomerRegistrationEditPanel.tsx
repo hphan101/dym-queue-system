@@ -4,6 +4,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type FormEvent } from 'react';
+import { hasChineseOrJapaneseCharacters, LATIN_NAME_MESSAGE, PASSPORT_NAME_MESSAGE } from '../../../../../supabase/functions/_shared/passportName';
 import type { SupportedLanguage } from '../../../locales/index';
 import { RegistrationAccessError, requestRegistrationAccess } from '../access/registrationAccessApi';
 import { loadProvinces, loadWardsForProvince, type Province, type Ward } from '../form/locationService';
@@ -102,9 +103,10 @@ export function CustomerRegistrationEditPanel({ session, lang, onEdited }: EditP
         setEditor(null);
         return;
       }
-      if (cause.code === 'INVALID_DATA' && cause.field && Object.hasOwn(fieldLabels, cause.field)) {
+      if ((cause.code === 'INVALID_DATA' || cause.code === 'INVALID_PASSPORT_NAME')
+        && cause.field && Object.hasOwn(fieldLabels, cause.field)) {
         const field = cause.field as EditField;
-        setError({ field, message: text(
+        setError({ field, message: cause.code === 'INVALID_PASSPORT_NAME' ? PASSPORT_NAME_MESSAGE[lang] : text(
           `Vui lòng kiểm tra ${label(field).toLowerCase()}.`,
           `Please check ${label(field).toLowerCase()}.`,
           `「${label(field)}」をご確認ください。`,
@@ -145,6 +147,12 @@ export function CustomerRegistrationEditPanel({ session, lang, onEdited }: EditP
     for (const field of Object.keys(fieldLabels) as EditField[]) {
       const value = String(input.get(field) ?? '').trim();
       if (value !== editor.details[field]) changes[field] = value;
+    }
+    if (changes.fullName && hasChineseOrJapaneseCharacters(changes.fullName)) {
+      setError({ field: 'fullName', message: LATIN_NAME_MESSAGE[lang] });
+      const control = form.elements.namedItem('fullName');
+      if (control instanceof HTMLElement) control.focus();
+      return;
     }
     setWorking(true);
     setError(null);
@@ -218,7 +226,14 @@ export function CustomerRegistrationEditPanel({ session, lang, onEdited }: EditP
       {error && !error.field && <Alert variant="destructive"><AlertDescription>{error.message}</AlertDescription></Alert>}
       <fieldset disabled={working}>
         <FieldGroup className="gap-3">
-          {renderInput('fullName', { required: true, minLength: 2, maxLength: 100, autoComplete: 'name' })}
+          {renderInput('fullName', { required: true, minLength: 2, maxLength: 100, autoComplete: 'name',
+            onChange: (event) => {
+              const name = event.target.value.trim();
+              setError((previous) => name !== details.fullName && hasChineseOrJapaneseCharacters(name)
+                ? { field: 'fullName', message: LATIN_NAME_MESSAGE[lang] }
+                : previous?.field === 'fullName' ? null : previous);
+            },
+          })}
           {renderInput('phoneNumber', { required: phoneRequired, maxLength: 24, type: 'tel', autoComplete: 'tel' })}
           {renderInput('email', { type: 'email', maxLength: 120, autoComplete: 'email' })}
           <Field data-invalid={error?.field === 'province'}>

@@ -182,7 +182,8 @@ export function PersonnelDocumentsDialog({
         <div className="personnel-documents-body">
         <div className="personnel-documents-guidance text-sm text-muted-foreground">
           <p>PDF, JPG, PNG · Tối đa 10 MB/file</p>
-          <p className="flex items-center gap-2"><LockKeyhole className="size-4 shrink-0" aria-hidden="true" />Hồ sơ riêng tư, chỉ admin được truy cập</p>
+          <p className="flex items-center gap-2"><LockKeyhole className="size-4 shrink-0" aria-hidden="true" />Hồ sơ riêng tư, chỉ tài khoản được cấp quyền mới xem được</p>
+          {typeof __DYM_CLOUDFLARE_PREVIEW__ !== 'undefined' && __DYM_CLOUDFLARE_PREVIEW__ && <p>Dùng tệp giả có tên bắt đầu bằng DEMO-.</p>}
         </div>
         {error && (
           <Alert variant="destructive"><AlertDescription className="break-words">

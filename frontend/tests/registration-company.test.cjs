@@ -6,18 +6,20 @@ const ts = require('typescript');
 const { PGlite } = require('@electric-sql/pglite');
 
 const root = path.resolve(__dirname, '../..');
-function load(file, mocks = {}, expose = '') {
+function load(file, mocks = {}) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function('exports', 'require', 'Deno', code + expose)(exports, (name) => mocks[name] ?? {}, { serve() {}, env: { get() {} } });
+  new Function('exports', 'require', 'Deno', code)(exports, (name) => mocks[name] ?? {}, { serve() {}, env: { get() {} } });
   return exports;
 }
 
 const constants = load('frontend/src/features/registration/tt25Constants.ts');
 const http = load('supabase/functions/_shared/http.ts');
-const api = load('supabase/functions/register/index.ts', { '../_shared/http.ts': http }, '\nexports.parsePayload = parsePayload; exports.getInvalidPayloadField = getInvalidPayloadField;');
-const validCustomer = { branch: 'q1', fullName: 'Nguyễn Văn A', phoneNumber: '0901234567', birthDate: '2000-01-01', gender: 'Nam', cccd: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', addressDetail: '123 đường A' };
+const api = load('supabase/functions/_shared/registrationPayload.ts', {
+  './http.ts': http, './passportName.ts': load('supabase/functions/_shared/passportName.ts'),
+});
+const validCustomer = { branch: 'q1', fullName: 'NGUYEN VAN A', phoneNumber: '0901234567', birthDate: '2000-01-01', gender: 'Nam', cccd: 'B1234567', province: 'Hà Nội', ward: 'Cầu Giấy', addressDetail: '123 đường A' };
 
 test('company checkups require a nonblank company in both the form policy and registration API', () => {
   for (const reason of [constants.CHECKUP_REASONS[0], 'Khám sức khỏe định kì theo công ty']) {
@@ -72,6 +74,18 @@ test('explicit passports bypass CCCD format, while CCCD and legacy submissions r
     assert.equal(Boolean(payload && !api.getInvalidPayloadField(payload)), valid);
     assert.equal(validator.validateVietnamCccd(data) === null, valid);
   }
+});
+
+test('passport names accept Vietnamese accents and name separators but reject non-Latin scripts', () => {
+  const data = { ...validCustomer, checkupReason: constants.CHECKUP_REASONS[2], identityDocumentType: 'passport' };
+  for (const fullName of ['Yamada Taro', "Anne-Marie O'Brien", 'ANNE O’BRIEN', 'Nguyễn Văn A', 'Đặng Mỹ Duyên'.normalize('NFD')]) {
+    assert.equal(api.getInvalidPayloadField(api.parsePayload({ ...data, fullName })), undefined);
+  }
+  for (const fullName of ['山田 太郎', '王小明', 'Taro 山田', 'YAMADA 2', 'ＮＡＭＥ']) {
+    assert.equal(api.getInvalidPayloadField(api.parsePayload({ ...data, fullName })), 'fullName');
+  }
+  assert.equal(api.getInvalidPayloadField(api.parsePayload({ ...data, fullName: '王小明', identityDocumentType: undefined })), 'fullName');
+  assert.equal(api.getInvalidPayloadField(api.parsePayload({ ...data, fullName: 'Nguyễn Văn A', cccd: '001200123456', identityDocumentType: 'cccd' })), undefined);
 });
 
 async function installRegistrationSchema(db) {
@@ -189,6 +203,8 @@ test('a submitted QR session can edit only its original waiting registration wit
     const extras = { checkupReason: constants.CHECKUP_REASONS[1], identityDocumentType: 'passport',
       email: 'original@example.test', consentAgreed: true, pregnancyStatus: 'suspected' };
     const receipt = (await db.query(request, [hash, extras])).rows[0];
+    await db.exec(migration('20261127100000_require_latin_passport_names.sql'));
+    await db.query('update public.registrations set full_name = full_name where id = $1', [receipt.registration_id]);
     await db.query("update public.registration_access_sessions set expires_at = now() - interval '1 second' where token_hash = $1", [hash]);
 
     assert.equal((await edit()).details.fullName, 'Nguyễn Văn A');
@@ -202,8 +218,11 @@ test('a submitted QR session can edit only its original waiting registration wit
     }
     await assert.rejects(edit({ email: 'bad@' }), (error) => error.message === 'INVALID_DATA' && error.detail === 'email');
     await assert.rejects(edit({ phoneNumber: 'bad' }), (error) => error.message === 'INVALID_DATA' && error.detail === 'phoneNumber');
+    await assert.rejects(edit({ fullName: '山田 太郎', phoneNumber: '' }), (error) =>
+      error.message === 'INVALID_DATA' && error.detail === 'fullName' && error.hint === 'passport_name');
+    assert.equal((await edit()).details.phoneNumber, '0901234567');
 
-    const changes = { fullName: 'Nguyễn Văn B', phoneNumber: '', email: '', province: 'Thành phố Hồ Chí Minh',
+    const changes = { fullName: 'Đặng Mỹ Duyên', phoneNumber: '', email: '', province: 'Thành phố Hồ Chí Minh',
       ward: 'Phường Sài Gòn', addressDetail: '45 đường B', workplace: 'Công ty thử' };
     assert.deepEqual((await edit(changes)).details, changes);
     assert.deepEqual((await edit(changes)).details, changes);

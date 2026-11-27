@@ -8,8 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient';
+import type { BranchCode } from '@/types/domain';
 import { buildReceptionTrend, type ReceptionDailyCount, type ReceptionTrendPeriod } from './receptionTrend';
-import type { DashboardBranch } from './dashboardSummary';
 import './receptionTrend.css';
 
 const chartConfig = {
@@ -18,7 +18,7 @@ const chartConfig = {
 const formatCount = (value: number) => value.toLocaleString('vi-VN');
 
 export function ReceptionTrendChart({ date, today, branch, isActiveTab, refresh }: {
-  date: string; today: string; branch: DashboardBranch; isActiveTab: boolean; refresh: number;
+  date: string; today: string; branch: 'all' | BranchCode; isActiveTab: boolean; refresh: number;
 }) {
   const [period, setPeriod] = useState<ReceptionTrendPeriod>('daily');
   const [reduceMotion, setReduceMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);

@@ -30,6 +30,7 @@ import {
   type PregnancyStatus,
   type TT25PaymentSource,
   type TT25TargetGroup,
+  type TT25MedicalHistory,
   getDefaultTargetPaymentByReason,
 } from '../../registration/tt25Types';
 import { usePrintStatus } from './usePrintStatus';
@@ -38,6 +39,7 @@ import {
   saveRegistrationEdit,
 } from './registrationEdits';
 import type { RegistrationDetails } from './types';
+import { RegistrationMedicalHistory } from './RegistrationMedicalHistory';
 import {
   calculateAge,
   formatBirthDate,
@@ -53,6 +55,7 @@ export interface RegistrationDetailModalProps {
   onPrint: (row: RegistrationDetails) => void;
   onPrintConsent?: (row: RegistrationDetails) => void;
   onUpdated?: (updated: RegistrationDetails) => void;
+  onHistoryUpdated: (id: string, history: TT25MedicalHistory) => void;
 }
 
 export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = ({
@@ -62,11 +65,13 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   onPrint,
   onPrintConsent,
   onUpdated,
+  onHistoryUpdated,
 }) => {
   const { can } = useStaffPermissions();
   const { getStatus } = usePrintStatus();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -80,7 +85,8 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
   const savedPregnancyStatus = effectiveRow?.tt25_data?.pregnancyStatus;
 
   const buildInitialForm = (row: RegistrationDetails): RegistrationEditableFields => {
-    const ext = row.tt25_data ?? {};
+    const ext = { ...row.tt25_data };
+    delete ext.medicalHistory;
     const defaultReason = row.company_name?.trim()
       ? 'Khám sức khỏe định kỳ theo công ty'
       : 'Khám sức khỏe cá nhân tự nguyện';
@@ -126,6 +132,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
   // Sync form state whenever selectedRow changes or edit mode opens
   useEffect(() => {
+    setIsEditingHistory(false);
     if (!effectiveRow) {
       setIsEditing(false);
       setFormError(null);
@@ -209,6 +216,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEditing || isSaving || !can('registrations', 'update')) return;
     if (!form.full_name.trim()) {
       setFormError('Vui lòng nhập họ và tên khách hàng.');
       return;
@@ -216,6 +224,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
 
     if (form.identity_document.trim()) {
       const cccdErr = validateVietnamCccd({
+        allowPreviewCode: typeof __DYM_CLOUDFLARE_PREVIEW__ !== 'undefined' && __DYM_CLOUDFLARE_PREVIEW__,
         cccd: form.identity_document,
         identityDocumentType: form.tt25_data?.identityDocumentType,
         gender: form.gender === 'Nữ' ? 'Nữ' : 'Nam',
@@ -299,7 +308,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!can('registrations', 'update')}
+                  disabled={isEditingHistory || !can('registrations', 'update')}
                   onClick={handleStartEdit}
                   title="Chỉnh sửa thông tin khách hàng"
                 >
@@ -335,7 +344,7 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
             )}
             <Button
               type="button"
-              disabled={!can('printing')}
+              disabled={isEditingHistory || !can('printing')}
               onClick={() => onPrint(effectiveRow)}
               title="In phiếu khám sức khỏe theo mẫu Thông tư 25"
             >
@@ -935,6 +944,15 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
               </div>
             )}
           </div>
+
+          <RegistrationMedicalHistory key={effectiveRow.id} id={effectiveRow.id}
+            history={effectiveRow.tt25_data?.medicalHistory} female={effectiveRow.gender === 'Nữ'}
+            canEdit={!isEditing && can('registrations', 'update')} onEditingChange={setIsEditingHistory}
+            onSaved={(history) => {
+              onHistoryUpdated(effectiveRow.id, history);
+              setSaveSuccess(true);
+              window.setTimeout(() => setSaveSuccess(false), 3000);
+            }} />
 
           {/* Edit Mode Save/Cancel Footer */}
           {isEditing && (

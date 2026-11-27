@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/functions/v1/*", "/rest/v1/*", "/api/*", "/tv/*"],
+  "exclude": []
+}

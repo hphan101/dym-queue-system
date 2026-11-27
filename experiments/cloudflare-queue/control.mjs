@@ -25,13 +25,14 @@ export const controlPage = `<!doctype html>
 <main>
   <header>
     <h1>Thử hàng đợi DYM</h1>
-    <p>Bản thử cục bộ. Hệ thống tự tạo mã khách giả.</p>
+    <p>Hệ thống tự tạo mã khách giả cho bản thử.</p>
   </header>
   <section aria-label="Điều khiển bản thử">
     <label for="branch">Chi nhánh</label>
     <select id="branch">
       <option value="q1">Quận 1</option>
       <option value="q7">Quận 7</option>
+      <option value="hn">Hà Nội</option>
     </select>
     <p><a id="tv" href="/tv/q1" target="_blank" rel="noopener">Mở màn hình TV ở tab mới</a></p>
     <div class="actions">
