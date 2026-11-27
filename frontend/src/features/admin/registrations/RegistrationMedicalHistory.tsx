@@ -4,11 +4,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TT25_PERSONAL_DISEASES, type TT25MedicalHistory } from '../../registration/tt25Types';
 import { saveRegistrationMedicalHistory, type MedicalHistoryEdit } from './registrationEdits';
 
-function answerLabel(value?: boolean | null) {
-  return value === true ? 'Có' : value === false ? 'Không' : 'Chưa ghi nhận';
+const answerLabels = { unknown: 'Chưa ghi nhận', yes: 'Có', no: 'Không' };
+
+function answerValue(value?: boolean | null) {
+  return value == null ? 'unknown' : value ? 'yes' : 'no';
 }
 
 function HistoryAnswer({ id, label, value, onChange, disabled }: {
@@ -17,13 +20,15 @@ function HistoryAnswer({ id, label, value, onChange, disabled }: {
   return (
     <Field className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <select id={id} disabled={disabled} value={value == null ? '' : String(value)}
-        className="h-9 max-w-full rounded-md border border-input bg-card px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-        onChange={(event) => onChange(event.target.value === '' ? null : event.target.value === 'true')}>
-        <option value="">Chưa ghi nhận</option>
-        <option value="true">Có</option>
-        <option value="false">Không</option>
-      </select>
+      <Select value={answerValue(value)} disabled={disabled}
+        onValueChange={(next) => onChange(next === 'unknown' ? null : next === 'yes')}>
+        <SelectTrigger id={id} className="w-40 gap-2"><SelectValue /></SelectTrigger>
+        <SelectContent align="end">
+          <SelectGroup>
+            {Object.entries(answerLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
     </Field>
   );
 }
@@ -35,6 +40,7 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
   const prefix = useId();
   const [draft, setDraft] = useState<MedicalHistoryEdit | null>(null);
   const [saving, setSaving] = useState(false);
+  const disabled = saving || !canEdit;
   const savingRef = useRef(false);
   const [error, setError] = useState('');
   const expected = useRef<TT25MedicalHistory | null>(null);
@@ -81,14 +87,14 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
   const renderNotes = (key: string, label: string, value: string, change: (value: string) => void) => (
     <Field>
       <FieldLabel htmlFor={`${prefix}-${key}`}>{label}</FieldLabel>
-      <Input id={`${prefix}-${key}`} maxLength={300} value={value} disabled={saving || !canEdit}
+      <Input id={`${prefix}-${key}`} maxLength={300} value={value} disabled={disabled}
         onChange={(event) => change(event.target.value)} />
     </Field>
   );
   const readAnswer = (label: string, value?: boolean | null, notes?: string) => (
     <div className="dym-detail-item">
       <dt className="dym-detail-label">{label}</dt>
-      <dd className="dym-detail-value break-words">{answerLabel(value)}{value && notes ? ` · ${notes}` : ''}</dd>
+      <dd className="dym-detail-value break-words">{answerLabels[answerValue(value)]}{value && notes ? ` · ${notes}` : ''}</dd>
     </div>
   );
 
@@ -104,7 +110,7 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
       </div>
       {draft ? (
         <FieldGroup className="gap-3">
-          <HistoryAnswer id={`${prefix}-family`} label="Tiền sử gia đình" value={draft.familyHistory.hasDisease} disabled={saving || !canEdit}
+          <HistoryAnswer id={`${prefix}-family`} label="Tiền sử gia đình" value={draft.familyHistory.hasDisease} disabled={disabled}
             onChange={(hasDisease) => setDraft({ ...draft, familyHistory: { ...draft.familyHistory, hasDisease } })} />
           {draft.familyHistory.hasDisease && renderNotes('family-notes', 'Bệnh trong gia đình', draft.familyHistory.diseaseDetails,
             (diseaseDetails) => setDraft({ ...draft, familyHistory: { ...draft.familyHistory, diseaseDetails } }))}
@@ -112,7 +118,7 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
             <summary className="cursor-pointer text-sm font-medium">Tiền sử bản thân</summary>
             <FieldGroup className="mt-2 gap-2">
               {TT25_PERSONAL_DISEASES.map(({ id, name }) => (
-                <HistoryAnswer key={id} id={`${prefix}-personal-${id}`} label={name} value={draft.personalHistory[id]} disabled={saving || !canEdit}
+                <HistoryAnswer key={id} id={`${prefix}-personal-${id}`} label={name} value={draft.personalHistory[id]} disabled={disabled}
                   onChange={(answer) => {
                     const personalHistory = { ...draft.personalHistory };
                     if (answer === null) delete personalHistory[id];
@@ -124,13 +130,13 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
                 (personalOtherDetails) => setDraft({ ...draft, personalOtherDetails }))}
             </FieldGroup>
           </details>
-          <HistoryAnswer id={`${prefix}-treatment`} label="Đang điều trị bệnh" value={draft.currentTreatment.isTreating} disabled={saving || !canEdit}
+          <HistoryAnswer id={`${prefix}-treatment`} label="Đang điều trị bệnh" value={draft.currentTreatment.isTreating} disabled={disabled}
             onChange={(isTreating) => setDraft({ ...draft, currentTreatment: { ...draft.currentTreatment, isTreating } })} />
           {draft.currentTreatment.isTreating && renderNotes('medications', 'Thuốc đang dùng và liều lượng', draft.currentTreatment.medications,
             (medications) => setDraft({ ...draft, currentTreatment: { ...draft.currentTreatment, medications } }))}
           {female && draft.pregnancyHistory && (
             <>
-              <HistoryAnswer id={`${prefix}-pregnancy`} label="Tiền sử thai sản" value={draft.pregnancyHistory.hasHistory} disabled={saving || !canEdit}
+              <HistoryAnswer id={`${prefix}-pregnancy`} label="Tiền sử thai sản" value={draft.pregnancyHistory.hasHistory} disabled={disabled}
                 onChange={(hasHistory) => setDraft({ ...draft, pregnancyHistory: { hasHistory, details: draft.pregnancyHistory?.details ?? '' } })} />
               {draft.pregnancyHistory.hasHistory && renderNotes('pregnancy-notes', 'Chi tiết tiền sử thai sản', draft.pregnancyHistory.details,
                 (details) => setDraft({ ...draft, pregnancyHistory: { hasHistory: true, details } }))}
@@ -139,7 +145,7 @@ export function RegistrationMedicalHistory({ id, history, female, canEdit, onEdi
           {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" disabled={saving} onClick={close}>Hủy</Button>
-            <Button type="button" size="sm" disabled={saving || !canEdit} onClick={() => void save()}>{saving ? 'Đang lưu…' : 'Lưu tiền sử'}</Button>
+            <Button type="button" size="sm" disabled={disabled} onClick={() => void save()}>{saving ? 'Đang lưu…' : 'Lưu tiền sử'}</Button>
           </div>
         </FieldGroup>
       ) : (
