@@ -1810,7 +1810,8 @@ body {
   box-shadow: none;
 }
 
-.dym-patient-name .dym-search-highlight {
+.dym-patient-name .dym-search-highlight,
+.dym-settlement-content .dym-search-highlight {
   padding-inline: 0;
   font-weight: inherit;
   box-shadow: none;

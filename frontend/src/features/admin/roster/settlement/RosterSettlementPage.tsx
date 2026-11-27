@@ -8,7 +8,6 @@ import { MonthPicker } from '@/components/ui/date-picker';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { NumberedPagination } from '@/components/numbered-pagination';
@@ -18,17 +17,19 @@ import type { BranchCode } from '@/types/domain';
 import {
   formatVndCurrency,
   ROSTER_BRANCH_LABELS,
-  ROLE_SHORT_LABELS,
   type PersonnelRoleType,
 } from '../data/rosterService';
 import { exportMonthlyPersonnelCostExcel } from '../shared/exportRosterExcel';
 import { useRosterData } from '../data/useRosterData';
 import { RosterShell } from '../shared/RosterShell';
+import { PersonnelRoleBadge } from '../shared/PersonnelRoleBadge';
+import { HighlightText } from '../../shared/HighlightText';
 import { buildSettlementMetrics } from './settlementMetrics';
 import { SettlementMetricCards } from './SettlementMetricCards';
 import { buildSettlementRows, type SettlementLocation, type SettlementRow, type SettlementSort } from './settlementRows';
 import { PersonnelCostSheet } from './PersonnelCostSheet';
 import { CampaignCostTable } from './CampaignCostTable';
+import { normalizeSettlementSearch, personnelSearchFields, settlementMatches } from './settlementSearch';
 import './settlement.css';
 
 export function RosterSettlementPage({
@@ -97,7 +98,8 @@ export function RosterSettlementPage({
   const visiblePage = pagination.key === pageKey ? Math.min(pagination.page, totalPages) : 1;
   const pageStart = (visiblePage - 1) * pageSize;
   const visibleRows = monthlySummary.slice(pageStart, pageStart + pageSize);
-  const hasFilters = Boolean(searchQuery.trim() || roleFilter !== 'all' || branchFilter !== 'all' || locationFilter !== 'all');
+  const searchKeyword = normalizeSettlementSearch(searchQuery);
+  const hasFilters = Boolean(searchKeyword || roleFilter !== 'all' || branchFilter !== 'all' || locationFilter !== 'all');
   const totals = monthlySummary.reduce((total, row) => ({
     base: total.base + row.totalBase,
     allowance: total.allowance + row.totalAllowance, grand: total.grand + row.totalGrand,
@@ -357,27 +359,27 @@ export function RosterSettlementPage({
               </thead>
               <tbody>
                 {visibleRows.map((row) => {
+                  const { person } = row;
+                  const [codeMatch, nameMatch, phoneMatch, emailMatch] = settlementMatches(personnelSearchFields(person), searchKeyword) ?? [];
                   return (
-                    <tr key={row.person.id}>
+                    <tr key={person.id}>
                       <td>
                         <span className="dym-roster-code-badge">
-                          {row.person.personnel_code}
+                          <HighlightText text={person.personnel_code} query={codeMatch} />
                         </span>
                       </td>
                       <td>
-                        <div className="flex flex-col">
-                          <button type="button" className="settlement-person-link" aria-label={`Xem chi phí của ${row.person.full_name}`} onClick={() => { setDetailRow(row); setDetailMonth(selectedMonth); setDetailOpen(true); }}>
-                            {row.person.full_name}
-                          </button>
-                        </div>
+                        <button type="button" className="settlement-person-link" aria-label={`Xem chi phí của ${person.full_name}`} onClick={() => { setDetailRow(row); setDetailMonth(selectedMonth); setDetailOpen(true); }}>
+                          <HighlightText text={person.full_name} query={nameMatch} />
+                        </button>
+                        {phoneMatch && <HighlightText className="block text-xs text-muted-foreground" text={person.phone_number} query={phoneMatch} />}
+                        {emailMatch && <HighlightText className="block text-xs text-muted-foreground" text={person.email} query={emailMatch} />}
                       </td>
                       <td className="is-center">
-                        <Badge variant="secondary">
-                          {row.person.role_type === 'nurse' ? 'Điều dưỡng' : ROLE_SHORT_LABELS[row.person.role_type]}
-                        </Badge>
+                        <PersonnelRoleBadge role={person.role_type} compact />
                       </td>
                       <td className="is-right dym-roster-tabular text-muted-foreground">
-                        {formatVndCurrency(row.person.fixed_cost)}
+                        {formatVndCurrency(person.fixed_cost)}
                       </td>
                       <td className="is-center dym-roster-tabular text-xs">
                         <div className="flex flex-col gap-1"><span>{row.insiteCount} ca phòng khám</span><span>{row.onsiteCount} ca ngoại viện</span></div>

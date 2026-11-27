@@ -1,6 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { APP_NAVIGATION_EVENT } from '../../../../lib/navigation';
 
+export function rosterViewHref(
+  page: 'roster-insite' | 'roster-onsite',
+  scope: { date: string; branch: 'q1' | 'q7' },
+  view: 'week' | 'day' | 'details',
+  campaign?: { id: string; schedule_type: string },
+) {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  params.set('page', page);
+  params.set('branch', scope.branch);
+  params.set('date', scope.date);
+  params.set('view', view);
+  if (campaign) {
+    params.set('campaign', campaign.id);
+    params.set('type', campaign.schedule_type);
+  } else {
+    params.delete('campaign');
+    params.delete('type');
+  }
+  return url.href;
+}
+
 export function readRosterDeepLink(search: string, page: string) {
   const params = new URLSearchParams(search);
   if (params.get('page') !== page) return null;

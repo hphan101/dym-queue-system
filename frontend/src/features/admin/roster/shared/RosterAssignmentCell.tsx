@@ -1,8 +1,7 @@
-import { useContext } from 'react';
+import { useContext, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { SearchField } from '@/components/search-field';
 import { PermissionModuleContext } from '../../shared/useStaffPermissions';
 import { useStaffPermissions } from '@/features/admin/shared/useStaffPermissions';
-import { useId, useMemo, useRef, useState } from 'react';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -31,6 +30,7 @@ import {
   parseCurrencyInput,
   ROLE_DOT_CLASS,
   ROLE_FILTER_OPTIONS,
+  ROLE_LABELS,
   ROLE_SHORT_LABELS,
   SHIFT_OPTIONS,
   type MedicalPersonnel,
@@ -41,6 +41,7 @@ import {
 import { useRosterUnavailability } from '../data/rosterUnavailability';
 import { assignmentShiftsOverlap, calculateClinicShiftCost, CLINIC_SHIFT_DEFAULTS, formatAssignmentShift, formatShiftMinute, SHIFT_MINUTES } from '../data/shiftTime';
 import { RosterAssignmentHistory } from './RosterAssignmentHistory';
+import { AssignmentTimelineAddLabels, AssignmentTimelineScale, AssignmentTimelineTrack } from './AssignmentTimeline';
 import './assignmentPopover.css';
 
 export interface RosterAssignmentDraft {
@@ -111,7 +112,7 @@ export function RosterAssignmentCell({
 }: RosterAssignmentCellProps) {
   const { can } = useStaffPermissions();
   const titleId = useId();
-  const popoverAnchor = useRef<HTMLButtonElement | null>(null);
+  const popoverAnchor = useRef<HTMLElement | null>(null);
   const module = useContext(PermissionModuleContext) ?? 'clinic';
   const [editing, setEditing] = useState<{ id: string; personnelId: string } | null>(null);
   const editingAssignmentId = editing?.id ?? null;
@@ -222,15 +223,15 @@ export function RosterAssignmentCell({
     unavailablePeople,
   ]);
 
-  const openAddPopover = () => {
+  const openAddPopover = (hour?: number) => {
     setSaveError('');
     setEditing(null);
     setPersonSearchQuery('');
     setPersonRoleFilter('all');
     setAssignPersonId('');
     setAssignShift('FULL');
-    setStartMinute(CLINIC_SHIFT_DEFAULTS.FULL[0]);
-    setEndMinute(CLINIC_SHIFT_DEFAULTS.FULL[1]);
+    setStartMinute(hour ?? CLINIC_SHIFT_DEFAULTS.FULL[0]);
+    setEndMinute(hour == null ? CLINIC_SHIFT_DEFAULTS.FULL[1] : hour + 60);
     setAssignBaseCost(0);
     setAssignAllowance(defaultAllowance);
     setAssignNote('');
@@ -358,136 +359,172 @@ export function RosterAssignmentCell({
           (p) => !getPersonConflictForShift(p.id, assignShift),
         )));
 
-  if (readOnly)
-    return (
-      <div className="dym-assignment-cell flex flex-wrap items-center gap-2">
-        {assignments.length ? (
-          assignments.map((assignment) => (
-            <span
-              key={assignment.id}
-              className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border px-2 py-1 text-sm"
-            >
-              {personnelMap.get(assignment.personnel_id)?.full_name ??
-                'Nhân sự'}{' '}
-              · {formatAssignmentShift(assignment)}
-              {showCosts && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {formatVndCurrency(
-                    Number(assignment.base_cost_snapshot) +
-                      Number(assignment.allowance_cost),
-                  )}
-                </span>
+  const renderAssignment = (assign: RosterAssignment, gridColumn?: string) => {
+    const person = personnelMap.get(assign.personnel_id);
+    const name = person?.full_name || 'Nhân sự';
+    const shift = formatAssignmentShift(assign);
+    const isEditingThisChip = isOpen && editingAssignmentId === assign.id;
+    const openEditor = (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (isEditingThisChip) {
+        closePopover();
+        return;
+      }
+      popoverAnchor.current = event.currentTarget;
+      openEditPopover(assign);
+    };
+    const showHistory = (trigger: ReactElement, summary?: ReactNode) => (
+      <Popover key={assign.id}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent aria-label="Lịch sử đổi người trực">
+          {summary}
+          <RosterAssignmentHistory assignmentId={assign.id} defaultOpen />
+        </PopoverContent>
+      </Popover>
+    );
+    const chipTooltip = !showCosts
+      ? `${name} · ${shift}`
+      : formatChipTooltip
+        ? formatChipTooltip(assign, person)
+        : `Cố định ${formatVndCurrency(assign.base_cost_snapshot)} + Phụ cấp ${formatVndCurrency(assign.allowance_cost)}${assign.note ? ` · Ghi chú: ${assign.note}` : ''}`;
+
+    if (gridColumn) {
+      const detail = `${name} · ${shift}`;
+      const tooltip = [detail, person?.personnel_code, showCosts && chipTooltip].filter(Boolean).join(' · ');
+      const content = (
+        <>
+          <span className="dym-assignment-time-name">{name}</span>
+          <span className="dym-assignment-time-label dym-roster-tabular">{shift}</span>
+        </>
+      );
+      const className = 'dym-assignment-time-card dym-assignment-edit';
+      const style = { gridColumn };
+      if (readOnly) {
+        return showHistory(
+          <button type="button" disabled={!can(module, 'view')}
+            className={className} style={style} title={tooltip}
+            aria-label={`Lịch sử ca · ${detail}`}>
+            {content}
+          </button>,
+          <div className="mb-2 text-sm">
+            <p className="font-medium">{detail}</p>
+            {showCosts && <p className="text-xs text-muted-foreground">{chipTooltip}</p>}
+          </div>,
+        );
+      }
+      return (
+        <button key={assign.id} type="button" className={className} style={style}
+          title={tooltip}
+          aria-label={detail} aria-haspopup="dialog" aria-expanded={isEditingThisChip}
+          disabled={!can(module, 'update') && !can(module, 'delete')} onClick={openEditor}>
+          {content}
+        </button>
+      );
+    }
+
+    if (readOnly) {
+      return (
+        <span
+          key={assign.id}
+          className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border px-2 py-1 text-sm"
+        >
+          {name} · {shift}
+          {showCosts && (
+            <span className="ml-2 text-xs text-muted-foreground">
+              {formatVndCurrency(
+                Number(assign.base_cost_snapshot) + Number(assign.allowance_cost),
               )}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button type="button" permissionAction="view" variant="ghost" size="icon-sm"
-                    aria-label={`Lịch sử ca của ${personnelMap.get(assignment.personnel_id)?.full_name ?? 'nhân sự'}`}>
-                    <History aria-hidden="true" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent aria-label="Lịch sử đổi người trực">
-                  <RosterAssignmentHistory assignmentId={assignment.id} defaultOpen />
-                </PopoverContent>
-              </Popover>
             </span>
-          ))
-        ) : (
-          <span className="text-sm text-muted-foreground">Chưa có người</span>
+          )}
+          {showHistory(
+            <Button type="button" permissionAction="view" variant="ghost" size="icon-sm"
+              aria-label={`Lịch sử ca của ${name}`}>
+              <History aria-hidden="true" />
+            </Button>,
+          )}
+        </span>
+      );
+    }
+    const hasAllowance = Number(assign.allowance_cost) > 0;
+
+    return (
+      <div
+        key={assign.id}
+        className={cn(
+          'dym-assignment-chip group inline-flex h-8 items-center rounded-md border bg-card text-[13px] shadow-2xs transition-colors',
+          isEditingThisChip
+            ? 'border-primary ring-2 ring-primary/20'
+            : 'border-border hover:border-ring/60',
         )}
+      >
+        <button
+          type="button"
+          disabled={!can(module, 'update') && !can(module, 'delete')}
+          aria-haspopup="dialog"
+          aria-expanded={isEditingThisChip}
+          onClick={openEditor}
+          className="dym-assignment-edit inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
+          title={chipTooltip}
+        >
+          {person && !timedShifts && (
+            <span
+              className={cn(
+                'size-2 shrink-0 rounded-full',
+                ROLE_DOT_CLASS[person.role_type],
+              )}
+              aria-hidden="true"
+            />
+          )}
+          <span className="dym-assignment-name font-medium text-foreground">
+            {person?.full_name || 'Nhân sự'}
+          </span>
+          {person?.personnel_code && (
+            <span className="dym-roster-tabular text-xs text-muted-foreground">
+              {person.personnel_code}
+            </span>
+          )}
+          <span className="text-muted-foreground/60">·</span>
+          <span className="font-medium text-muted-foreground">
+            {formatAssignmentShift(assign)}
+          </span>
+          {showCosts && hasAllowance && (
+            <span
+              className="inline-flex size-4 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold leading-none text-amber-600 dark:text-amber-400"
+              aria-label={`Có phụ cấp ${formatVndCurrency(assign.allowance_cost)}`}
+            >
+              +
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          disabled={!can(module, 'delete')} onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteClick(assign.id);
+          }}
+          className="inline-flex h-full w-7 items-center justify-center overflow-hidden rounded-r-md text-muted-foreground opacity-0 transition-[opacity,transform,background-color,color] duration-150 ease-out-quint hover:bg-destructive/15 hover:text-destructive active:scale-95 group-focus-within:border-l group-focus-within:border-border group-focus-within:opacity-100 group-hover:border-l group-hover:border-border group-hover:opacity-100"
+          title={deleteChipTitle}
+          aria-label={`${deleteChipTitle} ${person?.full_name || ''}`.trim()}
+        >
+          <XMarkIcon className="size-4 shrink-0" />
+        </button>
       </div>
     );
+  };
 
-  return (
-    <div className="dym-assignment-cell flex flex-wrap items-center gap-2">
-      {!hasStaff ? (
-        <span className="mr-1 text-[13px] text-muted-foreground">
-          Chưa có người
-        </span>
-      ) : (
-        assignments.map((assign) => {
-          const person = personnelMap.get(assign.personnel_id);
-          const isEditingThisChip = isOpen && editingAssignmentId === assign.id;
-          const hasAllowance = Number(assign.allowance_cost) > 0;
-          const chipTooltip = !showCosts
-            ? `${person?.full_name ?? 'Nhân sự'} · ${formatAssignmentShift(assign)}`
-            : formatChipTooltip
-              ? formatChipTooltip(assign, person)
-              : `Cố định ${formatVndCurrency(assign.base_cost_snapshot)} + Phụ cấp ${formatVndCurrency(assign.allowance_cost)}${assign.note ? ` · Ghi chú: ${assign.note}` : ''}`;
+  const assignmentsByRole = new Map<PersonnelRoleType | undefined, RosterAssignment[]>();
+  if (timedShifts) {
+    for (const assignment of assignments) {
+      const role = personnelMap.get(assignment.personnel_id)?.role_type;
+      const group = assignmentsByRole.get(role);
+      if (group) group.push(assignment);
+      else assignmentsByRole.set(role, [assignment]);
+    }
+  }
 
-          return (
-            <div
-              key={assign.id}
-              className={cn(
-                'dym-assignment-chip group inline-flex h-8 items-center rounded-md border bg-card text-[13px] shadow-2xs transition-colors',
-                isEditingThisChip
-                  ? 'border-primary ring-2 ring-primary/20'
-                  : 'border-border hover:border-ring/60',
-              )}
-            >
-              <button
-                type="button"
-                disabled={!can(module, 'update') && !can(module, 'delete')}
-                aria-haspopup="dialog"
-                aria-expanded={isEditingThisChip}
-                onClick={(event) => {
-                  if (isEditingThisChip) {
-                    closePopover();
-                    return;
-                  }
-                  popoverAnchor.current = event.currentTarget;
-                  openEditPopover(assign);
-                }}
-                className="dym-assignment-edit inline-flex h-full items-center gap-1.5 px-3 text-left transition-transform duration-150 ease-out-quint active:scale-[0.98]"
-                title={chipTooltip}
-              >
-                {person && (
-                  <span
-                    className={cn(
-                      'size-2 shrink-0 rounded-full',
-                      ROLE_DOT_CLASS[person.role_type],
-                    )}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="dym-assignment-name font-medium text-foreground">
-                  {person?.full_name || 'Nhân sự'}
-                </span>
-                {person?.personnel_code && (
-                  <span className="dym-roster-tabular text-xs text-muted-foreground">
-                    {person.personnel_code}
-                  </span>
-                )}
-                <span className="text-muted-foreground/60">·</span>
-                <span className="font-medium text-muted-foreground">
-                  {formatAssignmentShift(assign)}
-                </span>
-                {showCosts && hasAllowance && (
-                  <span
-                    className="inline-flex size-4 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold leading-none text-amber-600 dark:text-amber-400"
-                    aria-label={`Có phụ cấp ${formatVndCurrency(assign.allowance_cost)}`}
-                  >
-                    +
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={!can(module, 'delete')} onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(assign.id);
-                }}
-                className="inline-flex h-full w-7 items-center justify-center overflow-hidden rounded-r-md text-muted-foreground opacity-0 transition-[opacity,transform,background-color,color] duration-150 ease-out-quint hover:bg-destructive/15 hover:text-destructive active:scale-95 group-focus-within:border-l group-focus-within:border-border group-focus-within:opacity-100 group-hover:border-l group-hover:border-border group-hover:opacity-100"
-                title={deleteChipTitle}
-                aria-label={`${deleteChipTitle} ${person?.full_name || ''}`.trim()}
-              >
-                <XMarkIcon className="size-4 shrink-0" />
-              </button>
-            </div>
-          );
-        })
-      )}
-
+  function renderAssignmentEditor() {
+    const isAdding = isOpen && !editingAssignmentId;
+    return (
       <Popover
         open={isOpen}
         onOpenChange={(nextOpen) => {
@@ -500,31 +537,45 @@ export function RosterAssignmentCell({
       >
         <PopoverAnchor virtualRef={popoverAnchor} />
         <PopoverTrigger asChild>
-          <Button permissionAction="create"
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-expanded={isOpen && !editingAssignmentId}
-            onClick={(event) => {
-              popoverAnchor.current = event.currentTarget;
-              if (isOpen && editingAssignmentId) {
+          {timedShifts ? (
+            <button type="button" className="dym-assignment-add-track" aria-label="Thêm ca trực"
+              aria-expanded={isAdding} disabled={!can(module, 'create')}
+              onClick={(event) => {
                 event.preventDefault();
-                openAddPopover();
-              }
-            }}
-            className={cn(
-              'h-8 gap-1 px-3 text-[13px] font-medium',
-              !hasStaff
-                ? 'border-dashed text-muted-foreground hover:border-solid hover:text-foreground'
-                : 'bg-card',
-            )}
-          >
-            <PlusIcon className="size-3.5" />
-            <span>Thêm</span>
-          </Button>
+                const hourSlot = event.target instanceof Element
+                  ? event.target.closest<HTMLElement>('[data-start-minute]')
+                  : null;
+                const anchor = hourSlot ?? event.currentTarget;
+                if (isAdding && popoverAnchor.current === anchor) {
+                  closePopover();
+                  return;
+                }
+                const minute = hourSlot?.dataset.startMinute;
+                popoverAnchor.current = anchor;
+                openAddPopover(minute ? Number(minute) : undefined);
+              }}>
+              <AssignmentTimelineAddLabels />
+            </button>
+          ) : (
+            <Button permissionAction="create" type="button" variant="outline" size="sm" aria-expanded={isAdding}
+              onClick={(event) => {
+                popoverAnchor.current = event.currentTarget;
+                if (isOpen && editingAssignmentId) {
+                  event.preventDefault();
+                  openAddPopover();
+                }
+              }}
+              className={cn(
+                'h-8 gap-1 px-3 text-[13px] font-medium',
+                hasStaff ? 'bg-card' : 'border-dashed text-muted-foreground hover:border-solid hover:text-foreground',
+              )}>
+              <PlusIcon className="size-3.5" />
+              <span>Thêm</span>
+            </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent
-          align="start"
+          align={timedShifts && isAdding ? 'center' : 'start'}
           sideOffset={8}
           collisionPadding={16}
           aria-labelledby={titleId}
@@ -536,10 +587,10 @@ export function RosterAssignmentCell({
             }
           }}
           onCloseAutoFocus={(event) => {
-            const anchor = popoverAnchor.current;
-            if (anchor?.isConnected && document.activeElement === document.body) {
+            const trigger = popoverAnchor.current?.closest('button');
+            if (trigger?.isConnected && document.activeElement === document.body) {
               event.preventDefault();
-              anchor.focus({ preventScroll: true });
+              trigger.focus({ preventScroll: true });
             }
           }}
           className="dym-assignment-popover"
@@ -878,6 +929,26 @@ export function RosterAssignmentCell({
           </form>
         </PopoverContent>
       </Popover>
+    );
+  }
+
+  return (
+    <div className={cn('dym-assignment-cell', timedShifts ? 'dym-assignment-timeline' : 'flex flex-wrap items-center gap-2')}>
+      {timedShifts ? (
+        <>
+          <div className="dym-assignment-mobile-scale"><AssignmentTimelineScale /></div>
+          {Array.from(assignmentsByRole, ([role, group]) => (
+            <AssignmentTimelineTrack key={role ?? 'unknown'} assignments={group} role={role}
+              label={role ? ROLE_LABELS[role] : 'Nhân sự'} renderAssignment={renderAssignment} />
+          ))}
+        </>
+      ) : assignments.map((assignment) => renderAssignment(assignment))}
+
+      {!hasStaff && (!timedShifts || readOnly) && (
+        <span className="mr-1 text-[13px] text-muted-foreground">Chưa có người</span>
+      )}
+      {!readOnly && renderAssignmentEditor()}
+      {timedShifts && readOnly && !hasStaff && <div className="dym-assignment-track" aria-hidden="true" />}
     </div>
   );
 }

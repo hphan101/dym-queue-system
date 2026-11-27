@@ -255,30 +255,144 @@
   background: transparent;
   color: var(--color-muted);
 }
-.dym-insite-day .dym-assignment-cell { gap: 12px; }
-.dym-insite-day .dym-assignment-cell > span { font-size: 14px; }
-.dym-insite-day .dym-assignment-chip {
+.dym-assignment-timeline {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr);
+  gap: 8px;
+}
+.dym-assignment-scale {
+  position: relative;
+  height: 24px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+}
+.dym-assignment-scale > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.dym-assignment-mobile-scale { display: none; }
+.dym-assignment-track,
+.dym-assignment-add-track {
+  background-image: linear-gradient(to right, var(--color-rule) 1px, transparent 1px);
+  background-size: calc(100% / 11) 100%;
+}
+.dym-assignment-track {
+  display: grid;
+  grid-template-columns: repeat(44, minmax(0, 1fr));
+  grid-auto-flow: row dense;
+  grid-auto-rows: 44px;
+  row-gap: 4px;
+  min-height: 36px;
+}
+.dym-assignment-add-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  align-items: stretch;
+  min-height: 36px;
+  gap: 0;
+  padding: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+.dym-assignment-add-track:disabled { cursor: not-allowed; }
+.dym-assignment-add-track:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+.dym-assignment-add-hour {
+  display: grid;
+  place-items: center;
+}
+.dym-assignment-add-hour > span,
+.dym-assignment-add-label {
+  visibility: hidden;
+}
+.dym-assignment-add-hour > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dym-assignment-add-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.dym-assignment-add-track:focus-visible .dym-assignment-add-label {
+  visibility: visible;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-assignment-add-track:enabled .dym-assignment-add-hour:hover { background-color: var(--color-overlay-hover-soft); }
+  .dym-assignment-add-track:enabled:not(:focus-visible) .dym-assignment-add-hour:hover > span { visibility: visible; }
+}
+@media (hover: none), (pointer: coarse) {
+  .dym-assignment-add-label { visibility: visible; }
+  .dym-assignment-add-track { min-height: 44px; }
+}
+.dym-assignment-time-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0;
+  height: auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 4px;
+  text-align: left;
+  line-height: 16px;
+  container-type: inline-size;
+}
+.dym-assignment-time-card > span {
+  margin-inline: min(8px, 8cqi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dym-assignment-time-name { font-size: 13px; font-weight: 600; }
+.dym-assignment-time-label { font-size: 11px; font-weight: 400; }
+.dym-assignment-time-card:disabled { opacity: 1; }
+.dym-assignment-time-card[aria-expanded="true"],
+.dym-assignment-time-card:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dym-assignment-time-card:enabled:hover { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 55%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dym-assignment-time-card:not(:disabled) { transition: transform 150ms var(--ease-out); }
+  .dym-assignment-time-card:not(:disabled):active { transform: scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dym-assignment-time-card { transition: none; }
+}
+@container (max-width: 70px) {
+  .dym-assignment-time-label { display: none; }
+}
+@container (max-width: 24px) {
+  .dym-assignment-time-name { display: none; }
+}
+.dym-assignment-outside .dym-assignment-chip {
   max-width: 100%;
   height: auto;
-  min-height: 44px;
-  border-inline-start: 3px solid hsl(var(--primary));
-  border-radius: 8px;
-  font-size: 14px;
+  min-height: 36px;
   box-shadow: none;
 }
-.dym-insite-day .dym-assignment-edit {
-  min-height: 44px;
+.dym-assignment-outside .dym-assignment-edit {
+  min-height: 36px;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 8px;
 }
-.dym-insite-day .dym-assignment-name {
-  max-width: 24ch;
-  white-space: normal;
+.dym-assignment-outside .dym-assignment-name {
   overflow-wrap: anywhere;
 }
-.dym-insite-day .dym-assignment-cell > button { min-height: 36px; font-size: 14px; }
 .dym-insite-day .dym-provisional-editor { padding: 20px 24px; }
 .dym-insite-day .dym-provisional-label { font-weight: 500; }
 .dym-insite-day .dym-provisional-controls :is(input, button) { min-height: 40px; font-size: 14px; }
@@ -356,7 +470,7 @@
   }
   .dym-insite-day .dym-provisional-editor { padding: 16px; }
   .dym-insite-day .dym-provisional-controls :is(input, button),
-  .dym-insite-day .dym-assignment-cell > button { min-height: 44px; }
+  .dym-insite-day .dym-assignment-add-track { min-height: 44px; }
   .dym-insite-day .dym-roster-table { display: block; min-width: 0; }
   .dym-insite-day .dym-roster-table thead {
     position: absolute;
@@ -392,14 +506,10 @@
     gap: 8px;
   }
   .dym-insite-day .dym-day-room-cost::before { content: 'Chi phí phòng'; color: var(--color-muted); }
-  .dym-insite-day .dym-assignment-chip { width: 100%; }
-  .dym-insite-day .dym-assignment-edit { flex: 1; position: relative; padding-inline-start: 28px; }
-  .dym-insite-day .dym-assignment-edit > span[aria-hidden="true"]:first-child {
-    position: absolute;
-    left: 12px;
-    top: 14px;
-  }
-  .dym-insite-day .dym-assignment-name { max-width: 100%; }
+  .dym-insite-day .dym-assignment-timeline { grid-template-columns: minmax(0, 1fr); }
+  .dym-assignment-mobile-scale { display: block; }
+  .dym-assignment-mobile-scale .dym-assignment-scale { font-size: 12px; }
+  .dym-assignment-mobile-scale .dym-assignment-scale > span:is(:nth-child(2), :nth-child(odd):not(:first-child)) { display: none; }
   .dym-insite-day .dym-roster-table tbody > tr:not([data-position]) { display: block; }
   .dym-insite-day .dym-roster-table tbody > tr:not([data-position]) > td { display: block; }
   .dym-insite-day .dym-roster-table tfoot { background: var(--color-paper-3); }

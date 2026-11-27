@@ -3,6 +3,19 @@
    Framed-Sheet Clinical Ledger (design-taste-frontend + frontend-ui-engineering)
    ========================================================================== */
 
+:is(.personnel-role-badge, .dym-assignment-time-card, .dym-week-assignment) {
+  background-color: var(--personnel-role-bg, #48546b);
+  color: white;
+}
+.personnel-role-badge {
+  padding: 0 8px;
+  line-height: 20px;
+}
+[data-personnel-role="doctor"] { --personnel-role-bg: #307416; }
+[data-personnel-role="nurse"] { --personnel-role-bg: #225ba3; }
+[data-personnel-role="technician"] { --personnel-role-bg: #60469a; }
+[data-personnel-role="ctv"] { --personnel-role-bg: #855211; }
+
 /* 1. Scope & Filter Toolbar (contextual per dedicated screen) */
 .dym-roster-scope-bar {
   display: flex;

@@ -92,7 +92,8 @@ import { CampaignSetupRelations } from './CampaignSetupRelations';
 import { setupCaption } from './setupLinks';
 import { RosterProvisionalCost } from '../shared/RosterProvisionalCost';
 import { getTodayInVietnam } from '../../../../lib/date';
-import { useRosterDeepLink } from '../shared/useRosterDeepLink';
+import { navigateWithinApp } from '@/lib/navigation';
+import { rosterViewHref, useRosterDeepLink } from '../shared/useRosterDeepLink';
 
 interface PendingPositionRemoval {
   positionName: string;
@@ -241,13 +242,13 @@ export function RosterOnsitePage({
     setSelectedMonth(link.date.slice(0, 7));
     setSelectedBranch(link.branch);
     setWeekDate(link.date);
+    setPendingCampaignId(link.campaign);
+    setView(link.campaign || link.view === 'details' ? 'details' : 'week');
     if (link.campaign) {
       setSearchQuery('');
       setTypeFilter('all');
-      setPendingCampaignId(link.campaign);
       setSelectedCampaignId(link.campaign);
       setDailyCategory(link.type === 'blood_draw' ? 'blood_draw' : 'onsite');
-      setView('details');
     }
   });
   useEffect(() => {
@@ -535,20 +536,20 @@ export function RosterOnsitePage({
     return `DOAN-${dateStr.replace(/-/g, '')}-${randomSuffix}`;
   };
 
-  const openCampaign = (campaign: RosterSchedule) => {
-    setSearchQuery('');
-    setTypeFilter('all');
-    setDailyCategory(
-      campaign.schedule_type === 'blood_draw' ? 'blood_draw' : 'onsite',
-    );
-    setPendingCampaignId(campaign.id);
-    setSelectedCampaignId(campaign.id);
-    if (campaign.branch_code === 'q1' || campaign.branch_code === 'q7')
-      setSelectedBranch(campaign.branch_code);
-    setSelectedDate(campaign.schedule_date);
-    setSelectedMonth(campaign.schedule_date.slice(0, 7));
-    setWeekDate(campaign.schedule_date);
-    setView('details');
+  const weekHref = () => rosterViewHref('roster-onsite', { branch: selectedBranch, date: weekDate }, 'week');
+  const returnToWeek = () => {
+    navigateWithinApp(weekHref(), { replace: true });
+  };
+  const openCampaign = (campaign?: RosterSchedule) => {
+    if (view === 'week') {
+      window.history.replaceState(window.history.state, '', weekHref());
+    }
+    const campaignBranch = campaign?.branch_code;
+    const branch = campaignBranch === 'q1' || campaignBranch === 'q7' ? campaignBranch : selectedBranch;
+    navigateWithinApp(rosterViewHref('roster-onsite', {
+      branch,
+      date: campaign?.schedule_date ?? selectedDate,
+    }, 'details', campaign));
   };
 
   const openCreateCampaignModal = async (date = selectedDate) => {
@@ -955,7 +956,7 @@ export function RosterOnsitePage({
       contentClassName="dym-onsite-content"
       breadcrumbs={view === 'details' ? [
         { label: 'Điều phối' },
-        { label: 'Đoàn khám Onsite', onSelect: () => setView('week') },
+        { label: 'Đoàn khám Onsite', onSelect: returnToWeek },
         { label: selectedCampaign
           ? `${selectedCampaign.company_name || selectedCampaign.campaign_code} · ${formatDisplayDate(selectedCampaign.schedule_date)}`
           : 'Danh sách & chi tiết' },
@@ -988,7 +989,7 @@ export function RosterOnsitePage({
         <div className="dym-onsite-view-bar">
           <Tabs
             value={view}
-            onValueChange={(value) => setView(value as 'week' | 'details')}
+            onValueChange={(value) => value === 'week' ? returnToWeek() : openCampaign()}
           >
             <TabsList aria-label="Cách xem đoàn khám">
               <TabsTrigger value="week">Lịch tuần</TabsTrigger>

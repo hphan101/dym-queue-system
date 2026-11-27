@@ -1,5 +1,6 @@
 import type { BranchCode } from '@/types/domain';
 import type { MedicalPersonnel, PersonnelRoleType, RosterAssignment, RosterSchedule } from '../data/rosterService';
+import { normalizeSettlementSearch, personnelSearchFields, settlementMatches } from './settlementSearch';
 
 export type SettlementLocation = 'all' | 'insite' | 'onsite';
 export type SettlementSort = 'name' | 'shiftCount' | 'totalGrand';
@@ -39,10 +40,10 @@ export function buildSettlementRows(
     (!filters.location || filters.location === 'all' ||
       (filters.location === 'insite' ? schedule.schedule_type === 'insite' : schedule.schedule_type !== 'insite')),
   ).map(schedule => [schedule.id, schedule]));
-  const query = filters.query?.trim().toLocaleLowerCase('vi') ?? '';
+  const query = normalizeSettlementSearch(filters.query ?? '');
   const people = new Map(personnel.filter(person =>
     (!filters.role || filters.role === 'all' || person.role_type === filters.role) &&
-    (!query || `${person.personnel_code} ${person.full_name} ${person.phone_number} ${person.email}`.toLocaleLowerCase('vi').includes(query)),
+    (!query || settlementMatches(personnelSearchFields(person), query)),
   ).map(person => [person.id, person]));
   const rows = new Map<string, SettlementRow>();
   for (const assignment of assignments) {

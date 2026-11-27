@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { navigateWithinApp } from '@/lib/navigation';
 import { useMemo, useState } from 'react';
-import { useRosterDeepLink } from '../shared/useRosterDeepLink';
+import { rosterViewHref, useRosterDeepLink } from '../shared/useRosterDeepLink';
 import { GripVertical } from 'lucide-react';
 import {
   ArrowDownTrayIcon,
@@ -52,6 +53,7 @@ import {
   RosterAssignmentCell,
   type RosterAssignmentDraft,
 } from '../shared/RosterAssignmentCell';
+import { AssignmentTimelineScale } from '../shared/AssignmentTimeline';
 import {
   formatVndCurrency,
   getProvisionalCost,
@@ -147,13 +149,13 @@ export function RosterInsitePage({
   const today = rosterToday || getTodayInVietnam();
   const historyLocked = isRosterDateLocked(selectedDate, today, canEditHistory);
   const [view, setView] = useState<'week' | 'day'>('week');
-  const [weekDate, setWeekDate] = useState(selectedDate);
   const [weekRefresh, setWeekRefresh] = useState(0);
   useRosterDeepLink('roster-insite', (link) => {
     setSelectedDate(link.date);
     setSelectedBranch(link.branch);
-    setWeekDate(link.date);
-    if (link.view === 'day') setView('day');
+    setView(link.view === 'day' ? 'day' : 'week');
+    closePopover();
+    setIsAddingDailyRoom(false);
   });
 
   // Step 1: Fixed Room Catalog Drawer (⚙) state
@@ -172,6 +174,16 @@ export function RosterInsitePage({
   // Per-row Popover state for adding/editing room assignment
   const [popoverRoomKey, setPopoverRoomKey] = useState<string | null>(null);
   const closePopover = () => setPopoverRoomKey(null);
+
+  const weekHref = () => rosterViewHref('roster-insite', { branch: selectedBranch, date: selectedDate }, 'week');
+  const returnToWeek = () => {
+    navigateWithinApp(weekHref(), { replace: true });
+  };
+  const openDay = (date: string) => {
+    // Preserve the displayed week for browser Back.
+    window.history.replaceState(window.history.state, '', weekHref());
+    navigateWithinApp(rosterViewHref('roster-insite', { branch: selectedBranch, date }, 'day'));
+  };
 
   // Fixed catalog rooms active on selectedDate (soft-deactivated rooms with inactive_from <= selectedDate are excluded)
   const catalogRoomsForDate = useMemo(
@@ -718,7 +730,7 @@ export function RosterInsitePage({
       contentClassName="dym-clinic-content"
       breadcrumbs={view === 'day' ? [
         { label: 'Điều phối' },
-        { label: 'Lịch tại Phòng khám', onSelect: () => setView('week') },
+        { label: 'Lịch tại Phòng khám', onSelect: returnToWeek },
         { label: formatDisplayDate(selectedDate) },
       ] : undefined}
       title={`Lịch tại Phòng khám (${ROSTER_BRANCH_LABELS[selectedBranch]})`}
@@ -768,15 +780,9 @@ export function RosterInsitePage({
       {view === 'week' ? (
         <RosterInsiteWeek
           refreshKey={weekRefresh}
-          date={weekDate}
-          onDateChange={(date) => {
-            setWeekDate(date);
-            setSelectedDate(date);
-          }}
-          onOpenDay={(date) => {
-            setSelectedDate(date);
-            setView('day');
-          }}
+          date={selectedDate}
+          onDateChange={setSelectedDate}
+          onOpenDay={openDay}
         />
       ) : (
         <div className="dym-insite-day">
@@ -785,13 +791,9 @@ export function RosterInsitePage({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                closePopover();
-                setIsAddingDailyRoom(false);
-                setView('week');
-              }}
+              onClick={returnToWeek}
             >
-              <ChevronLeftIcon data-icon="inline-start" /> Về lịch tuần
+              <ChevronLeftIcon data-icon="inline-start" /> Về Lịch tại Phòng khám
             </Button>
             <CardTitle className="dym-day-title"><h2>Lịch ngày {formatDisplayDate(selectedDate)}</h2></CardTitle>
             <Badge variant="secondary" className="dym-day-state">
@@ -951,7 +953,7 @@ export function RosterInsitePage({
               sửa lịch cũ mới được chỉnh sửa.
             </AlertDescription></Alert>
           )}
-          <fieldset disabled={historyLocked} className="min-w-0 border-0 p-0">
+          <div className="min-w-0">
             <RosterProvisionalCost
               key={`${selectedBranch}-${selectedDate}-${provisionalCost}`}
               branch={selectedBranch}
@@ -987,7 +989,11 @@ export function RosterInsitePage({
                         <span className="sr-only">Đổi thứ tự phòng</span>
                       </th>
                       <th className="w-56 sm:w-64">Phòng</th>
-                      <th>Nhân sự trực</th>
+                      <th scope="col" aria-label="Giờ trực">
+                        <div className="dym-assignment-timeline">
+                          <AssignmentTimelineScale />
+                        </div>
+                      </th>
                       <th className="is-right w-36 sm:w-44">Chi phí phòng</th>
                     </tr>
                   </thead>
@@ -1070,7 +1076,7 @@ export function RosterInsitePage({
                                 <div className="flex items-center gap-1.5">
                                   {/* Left hover ⋯ menu for per-day room hide / delete */}
                                   <Popover
-                                    open={isRowMenuOpen}
+                                    open={isRowMenuOpen && !historyLocked}
                                     onOpenChange={(nextOpen) =>
                                       setOpenRowMenuKey(
                                         nextOpen ? roomRow.key : null,
@@ -1080,6 +1086,7 @@ export function RosterInsitePage({
                                     <PopoverTrigger asChild>
                                       <button
                                         type="button"
+                                        disabled={historyLocked}
                                         className={cn(
                                           'inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100',
                                           isRowMenuOpen
@@ -1223,7 +1230,7 @@ export function RosterInsitePage({
                         {/* Dashed Bottom Row: "+ Thêm phòng cho ngày này" */}
                         <tr className="bg-muted/10">
                           <td colSpan={4} className="py-2.5">
-                            {isAddingDailyRoom ? (
+                            {isAddingDailyRoom && !historyLocked ? (
                               <form
                                 onSubmit={(e) =>
                                   void handleAddDailyRoomSubmit(e)
@@ -1272,6 +1279,7 @@ export function RosterInsitePage({
                             ) : (
                               <button
                                 type="button"
+                                disabled={historyLocked}
                                 onClick={() => {
                                   setIsAddingDailyRoom(true);
                                   setNewDailyRoomName('');
@@ -1308,6 +1316,7 @@ export function RosterInsitePage({
                                 <span>·</span>
                                 <button
                                   type="button"
+                                  disabled={historyLocked}
                                   onClick={() =>
                                     void handleRestoreAllHiddenRooms()
                                   }
@@ -1360,7 +1369,7 @@ export function RosterInsitePage({
                 </table>
               </CardContent>
             </Card>
-          </fieldset>
+          </div>
         </div>
       )}
 

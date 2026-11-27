@@ -1,4 +1,5 @@
 import { formatAssignmentShift } from '../data/shiftTime';
+import type { RosterAssignment } from '../data/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from 'lucide-react';
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTodayInVietnam } from '../../../../lib/date';
 import { formatDisplayDate } from '../../shared/adminFormatters';
@@ -82,8 +82,18 @@ export function RosterInsiteWeek({
         loaded.assignments,
       )
     : [];
-  const personName = (id: string) =>
-    personnelMap.get(id)?.full_name ?? 'Nhân sự không còn trong danh mục';
+  const renderAssignment = (assignment: RosterAssignment) => {
+    const person = personnelMap.get(assignment.personnel_id);
+    const name = person?.full_name ?? 'Nhân sự không còn trong danh mục';
+    const time = formatAssignmentShift(assignment);
+    return (
+      <span key={assignment.id} className="dym-week-assignment"
+        data-personnel-role={person?.role_type} title={`${name} · ${time}`}>
+        <span className="dym-week-person">{name}</span>
+        <span className="dym-week-time">{time}</span>
+      </span>
+    );
+  };
 
   return (
     <Card className="dym-insite-week">
@@ -231,19 +241,7 @@ export function RosterInsiteWeek({
                               className="dym-week-cell"
                             >
                               {items.length ? (
-                                items.map((item) => (
-                                  <span
-                                    key={item.id}
-                                    className="dym-week-assignment"
-                                  >
-                                    <span className="dym-week-person">
-                                      {personName(item.personnel_id)}
-                                    </span>
-                                    <Badge variant="secondary">
-                                      {formatAssignmentShift(item)}
-                                    </Badge>
-                                  </span>
-                                ))
+                                items.map(renderAssignment)
                               ) : (
                                 <span className="dym-week-empty">
                                   <span className="dym-week-add">
@@ -346,15 +344,8 @@ export function RosterInsiteWeek({
                     staffed.map((room) => (
                       <div key={room.key} className="dym-week-agenda-room">
                         <span>{room.name}</span>
-                        <div>
-                          {room.days.get(day)!.map((item) => (
-                            <p key={item.id}>
-                              {personName(item.personnel_id)}{' '}
-                              <span>
-                                · {formatAssignmentShift(item)}
-                              </span>
-                            </p>
-                          ))}
+                        <div className="dym-week-agenda-assignments">
+                          {room.days.get(day)?.map(renderAssignment)}
                         </div>
                       </div>
                     ))

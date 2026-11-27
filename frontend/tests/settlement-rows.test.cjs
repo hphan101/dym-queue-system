@@ -12,8 +12,12 @@ function load(file, imports = {}) {
   new Function('exports', 'require', code)(exports, name => imports[name] ?? {});
   return exports;
 }
-const rowsModule = load('features/admin/roster/settlement/settlementRows.ts');
+const searchModule = load('features/admin/roster/settlement/settlementSearch.ts', {
+  '../../shared/adminFormatters': load('features/admin/shared/adminFormatters.ts'),
+});
+const rowsModule = load('features/admin/roster/settlement/settlementRows.ts', { './settlementSearch': searchModule });
 const { buildSettlementRows } = rowsModule;
+const { normalizeSettlementSearch, settlementMatches } = searchModule;
 const people = [
   { id: 'a', personnel_code: 'BS-001', full_name: 'An', role_type: 'doctor', phone_number: '090111', fixed_cost: 999999, email: '' },
   { id: 'b', personnel_code: 'DD-001', full_name: 'Bình', role_type: 'nurse', phone_number: '090222', fixed_cost: 888888, email: '' },
@@ -54,7 +58,19 @@ test('settlement combines month, role, branch, workplace and search filters', ()
   assert.deepEqual(build({ role: 'nurse', query: 'An' }), []);
   assert.equal(build({ location: 'onsite' }).find(row => row.person.id === 'b').shiftCount, 1);
   assert.equal(build({ query: 'bs-001' }).length, 1);
+  assert.deepEqual(build({ query: 'DD-001 binh' }).map(row => row.person.id), ['b']);
   assert.deepEqual(buildSettlementRows(schedules, assignments, people, { month: '2026-12' }), []);
+});
+
+test('settlement finds the fields matching the typed term across names, contacts and campaign codes', () => {
+  const fields = ['BS-001', 'Đặng Mỹ Duyên', '0901234567', 'duyen@example.test'];
+  const match = (keyword, values = fields) => settlementMatches(values, normalizeSettlementSearch(keyword));
+  assert.deepEqual(match(' dang my '), ['', 'dang my', '', '']);
+  assert.deepEqual(match('1234'), ['', '', '1234', '']);
+  assert.deepEqual(match('@example'), ['', '', '', '@example']);
+  assert.deepEqual(match('001 dang'), ['001', 'dang', '', '']);
+  assert.deepEqual(match('An Phú', ['DOAN-003', 'Công ty An Phú']), ['', 'an phu']);
+  assert.equal(match('missing'), null);
 });
 
 test('settlement sorts names, shifts and costs in both directions without mutating inputs', () => {
@@ -85,7 +101,7 @@ test('filtered Excel matches table rows and totals; full-month Excel ignores tab
   global.window = { setTimeout: callback => callback() };
   try {
     const args = { monthStr: '2026-11', schedules, assignments, personnelList: people, roomMap: new Map() };
-    excel.exportMonthlyPersonnelCostExcel({ ...args, filterBranch: 'q7', filterLocation: 'onsite', filterRole: 'doctor', scope: 'filtered' });
+    excel.exportMonthlyPersonnelCostExcel({ ...args, filterBranch: 'q7', filterLocation: 'onsite', filterRole: 'doctor', filterPersonnelQuery: 'BS-001 An', scope: 'filtered' });
     const xml = file => {
       const entry = entries.find(entry => entry.name === file);
       return typeof entry.data === 'string' ? entry.data : new TextDecoder().decode(entry.data);

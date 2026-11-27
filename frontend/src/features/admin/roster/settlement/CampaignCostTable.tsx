@@ -15,10 +15,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDisplayDate } from '../../shared/adminFormatters';
+import { HighlightText } from '../../shared/HighlightText';
 import { fetchRosterBundleForMonth, formatVndCurrency, ROSTER_BRANCH_LABELS, type RosterSchedule, type RosterAssignment, type MedicalPersonnel } from '../data/rosterService';
 import { exportCampaignSettlementExcel } from '../shared/exportRosterExcel';
 import { buildCampaignSettlementRows, type CampaignCostType, type CampaignSettlementRow } from './campaignSettlementRows';
 import { CampaignCostSheet } from './CampaignCostSheet';
+import { normalizeSettlementSearch, settlementMatches } from './settlementSearch';
 import '../shared/campaignColors.css';
 
 const types = [
@@ -47,20 +49,19 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
   const [type, setType] = useState<CampaignCostType>('all');
   const [query, setQuery] = useState('');
   const [pageSize, setPageSize] = useState(20);
-  const [pagination, setPagination] = useState({ key: '', page: 1 });
+  const [pagination, setPagination] = useState<{ key: string; page: number } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [detail, setDetail] = useState<CampaignSettlementRow | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const personnelMap = useMemo(() => new Map(personnelList.map(person => [person.id, person])), [personnelList]);
   const rows = useMemo(() => buildCampaignSettlementRows(monthSchedules, monthAssignments, campaignMonth, today), [monthSchedules, monthAssignments, campaignMonth, today]);
-  const filtered = useMemo(() => {
-    const keyword = query.trim().toLocaleLowerCase('vi');
-    return rows.filter(({ schedule }) => (type === 'all' || schedule.schedule_type === type)
-      && (!keyword || `${schedule.campaign_code ?? ''} ${schedule.company_name ?? ''}`.toLocaleLowerCase('vi').includes(keyword)));
-  }, [rows, query, type]);
+  const keyword = normalizeSettlementSearch(query);
+  const hasFilters = Boolean(keyword || type !== 'all');
+  const filtered = useMemo(() => rows.filter(({ schedule }) => (type === 'all' || schedule.schedule_type === type)
+    && (!keyword || settlementMatches([schedule.campaign_code, schedule.company_name], keyword))), [rows, keyword, type]);
   const key = JSON.stringify([campaignMonth, type, query, pageSize]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = pagination.key === key ? Math.min(pagination.page, totalPages) : 1;
+  const page = pagination?.key === key ? Math.min(pagination.page, totalPages) : 1;
   const start = (page - 1) * pageSize;
   const totals = filtered.reduce((sum, row) => ({ base: sum.base + row.baseCost, allowance: sum.allowance + row.allowanceCost, total: sum.total + row.totalCost, reserve: sum.reserve + row.reserve }), { base: 0, allowance: 0, total: 0, reserve: 0 });
   const exportExcel = (filteredOnly: boolean) => {
@@ -76,7 +77,7 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
         <CardDescription>{filtered.length} lịch đoàn trong tháng · Dự phòng hiển thị riêng với chi phí nhân sự</CardDescription>
         </div>
         <div className="settlement-table-actions">
-          <MonthPicker value={campaignMonth} onChange={value => { setDetailOpen(false); setCampaignMonth(value); setPagination({ key: '', page: 1 }); }} ariaLabel="Chọn tháng chi phí đoàn" />
+          <MonthPicker value={campaignMonth} onChange={value => { setDetailOpen(false); setCampaignMonth(value); setPagination(null); }} ariaLabel="Chọn tháng chi phí đoàn" />
           <Popover open={exportOpen} onOpenChange={setExportOpen}>
             <PopoverTrigger asChild>
               <Button type="button" permissionAction="view" permissionModule="export" disabled={loading || Boolean(error) || rows.length === 0}>
@@ -93,12 +94,12 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
         </div>
       </div>
       <div className="settlement-table-toolbar">
-        <Tabs value={type} onValueChange={value => { setType(value as CampaignCostType); setPagination({ key: '', page: 1 }); }}>
+        <Tabs value={type} onValueChange={value => { setType(value as CampaignCostType); setPagination(null); }}>
           <TabsList aria-label="Lọc chi phí theo loại đoàn">
             {types.map(item => <TabsTrigger key={item.value} value={item.value}>{item.label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
-        <SearchField value={query} onChange={event => { setQuery(event.target.value); setPagination({ key: '', page: 1 }); }} onClear={() => { setQuery(''); setPagination({ key: '', page: 1 }); }}
+        <SearchField value={query} onChange={event => { setQuery(event.target.value); setPagination(null); }} onClear={() => { setQuery(''); setPagination(null); }}
           placeholder="Tìm mã đoàn, công ty..." aria-label="Tìm đoàn trong bảng chi phí" />
       </div>
     </CardHeader>
@@ -109,8 +110,8 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
         <span className="sr-only">Đang tải chi phí đoàn</span>
         {[0, 1, 2].map(index => <Skeleton key={index} className="h-10 w-full" />)}
       </div> : filtered.length === 0 ? <Empty className="settlement-empty"><EmptyHeader>
-        <EmptyTitle>{query.trim() || type !== 'all' ? 'Không có đoàn phù hợp' : 'Chưa có lịch đoàn trong tháng'}</EmptyTitle>
-        <EmptyDescription>{query.trim() || type !== 'all' ? 'Thử từ khóa khác hoặc chọn Tất cả' : 'Các lịch lấy máu, Onsite và Setup sẽ xuất hiện tại đây'}</EmptyDescription>
+        <EmptyTitle>{hasFilters ? 'Không có đoàn phù hợp' : 'Chưa có lịch đoàn trong tháng'}</EmptyTitle>
+        <EmptyDescription>{hasFilters ? 'Thử từ khóa khác hoặc chọn Tất cả' : 'Các lịch lấy máu, Onsite và Setup sẽ xuất hiện tại đây'}</EmptyDescription>
       </EmptyHeader></Empty> : <div className="settlement-campaign-table">
         <Table className="dym-roster-table" aria-label="Chi phí theo đoàn">
           <TableHeader><TableRow>
@@ -118,19 +119,25 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
             <TableHead className="is-right">Chi phí cố định</TableHead>
             <TableHead className="is-right">Phụ cấp</TableHead><TableHead className="is-right">Chi phí nhân sự</TableHead><TableHead className="is-right">Dự phòng</TableHead>
           </TableRow></TableHeader>
-          <TableBody>{filtered.slice(start, start + pageSize).map(row => <TableRow key={row.schedule.id}>
-            <TableCell className="whitespace-nowrap tabular-nums"><button type="button" className="settlement-person-link"
-              aria-label={`Xem chi phí đoàn ${row.schedule.campaign_code || row.schedule.company_name || formatDisplayDate(row.schedule.schedule_date)}`}
-              onClick={() => { setDetail(row); setDetailOpen(true); }}>{row.schedule.campaign_code || 'Chưa cấp mã đoàn'}</button></TableCell>
-            <TableCell className="font-medium">{row.schedule.company_name || 'Chưa có tên công ty'}</TableCell>
-            <TableCell className="whitespace-nowrap tabular-nums">{formatDisplayDate(row.schedule.schedule_date)}</TableCell>
-            <TableCell data-type={row.schedule.schedule_type}><Badge variant="secondary" className="settlement-campaign-type">{types.find(item => item.value === row.schedule.schedule_type)?.label}</Badge></TableCell>
-            <TableCell className="whitespace-nowrap">{ROSTER_BRANCH_LABELS[row.schedule.branch_code as 'q1' | 'q7'] ?? row.schedule.branch_code.toUpperCase()}</TableCell>
-            <TableCell className="is-right tabular-nums">{formatVndCurrency(row.baseCost)}</TableCell>
-            <TableCell className="is-right tabular-nums">{formatVndCurrency(row.allowanceCost)}</TableCell>
-            <TableCell className="is-right tabular-nums font-medium">{formatVndCurrency(row.totalCost)}</TableCell>
-            <TableCell className="is-right tabular-nums text-muted-foreground">{formatVndCurrency(row.reserve)}</TableCell>
-          </TableRow>)}</TableBody>
+          <TableBody>{filtered.slice(start, start + pageSize).map(row => {
+            const { schedule } = row;
+            const [codeMatch, companyMatch] = settlementMatches([schedule.campaign_code, schedule.company_name], keyword) ?? [];
+            return (
+              <TableRow key={schedule.id}>
+                <TableCell className="whitespace-nowrap tabular-nums"><button type="button" className="settlement-person-link"
+                  aria-label={`Xem chi phí đoàn ${schedule.campaign_code || schedule.company_name || formatDisplayDate(schedule.schedule_date)}`}
+                  onClick={() => { setDetail(row); setDetailOpen(true); }}><HighlightText text={schedule.campaign_code || 'Chưa cấp mã đoàn'} query={codeMatch} /></button></TableCell>
+                <TableCell className="font-medium"><HighlightText text={schedule.company_name || 'Chưa có tên công ty'} query={companyMatch} /></TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums">{formatDisplayDate(schedule.schedule_date)}</TableCell>
+                <TableCell data-type={schedule.schedule_type}><Badge variant="secondary" className="settlement-campaign-type">{types.find(item => item.value === schedule.schedule_type)?.label}</Badge></TableCell>
+                <TableCell className="whitespace-nowrap">{ROSTER_BRANCH_LABELS[schedule.branch_code as 'q1' | 'q7'] ?? schedule.branch_code.toUpperCase()}</TableCell>
+                <TableCell className="is-right tabular-nums">{formatVndCurrency(row.baseCost)}</TableCell>
+                <TableCell className="is-right tabular-nums">{formatVndCurrency(row.allowanceCost)}</TableCell>
+                <TableCell className="is-right tabular-nums font-medium">{formatVndCurrency(row.totalCost)}</TableCell>
+                <TableCell className="is-right tabular-nums text-muted-foreground">{formatVndCurrency(row.reserve)}</TableCell>
+              </TableRow>
+            );
+          })}</TableBody>
           <TableFooter><TableRow>
             <TableCell colSpan={5}>Tổng ({filtered.length} lịch đoàn)</TableCell>
             <TableCell className="is-right tabular-nums">{formatVndCurrency(totals.base)}</TableCell>
@@ -144,7 +151,7 @@ export function CampaignCostTable({ schedules, assignments, personnelList, month
     {!loading && !error && filtered.length > 0 && <div className="settlement-pagination">
       <p>Hiển thị {start + 1}–{Math.min(start + pageSize, filtered.length)} trong {filtered.length} lịch đoàn</p>
       <NumberedPagination currentPage={page} totalPages={totalPages} onPageChange={page => setPagination({ key, page })}
-        pageSize={pageSize} onPageSizeChange={value => { setPageSize(value); setPagination({ key: '', page: 1 }); }} label="Phân trang chi phí đoàn" />
+        pageSize={pageSize} onPageSizeChange={value => { setPageSize(value); setPagination(null); }} label="Phân trang chi phí đoàn" />
     </div>}
     <CampaignCostSheet row={detail} personnelMap={personnelMap} open={detailOpen && isActiveTab && detail?.schedule.schedule_date.slice(0, 7) === campaignMonth} onOpenChange={setDetailOpen} />
   </Card>;

@@ -21,7 +21,7 @@ interface InternalLinkEvent {
   preventDefault: () => void;
 }
 
-function navigateWithinApp(href: string) {
+export function navigateWithinApp(href: string, { replace = false }: { replace?: boolean } = {}) {
   const nextUrl = new URL(href, window.location.origin);
   const currentUrl = new URL(window.location.href);
 
@@ -33,7 +33,11 @@ function navigateWithinApp(href: string) {
     return;
   }
 
-  window.history.pushState(null, '', nextUrl);
+  if (replace) {
+    window.history.replaceState(window.history.state, '', nextUrl);
+  } else {
+    window.history.pushState(null, '', nextUrl);
+  }
   window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
   window.scrollTo({ top: 0, behavior: 'auto' });
 }

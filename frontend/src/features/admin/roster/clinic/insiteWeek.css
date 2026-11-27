@@ -228,24 +228,28 @@
 }
 .dym-week-assignment {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
   width: 100%;
-  border: 1px solid var(--color-rule);
-  border-inline-start: 3px solid hsl(var(--primary));
-  border-radius: 8px;
-  background: var(--color-paper-2);
+  min-width: 0;
+  border-radius: 4px;
+  line-height: 18px;
 }
 .dym-week-person {
   min-width: 0;
-  max-width: 100%;
-  white-space: normal;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dym-week-time {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 .dym-week-empty {
   display: flex;
@@ -376,11 +380,10 @@
   .dym-week-agenda-room > span {
     font-weight: 500;
   }
-  .dym-week-agenda-room p {
-    margin: 0 0 4px;
-  }
-  .dym-week-agenda-room p span {
-    color: var(--color-muted);
+  .dym-week-agenda-assignments {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
   }
   .dym-week-agenda-empty {
     margin: 0;
@@ -405,14 +408,6 @@
 @media (min-width: 768px) {
   .dym-week-controls > button,
   .dym-week-navigation > button { min-height: 40px; }
-}
-.dym-week-assignment [data-slot="badge"] {
-  border: 0;
-  border-radius: 4px;
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-  font-weight: 500;
 }
 .dym-week-table tfoot > tr > * {
   border-top: 1px solid var(--color-rule);
